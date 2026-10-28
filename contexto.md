@@ -87,4 +87,93 @@ Abre `http://localhost:5000`.
 - Confirmar que el deploy en Railway termine de arrancar una vez pase el incidente.
 - Ampliar el diccionario `SINONIMOS` con más jerga según lo que el usuario necesite
   buscar seguido.
-- Empaquetar y probar el `.exe` con PyInstaller.
+
+## Implementacion sesion 2026-10-28 (asientos contables) — HECHO
+
+- `desktop.py` eliminado, proyecto 100% web.
+- Deps agregadas: `SQLAlchemy`, `alembic`, `psycopg2-binary`, `python-dotenv`, `openpyxl`.
+- `DATABASE_URL` en `.env` local (ignorado) apuntando a Neon (region sa-east-1, pooler). **Pendiente**: setear `DATABASE_URL` como variable de entorno en Railway y **rotar la password** de `neondb_owner` porque el string original quedo en el transcript del chat.
+- `models.py`: `Asiento` + `AsientoLinea` con CHECK de partida doble a nivel DB.
+- `db.py`: engine y `SessionLocal`.
+- Alembic en `migrations/` con `env.py` que lee `DATABASE_URL` directo (sin pasar por `alembic.ini` por el `%` del connection string). Migracion inicial `ea9387279af4` aplicada en Neon.
+- Endpoints en `app.py`:
+  - `GET /asientos` listado (ultimos 200).
+  - `GET /asientos/nuevo` formulario.
+  - `POST /asientos` crear (JSON, valida: ≥2 lineas, cuenta en PCGE nivel 4-5, debe XOR haber, cuadre ±0.01, fecha no futura). Numero autogenerado `YYYY-MM-NNNN` por mes.
+  - `GET /asientos/<id>` detalle.
+  - `POST /asientos/<id>/reversa` crea asiento inverso (debe↔haber), marca original anulado. No se puede reversar una reversa, ni reversar algo ya anulado.
+  - `GET /asientos/<id>/excel` export openpyxl.
+  - `/buscar` acepta `solo_movimiento=1` para filtrar nivel 4-5 en el autocomplete.
+- Templates: `asientos_listado.html`, `asiento_form.html` (filas dinamicas, autocomplete con teclado, mutex debe/haber, totales en vivo, boton guardar bloqueado hasta cuadrar, atajo "cuadrar en ultima linea"), `asiento_detalle.html` (con boton reversa + export Excel). Nav agregada a `index.html`.
+- Smoke test local: creado asiento `2026-10-0001` (1000 debe 6011 / 1000 haber 1041), export Excel 5KB OK, reversa `2026-10-0002` OK.
+
+## Decisiones de la sesión 2026-10-28 (asientos contables)
+
+### Alcance acordado
+- Se **descarta la versión `.exe` desktop** — el proyecto queda **100% web**.
+  Pendiente: borrar `desktop.py` y quitar las instrucciones de PyInstaller de este
+  archivo y del README cuando se arranque la implementación.
+- Se implementará un módulo de **asientos contables con partida doble** reusando el
+  buscador existente para autocompletar cuentas en las líneas del asiento.
+
+### Stack para la parte de asientos
+- **BD**: Postgres en **Neon** (neon.tech, free tier). La cuenta ya la tiene el
+  usuario — falta pegar el `DATABASE_URL` al proyecto cuando se arranque la
+  implementación.
+- **ORM**: SQLAlchemy.
+- **Migraciones**: Alembic.
+- **Driver**: `psycopg2-binary`.
+- **Config**: `python-dotenv` + `.env` local (ignorado por git), `DATABASE_URL` como
+  variable de entorno en Railway.
+- Se descartó SQLite porque ya no hay `.exe` que lo justifique y Neon es Postgres puro
+  (no soporta SQLite).
+
+### Modelo de datos previsto
+- `asiento(id, numero, fecha, glosa, moneda default 'PEN', tipo_cambio default 1, created_at)`
+  - `numero` correlativo mensual tipo `2026-10-0001`, generado en backend dentro de
+    transacción.
+- `asiento_linea(id, asiento_id FK, orden, cuenta_codigo, glosa_linea, debe DECIMAL(15,2), haber DECIMAL(15,2))`
+  - Constraint a nivel BD: `CHECK ((debe > 0 AND haber = 0) OR (debe = 0 AND haber > 0))`.
+
+### Reglas de partida doble (validadas en backend, no solo UI)
+1. Mínimo 2 líneas por asiento.
+2. Cada línea: exactamente uno de `debe`/`haber` positivo, el otro = 0.
+3. `SUM(debe) == SUM(haber)` por asiento, tolerancia ±0.01.
+4. `cuenta_codigo` existe en PCGE **y** es cuenta de movimiento (nivel 4 o 5 — no
+   permitir asentar en agrupadoras de 2 dígitos).
+5. Fecha no futura (configurable).
+6. **No se edita** un asiento guardado: se anula con un asiento de reversa
+   (debe↔haber) que referencia al original. Simplifica auditoría y evita
+   versionado.
+
+### UX del formulario (planeada)
+- Tabla con filas dinámicas (agregar/eliminar).
+- Columna cuenta con autocomplete usando el endpoint `/buscar` existente.
+- Columnas debe/haber: al tipear en una, la otra se bloquea en esa fila.
+- Footer con totales en vivo (`Σ Debe | Σ Haber | Diferencia`), botón Guardar
+  deshabilitado hasta que cuadre.
+- Atajo "cuadrar en última línea".
+- Export a Excel (openpyxl) para asiento individual o rangos.
+
+### Orden de implementación (pendiente de arrancar)
+1. Deps + conexión SQLAlchemy en `app.py` + modelos + Alembic init.
+2. Primera migración contra Neon.
+3. `GET /asientos/nuevo` (formulario).
+4. `POST /asientos` con todas las validaciones.
+5. `GET /asientos` listado + `GET /asientos/<id>` detalle.
+6. Export Excel + reversa.
+
+### Fuera de alcance del MVP de asientos
+- Centros de costo / áreas / proyectos por línea.
+- Multi-moneda real con revaluación.
+- Libro Diario / Mayor / Balance de comprobación automáticos.
+- PLE SUNAT (formato oficial).
+- Multiempresa / periodos / cierre.
+
+### Infra / tooling
+- Se instaló **Playwright MCP** en el scope de usuario de Claude Code en esta laptop
+  (`claude mcp add playwright --scope user -- npx @playwright/mcp@latest`,
+  configurado en `C:\Users\crist\.claude.json`). Objetivo: permitir que Claude Code
+  maneje el navegador para flujos tipo "crear cuenta en Neon". Requiere **reiniciar
+  Claude Code** para que las herramientas `mcp__playwright__*` queden disponibles.
+  La primera invocación descarga Chromium (~150 MB).

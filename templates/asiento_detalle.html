@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Asiento {{ asiento.numero }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background: #f5f6f8; color: #222; }
+    h1 { font-size: 1.4rem; }
+    nav { margin-bottom: 1rem; }
+    .meta { background: #fff; padding: 1rem; border: 1px solid #ddd; margin-bottom: 1rem; }
+    .meta div { margin-bottom: .3rem; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { border: 1px solid #ddd; padding: .4rem .6rem; font-size: .9rem; text-align: left; }
+    th { background: #2c3e50; color: #fff; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tfoot td { font-weight: bold; background: #e8edf3; }
+    .btn { padding: .4rem .8rem; background: #2c3e50; color: #fff; text-decoration: none; border: none; border-radius: 3px; cursor: pointer; font-size: .9rem; }
+    .btn.warn { background: #c0392b; }
+    .badge { padding: .15rem .5rem; border-radius: 3px; font-size: .8rem; }
+    .badge.ok { background: #27ae60; color: #fff; }
+    .badge.anul { background: #c0392b; color: #fff; }
+    .badge.rev { background: #e67e22; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>Asiento {{ asiento.numero }}
+    {% if asiento.reversa_de_id %}<span class="badge rev">REVERSA</span>
+    {% elif asiento.anulado_por_id %}<span class="badge anul">ANULADO</span>
+    {% else %}<span class="badge ok">VIGENTE</span>{% endif %}
+  </h1>
+  <nav>
+    <a href="/asientos">&larr; Volver al listado</a> |
+    <a href="/asientos/nuevo">+ Nuevo</a> |
+    <a href="/asientos/{{ asiento.id }}/excel" class="btn">Exportar Excel</a>
+    {% if not asiento.reversa_de_id and not asiento.anulado_por_id %}
+      <button class="btn warn" onclick="hacerReversa({{ asiento.id }})">Anular (crear reversa)</button>
+    {% endif %}
+  </nav>
+  <div class="meta">
+    <div><strong>Fecha:</strong> {{ asiento.fecha }}</div>
+    <div><strong>Glosa:</strong> {{ asiento.glosa }}</div>
+    <div><strong>Moneda:</strong> {{ asiento.moneda }} (TC {{ asiento.tipo_cambio }})</div>
+    {% if asiento.reversa_de_id %}<div><strong>Reversa de:</strong> <a href="/asientos/{{ asiento.reversa_de_id }}">asiento #{{ asiento.reversa_de_id }}</a></div>{% endif %}
+    {% if asiento.anulado_por_id %}<div><strong>Anulado por:</strong> <a href="/asientos/{{ asiento.anulado_por_id }}">asiento #{{ asiento.anulado_por_id }}</a></div>{% endif %}
+  </div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Cuenta</th><th>Descripcion</th><th>Glosa linea</th><th>Debe</th><th>Haber</th></tr>
+    </thead>
+    <tbody>
+      {% for l in lineas %}
+      <tr {% if l.es_titulo %}style="background:#f0f0f0;font-weight:bold;"{% endif %}>
+        <td>{{ l.orden }}</td>
+        <td>{{ l.cuenta_codigo }}</td>
+        <td>{{ l.cuenta_desc }}</td>
+        <td>{{ l.glosa_linea }}</td>
+        <td class="num">{% if not l.es_titulo %}{{ '%.2f'|format(l.debe) }}{% endif %}</td>
+        <td class="num">{% if not l.es_titulo %}{{ '%.2f'|format(l.haber) }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="4" style="text-align:right;">TOTAL</td>
+        <td class="num">{{ '%.2f'|format(total_debe) }}</td>
+        <td class="num">{{ '%.2f'|format(total_haber) }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  <script>
+    function hacerReversa(id) {
+      if (!confirm('Crear asiento de reversa? Esta accion no se puede deshacer.')) return;
+      fetch('/asientos/' + id + '/reversa', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            alert('Reversa creada: ' + d.numero);
+            location.reload();
+          } else {
+            alert('Error: ' + (d.error || JSON.stringify(d)));
+          }
+        });
+    }
+  </script>
+</body>
+</html>

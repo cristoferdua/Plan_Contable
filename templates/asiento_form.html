@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Nuevo asiento - Libro Diario (Formato SUNAT 5.1)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 1.5rem; background: #f5f6f8; color: #222; }
+    h1 { font-size: 1.3rem; }
+    nav { margin-bottom: 1rem; }
+    .card { background: #fff; padding: 1rem; border: 1px solid #ccc; margin-bottom: 1rem; }
+    label { display: block; font-size: .75rem; color: #555; margin-bottom: .2rem; }
+    input, textarea, select { padding: .35rem; font-size: .85rem; box-sizing: border-box; }
+    .cabecera { display: grid; grid-template-columns: 130px 90px 90px 130px 150px 150px 1fr; gap: .6rem; }
+    .cabecera input, .cabecera select { width: 100%; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #999; }
+    th, td { border: 1px solid #bbb; padding: .25rem .4rem; font-size: .82rem; vertical-align: middle; }
+    th { background: #2c3e50; color: #fff; font-weight: normal; text-align: center; }
+    td.c { text-align: center; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td input, td textarea { width: 100%; border: none; outline: none; background: transparent; font-size: .82rem; padding: .15rem; }
+    tr.titulo td { background: #eef1f5; font-weight: bold; color: #333; }
+    tr.glosa td { background: #fffbea; font-style: italic; }
+    tfoot td { font-weight: bold; background: #e8edf3; }
+    .btn { padding: .4rem .8rem; background: #2c3e50; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: .85rem; }
+    .btn:disabled { background: #999; cursor: not-allowed; }
+    .btn.sec { background: #7f8c8d; }
+    .btn.dh { padding: .15rem .4rem; width: 100%; }
+    .btn.dh.d { background: #2c3e50; }
+    .btn.dh.h { background: #e67e22; }
+    .suggest { position: absolute; background: #fff; border: 1px solid #999; max-height: 180px; overflow: auto; z-index: 10; font-size: .78rem; min-width: 320px; }
+    .suggest div { padding: .25rem .4rem; cursor: pointer; }
+    .suggest div:hover, .suggest div.active { background: #e8edf3; }
+    .suggest .codigo { font-weight: bold; margin-right: .4rem; }
+    .suggest .nivel { color: #888; font-size: .7rem; margin-left: .3rem; }
+    .errores { background: #fdecea; border: 1px solid #c0392b; padding: .6rem; margin-bottom: 1rem; color: #c0392b; }
+    .errores ul { margin: .3rem 0 0 1.2rem; }
+    .acciones { display: flex; gap: .5rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
+    .diff-ok { color: #27ae60; }
+    .diff-bad { color: #c0392b; }
+  </style>
+</head>
+<body>
+  <h1>Formato 5.1: "Libro Diario" &mdash; Nuevo asiento</h1>
+  <nav>
+    <a href="/">Buscador</a> |
+    <a href="/asientos">Asientos</a>
+  </nav>
+
+  <div id="errores" class="errores" style="display:none;"></div>
+
+  <div class="card">
+    <div class="cabecera">
+      <div><label>Fecha de la operacion</label><input type="date" id="fecha" value="{{ hoy }}" max="{{ hoy }}"></div>
+      <div><label>Cod. libro</label><input type="text" id="codigo_libro" placeholder="5" maxlength="10"></div>
+      <div><label>N&deg; correlativo</label><input type="text" id="numero_correlativo" placeholder="001" maxlength="20"></div>
+      <div><label>N&deg; documento</label><input type="text" id="numero_documento" placeholder="F001-1234" maxlength="30"></div>
+      <div><label>Moneda</label><select id="moneda"><option value="PEN">PEN</option><option value="USD">USD</option></select></div>
+      <div><label>Tipo cambio</label><input type="number" id="tipo_cambio" step="0.0001" value="1"></div>
+      <div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table id="tabla">
+      <thead>
+        <tr>
+          <th style="width:28px;">#</th>
+          <th style="width:95px;">Codigo</th>
+          <th>Denominacion</th>
+          <th style="width:55px;">D/H</th>
+          <th style="width:110px;">Monto</th>
+          <th style="width:110px;">Debe</th>
+          <th style="width:110px;">Haber</th>
+          <th style="width:28px;"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5" style="text-align:right;">TOTALES</td>
+          <td class="num" id="td-debe">0.00</td>
+          <td class="num" id="td-haber">0.00</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td colspan="5" style="text-align:right;">DIFERENCIA</td>
+          <td class="num" colspan="2" id="td-diff">0.00</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="acciones">
+      <button class="btn sec" onclick="agregarFila(false)">+ Linea de cuenta</button>
+      <button class="btn sec" onclick="agregarFila(true)">+ Titulo (nivel 2-3)</button>
+      <button class="btn sec" onclick="cuadrarUltima()">Cuadrar en ultima linea</button>
+      <button class="btn" id="btn-guardar" onclick="guardar()" disabled>Guardar asiento</button>
+    </div>
+    <p style="font-size:.8rem;color:#666;margin-top:.5rem;">
+      La <strong>glosa del asiento</strong> va abajo, al final de todas las lineas de cuenta (como en el formato SUNAT).
+    </p>
+  </div>
+
+  <div class="card">
+    <label style="font-size:.9rem;font-weight:bold;">Glosa del asiento (concepto / descripcion de la operacion)</label>
+    <textarea id="glosa" rows="2" style="width:100%;" placeholder="Ej: Por aumento de capital de Jose Perez"></textarea>
+  </div>
+
+  <script>
+    let autoId = 0;
+    const tbody = document.getElementById('tbody');
+
+    function money(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function agregarFila(soloTitulo) {
+      const id = ++autoId;
+      const tr = document.createElement('tr');
+      tr.dataset.id = id;
+      tr.dataset.titulo = soloTitulo ? '1' : '0';
+      if (soloTitulo) tr.classList.add('titulo');
+      tr.innerHTML = `
+        <td class="c orden"></td>
+        <td style="position:relative;">
+          <input class="in-cuenta" placeholder="Buscar..." autocomplete="off">
+          <div class="suggest" style="display:none;"></div>
+        </td>
+        <td class="desc-cuenta" style="color:#555;"></td>
+        <td class="c">${soloTitulo ? '' : '<button type="button" class="btn dh d" data-val="D">D</button>'}</td>
+        <td class="num">${soloTitulo ? '' : '<input class="in-monto" type="number" step="0.01" min="0" placeholder="0.00">'}</td>
+        <td class="num celda-debe">${soloTitulo ? '' : '0.00'}</td>
+        <td class="num celda-haber">${soloTitulo ? '' : '0.00'}</td>
+        <td class="c"><button class="btn sec" style="padding:.1rem .35rem;" onclick="eliminarFila(this)">X</button></td>
+      `;
+      tbody.appendChild(tr);
+      wireFila(tr);
+      renumerar();
+      recalc();
+      return tr;
+    }
+
+    function eliminarFila(btn) { btn.closest('tr').remove(); renumerar(); recalc(); }
+    function renumerar() {
+      Array.from(tbody.children).forEach((tr, i) => {
+        tr.querySelector('.orden').textContent = (i + 1);
+      });
+    }
+
+    function wireFila(tr) {
+      const esTitulo = tr.dataset.titulo === '1';
+      const cuenta = tr.querySelector('.in-cuenta');
+      const suggest = tr.querySelector('.suggest');
+
+      if (!esTitulo) {
+        const monto = tr.querySelector('.in-monto');
+        const btnDH = tr.querySelector('.btn.dh');
+        function pintarDH() {
+          const esDebe = btnDH.dataset.val === 'D';
+          btnDH.textContent = esDebe ? 'D' : 'H';
+          btnDH.classList.toggle('d', esDebe);
+          btnDH.classList.toggle('h', !esDebe);
+        }
+        function recalcFila() {
+          const m = parseFloat(monto.value) || 0;
+          const esDebe = btnDH.dataset.val === 'D';
+          tr.querySelector('.celda-debe').textContent = money(esDebe ? m : 0);
+          tr.querySelector('.celda-haber').textContent = money(esDebe ? 0 : m);
+        }
+        btnDH.addEventListener('click', () => {
+          btnDH.dataset.val = btnDH.dataset.val === 'D' ? 'H' : 'D';
+          pintarDH(); recalcFila(); recalc();
+        });
+        monto.addEventListener('input', () => { recalcFila(); recalc(); });
+      }
+
+      let timer = null;
+      let activeIdx = -1;
+      cuenta.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = cuenta.value.trim();
+        if (!q) { suggest.style.display = 'none'; tr.querySelector('.desc-cuenta').textContent = ''; return; }
+        timer = setTimeout(() => buscarCuenta(q, suggest, cuenta, tr, esTitulo), 200);
+      });
+      cuenta.addEventListener('keydown', (e) => {
+        const items = suggest.querySelectorAll('div');
+        if (suggest.style.display === 'none' || items.length === 0) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx + 1) % items.length; }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx - 1 + items.length) % items.length; }
+        else if (e.key === 'Enter') { e.preventDefault(); if (activeIdx >= 0) items[activeIdx].click(); }
+        else if (e.key === 'Escape') { suggest.style.display = 'none'; return; }
+        items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+      });
+      cuenta.addEventListener('blur', () => { setTimeout(() => suggest.style.display = 'none', 200); });
+    }
+
+    function buscarCuenta(q, suggestEl, cuentaEl, tr, esTitulo) {
+      const soloMov = esTitulo ? '' : '&solo_movimiento=1';
+      fetch('/buscar?q=' + encodeURIComponent(q) + soloMov)
+        .then(r => r.json())
+        .then(d => {
+          const items = d.resultados.slice(0, 15);
+          if (items.length === 0) { suggestEl.style.display = 'none'; return; }
+          suggestEl.innerHTML = items.map(r =>
+            `<div data-codigo="${r.codigo}" data-desc="${escapeHtml(r.descripcion)}"><span class="codigo">${r.codigo}</span>${escapeHtml(r.descripcion)}<span class="nivel">(N${r.nivel})</span></div>`
+          ).join('');
+          suggestEl.style.display = 'block';
+          suggestEl.querySelectorAll('div').forEach(el => {
+            el.addEventListener('click', () => {
+              cuentaEl.value = el.dataset.codigo;
+              if (tr) tr.querySelector('.desc-cuenta').textContent = el.dataset.desc;
+              suggestEl.style.display = 'none';
+            });
+          });
+        });
+    }
+
+    function recalc() {
+      let td = 0, th = 0, nMov = 0;
+      Array.from(tbody.children).forEach(tr => {
+        if (tr.dataset.titulo === '1') return;
+        const m = parseFloat(tr.querySelector('.in-monto').value) || 0;
+        if (m > 0) nMov++;
+        const esDebe = tr.querySelector('.btn.dh').dataset.val === 'D';
+        td += esDebe ? m : 0;
+        th += esDebe ? 0 : m;
+      });
+      document.getElementById('td-debe').textContent = money(td);
+      document.getElementById('td-haber').textContent = money(th);
+      const diff = td - th;
+      const diffEl = document.getElementById('td-diff');
+      diffEl.textContent = money(diff);
+      diffEl.className = 'num ' + (Math.abs(diff) < 0.005 && td > 0 ? 'diff-ok' : 'diff-bad');
+      document.getElementById('btn-guardar').disabled = !(Math.abs(diff) < 0.005 && td > 0 && nMov >= 2);
+    }
+
+    function cuadrarUltima() {
+      const filasMov = Array.from(tbody.children).filter(tr => tr.dataset.titulo === '0');
+      if (filasMov.length === 0) return;
+      let td = 0, th = 0;
+      filasMov.slice(0, -1).forEach(tr => {
+        const m = parseFloat(tr.querySelector('.in-monto').value) || 0;
+        const esDebe = tr.querySelector('.btn.dh').dataset.val === 'D';
+        td += esDebe ? m : 0;
+        th += esDebe ? 0 : m;
+      });
+      const ult = filasMov[filasMov.length - 1];
+      const diff = td - th;
+      if (Math.abs(diff) < 0.005) return;
+      const monto = ult.querySelector('.in-monto');
+      const btnDH = ult.querySelector('.btn.dh');
+      btnDH.dataset.val = diff > 0 ? 'H' : 'D';
+      monto.value = money(Math.abs(diff));
+      btnDH.classList.toggle('d', btnDH.dataset.val === 'D');
+      btnDH.classList.toggle('h', btnDH.dataset.val === 'H');
+      btnDH.textContent = btnDH.dataset.val;
+      monto.dispatchEvent(new Event('input'));
+    }
+
+    function guardar() {
+      const lineas = Array.from(tbody.children).map(tr => {
+        const esTitulo = tr.dataset.titulo === '1';
+        if (esTitulo) {
+          return {
+            cuenta_codigo: tr.querySelector('.in-cuenta').value.trim(),
+            glosa_linea: '',
+            debe: 0,
+            haber: 0,
+          };
+        }
+        const m = parseFloat(tr.querySelector('.in-monto').value) || 0;
+        const esDebe = tr.querySelector('.btn.dh').dataset.val === 'D';
+        return {
+          cuenta_codigo: tr.querySelector('.in-cuenta').value.trim(),
+          glosa_linea: '',
+          debe: esDebe ? m : 0,
+          haber: esDebe ? 0 : m,
+        };
+      });
+      const payload = {
+        fecha: document.getElementById('fecha').value,
+        glosa: document.getElementById('glosa').value.trim(),
+        moneda: document.getElementById('moneda').value,
+        tipo_cambio: document.getElementById('tipo_cambio').value || '1',
+        codigo_libro: document.getElementById('codigo_libro').value.trim(),
+        numero_correlativo: document.getElementById('numero_correlativo').value.trim(),
+        numero_documento: document.getElementById('numero_documento').value.trim(),
+        lineas,
+      };
+      const errBox = document.getElementById('errores');
+      errBox.style.display = 'none';
+      const btn = document.getElementById('btn-guardar');
+      btn.disabled = true;
+      fetch('/asientos', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      })
+      .then(r => r.json().then(d => ({ status: r.status, body: d })))
+      .then(({ status, body }) => {
+        if (status === 200 && body.ok) {
+          location.href = '/asientos/' + body.id;
+        } else {
+          errBox.style.display = 'block';
+          errBox.innerHTML = '<strong>No se pudo guardar:</strong><ul>' +
+            (body.errores || [body.error || 'error desconocido']).map(e => '<li>' + escapeHtml(e) + '</li>').join('') +
+            '</ul>';
+          btn.disabled = false;
+        }
+      });
+    }
+
+    agregarFila(false);
+    agregarFila(false);
+  </script>
+</body>
+</html>

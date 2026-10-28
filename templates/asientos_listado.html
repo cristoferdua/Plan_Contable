@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Asientos contables</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background: #f5f6f8; color: #222; }
+    h1 { font-size: 1.4rem; }
+    nav { margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { border: 1px solid #ddd; padding: .4rem .6rem; font-size: .9rem; text-align: left; }
+    th { background: #2c3e50; color: #fff; }
+    tr.anulado td { text-decoration: line-through; color: #888; }
+    tr.reversa td { background: #fff6e5; }
+    .btn { display: inline-block; padding: .4rem .8rem; background: #2c3e50; color: #fff; text-decoration: none; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>Asientos contables</h1>
+  <nav>
+    <a href="/">Buscador</a> |
+    <a href="/asientos">Asientos</a> |
+    <a href="/asientos/nuevo" class="btn">+ Nuevo asiento</a>
+  </nav>
+  <table>
+    <thead>
+      <tr>
+        <th>Numero</th><th>Fecha</th><th>Glosa</th><th>Moneda</th>
+        <th style="text-align:right;">Monto</th><th>Estado</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in asientos %}
+      <tr class="{% if a.anulado_por_id %}anulado{% endif %}{% if a.reversa_de_id %} reversa{% endif %}">
+        <td>{{ a.numero }}</td>
+        <td>{{ a.fecha }}</td>
+        <td>{{ a.glosa }}</td>
+        <td>{{ a.moneda }}</td>
+        <td style="text-align:right;">{{ '%.2f'|format(totales[a.id]) }}</td>
+        <td>
+          {% if a.reversa_de_id %}Reversa{% elif a.anulado_por_id %}Anulado{% else %}Vigente{% endif %}
+        </td>
+        <td><a href="/asientos/{{ a.id }}">Ver</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7">Sin asientos registrados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
