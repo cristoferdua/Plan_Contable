@@ -294,6 +294,329 @@ html[data-theme="dark"] .empty-state h3 { color: #e5eaf0; }
 html[data-theme="dark"] .empty-state .empty-icon { background: linear-gradient(135deg, #192432 0%, #1f2a3a 100%); color: #5a9ad1; }
 
 /* ========================================
+   DARK MODE — fixes para cards con fondo blanco inline en templates
+   (balance, dashboard, reporte anual, cierres, entidades, importar, por-ruc)
+   ======================================== */
+html[data-theme="dark"] body { background: #0f1419 !important; }
+
+/* Cards con fondo blanco inline en balance_comprobacion, dashboard, etc. */
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .filters-card,
+html[data-theme="dark"] .balance-card,
+html[data-theme="dark"] .mes-card,
+html[data-theme="dark"] .cierre-card,
+html[data-theme="dark"] .entidad-card,
+html[data-theme="dark"] .importar-card,
+html[data-theme="dark"] .ventas-compras-card {
+  background: #1a2129 !important;
+  color: #e5eaf0 !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,.4) !important;
+  border-color: #2a3340 !important;
+}
+
+/* Textos secundarios dentro de stat-cards */
+html[data-theme="dark"] .stat-label,
+html[data-theme="dark"] .stat-sub,
+html[data-theme="dark"] .mes-sub,
+html[data-theme="dark"] .section-head h3 {
+  color: #8a95a4 !important;
+}
+html[data-theme="dark"] .stat-value,
+html[data-theme="dark"] .mes-monto,
+html[data-theme="dark"] .mes-nombre {
+  color: #e5eaf0 !important;
+}
+
+/* Stat-icon color de fondo (los chips cuadrados) */
+html[data-theme="dark"] .stat-icon {
+  background: #253040 !important;
+  color: #a4c2e5 !important;
+}
+html[data-theme="dark"] .stat-icon.c-blue { background: #1e3a52 !important; color: #a4c2e5 !important; }
+html[data-theme="dark"] .stat-icon.c-green { background: #1a3a26 !important; color: #86d4a3 !important; }
+html[data-theme="dark"] .stat-icon.c-orange { background: #3a2f1e !important; color: #f3d3a3 !important; }
+html[data-theme="dark"] .stat-icon.c-purple { background: #2d1e3a !important; color: #c7a4e5 !important; }
+
+/* Status chips (balance "cuadran correctamente", etc.) */
+html[data-theme="dark"] .status-chip.ok,
+html[data-theme="dark"] .big-chip.ok,
+html[data-theme="dark"] .chip-mes.ok {
+  background: #1a3a26 !important; color: #86d4a3 !important;
+}
+html[data-theme="dark"] .status-chip.bad,
+html[data-theme="dark"] .big-chip.bad,
+html[data-theme="dark"] .chip-mes.bad {
+  background: #3a1e1a !important; color: #f1a9a0 !important;
+}
+html[data-theme="dark"] .big-chip.empty,
+html[data-theme="dark"] .chip-mes.empty {
+  background: #253040 !important; color: #8a95a4 !important; border-color: #2a3340 !important;
+}
+html[data-theme="dark"] .chip-mes.cerrado {
+  background: #3a2f1e !important; color: #f3d3a3 !important;
+}
+
+/* Elem-pill en tablas */
+html[data-theme="dark"] .elem-pill {
+  background: #253040 !important; color: #a4c2e5 !important;
+}
+
+/* tfoot con fondo claro */
+html[data-theme="dark"] tfoot td,
+html[data-theme="dark"] .balance-table tfoot td,
+html[data-theme="dark"] .tabla tfoot td {
+  background: #141b23 !important;
+  color: #e5eaf0 !important;
+  border-color: #2a3340 !important;
+}
+
+/* Links tipo "Ver detalle →" en cards */
+html[data-theme="dark"] .stat-card a,
+html[data-theme="dark"] .mes-links a {
+  color: #a4c2e5 !important;
+  background: #253040 !important;
+}
+html[data-theme="dark"] .mes-links a:hover {
+  background: #2c3b4e !important; color: #e5eaf0 !important;
+}
+
+/* Quick-link en dashboard */
+html[data-theme="dark"] .quick-link {
+  background: #1a2129 !important;
+  border-color: #2a3340 !important;
+  color: #e5eaf0 !important;
+}
+html[data-theme="dark"] .quick-link:hover {
+  border-color: #5a9ad1 !important;
+  background: #1f2832 !important;
+}
+html[data-theme="dark"] .quick-link strong { color: #e5eaf0 !important; }
+html[data-theme="dark"] .quick-link span.ds { color: #8a95a4 !important; }
+
+/* Barra Ventas vs Compras: fondos pastel se vuelven oscuros */
+html[data-theme="dark"] .vs-bar-ventas,
+html[data-theme="dark"] .vs-bar-compras {
+  background: #253040 !important;
+}
+
+/* Hero gradientes y última operación */
+html[data-theme="dark"] .hero {
+  background: linear-gradient(135deg, #0a1118 0%, #1a2838 100%) !important;
+  color: #e5eaf0 !important;
+}
+html[data-theme="dark"] .big-chip.ok { border-color: #86d4a3 !important; }
+html[data-theme="dark"] .big-chip.bad { border-color: #f1a9a0 !important; }
+
+/* --- cards y contenedores genericos usados en reporte_anual, cierres,
+   entidades, importar, reporte_por_ruc, libro_mayor, asiento_detalle --- */
+html[data-theme="dark"] .wrap > .card,
+html[data-theme="dark"] .filters,
+html[data-theme="dark"] .tbl-card,
+html[data-theme="dark"] .asiento-prev,
+html[data-theme="dark"] .empty-state {
+  background: #1a2129 !important;
+  color: #e5eaf0 !important;
+  border-color: #2a3340 !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,.4) !important;
+}
+
+/* Cabeceras internas con fondo claro (lines-head, card-head, tbl-head, ap-head) */
+html[data-theme="dark"] .tbl-head,
+html[data-theme="dark"] .lines-head,
+html[data-theme="dark"] .asiento-prev .ap-head {
+  background: #141b23 !important;
+  color: #e5eaf0 !important;
+  border-color: #2a3340 !important;
+}
+
+/* Botones secundarios de accion (reabrir, ver, act) con fondo blanco */
+html[data-theme="dark"] .btn-reabrir,
+html[data-theme="dark"] .btn-ver,
+html[data-theme="dark"] .btn-act {
+  background: #253040 !important;
+  color: #a4c2e5 !important;
+  border-color: #2a3340 !important;
+}
+html[data-theme="dark"] .btn-reabrir:hover,
+html[data-theme="dark"] .btn-ver:hover,
+html[data-theme="dark"] .btn-act:hover {
+  background: #2c3b4e !important;
+  color: #e5eaf0 !important;
+}
+html[data-theme="dark"] .op-btn.danger {
+  background: #253040 !important;
+  color: #f1a9a0 !important;
+  border-color: #3a1e1a !important;
+}
+
+/* Chips pastel: warn / bad / cerrado */
+html[data-theme="dark"] .pill.warn,
+html[data-theme="dark"] .status.reversa {
+  background: #3a2f1e !important; color: #f3d3a3 !important;
+}
+html[data-theme="dark"] .pill.bad,
+html[data-theme="dark"] .status.anulado,
+html[data-theme="dark"] .balance-chip.bad,
+html[data-theme="dark"] .badge-cerrado,
+html[data-theme="dark"] .pill-bad {
+  background: #3a1e1a !important; color: #f1a9a0 !important;
+}
+
+/* Lista de errores en importar */
+html[data-theme="dark"] .err-list {
+  background: #2a1816 !important;
+  color: #f8ccc5 !important;
+  border-color: #c0392b !important;
+}
+
+/* Fila con error en formulario de asiento */
+html[data-theme="dark"] tbody tr.fila-error td.celda-cuenta {
+  background: #2a1816 !important;
+}
+
+/* Niveles 5 (naranja claro) en index */
+html[data-theme="dark"] .nivel-badge.n5 { background: #3a2f1e !important; color: #f3d3a3 !important; }
+
+/* --- Libro Mayor: cuenta-card, cuenta-head (gradiente azul claro) --- */
+html[data-theme="dark"] .cuenta-card {
+  background: #1a2129 !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,.4) !important;
+}
+html[data-theme="dark"] .cuenta-head {
+  background: linear-gradient(90deg, #192432 0%, #1f2a3a 100%) !important;
+  border-color: #2a3340 !important;
+}
+html[data-theme="dark"] .cuenta-codigo { color: #a4c2e5 !important; }
+html[data-theme="dark"] .cuenta-desc { color: #e5eaf0 !important; }
+html[data-theme="dark"] .cuenta-stat .lbl { color: #8a95a4 !important; }
+html[data-theme="dark"] .cuenta-stat .val { color: #e5eaf0 !important; }
+html[data-theme="dark"] .cuenta-stat.debe .val { color: #a4c2e5 !important; }
+html[data-theme="dark"] .cuenta-stat.haber .val { color: #86d4a3 !important; }
+html[data-theme="dark"] .cuenta-stat.saldo .val.pos { color: #a4c2e5 !important; }
+html[data-theme="dark"] .cuenta-stat.saldo .val.neg { color: #f1a9a0 !important; }
+html[data-theme="dark"] table.movs thead th {
+  background: #141b23 !important; color: #8a95a4 !important; border-color: #2a3340 !important;
+}
+html[data-theme="dark"] table.movs tbody td { border-color: #202830 !important; }
+html[data-theme="dark"] table.movs tbody tr:hover td { background: #253040 !important; }
+html[data-theme="dark"] .mov-link { color: #a4c2e5 !important; }
+
+/* --- Chips de iconos pastel (c-blue, c-green, c-orange, c-purple) --- */
+html[data-theme="dark"] .c-blue,
+html[data-theme="dark"] .stat-icon.c-blue { background: #1e3a52 !important; color: #a4c2e5 !important; }
+html[data-theme="dark"] .c-green,
+html[data-theme="dark"] .stat-icon.c-green { background: #1a3a26 !important; color: #86d4a3 !important; }
+html[data-theme="dark"] .c-orange,
+html[data-theme="dark"] .stat-icon.c-orange { background: #3a2f1e !important; color: #f3d3a3 !important; }
+html[data-theme="dark"] .stat-icon.c-purple { background: #2d1e3a !important; color: #c7a4e5 !important; }
+
+/* --- Pills ok / status vigente / balance-chip ok / pill-ok --- */
+html[data-theme="dark"] .pill.ok,
+html[data-theme="dark"] .status.vigente,
+html[data-theme="dark"] .balance-chip.ok,
+html[data-theme="dark"] .pill-ok,
+html[data-theme="dark"] .chip-mes.cuadra {
+  background: #1a3a26 !important; color: #86d4a3 !important;
+}
+
+/* --- Links tipo "Ver" en mes-card (azul claro con fondo blanco) --- */
+html[data-theme="dark"] .mes-links a {
+  background: #253040 !important;
+  color: #a4c2e5 !important;
+}
+
+/* --- Mes-card bordes de color segun estado --- */
+html[data-theme="dark"] .mes-card.cuadra { border-left-color: #86d4a3 !important; }
+html[data-theme="dark"] .mes-card.descuadra { border-left-color: #f1a9a0 !important; }
+html[data-theme="dark"] .mes-diff { color: #f1a9a0 !important; }
+
+/* --- Suggest dropdown en formulario de asiento --- */
+html[data-theme="dark"] .suggest div:hover,
+html[data-theme="dark"] .suggest div.active { background: #253040 !important; }
+
+/* --- Estado ok/bad en formulario --- */
+html[data-theme="dark"] .estado.ok { background: #1a3a26 !important; color: #86d4a3 !important; }
+html[data-theme="dark"] .estado.bad { background: #3a1e1a !important; color: #f1a9a0 !important; }
+
+/* --- Empty state body text --- */
+html[data-theme="dark"] .empty-state p,
+html[data-theme="dark"] .empty-state span { color: #8a95a4 !important; }
+
+/* --- Botones Excel / Filtrar / Aplicar siguen con sus colores primarios --- */
+html[data-theme="dark"] .btn.primary,
+html[data-theme="dark"] button.primary { background: #2c5282 !important; color: #fff !important; border-color: #2c5282 !important; }
+
+/* --- Chip mixto en listado de operaciones --- */
+html[data-theme="dark"] .chip-mixto {
+  background: linear-gradient(90deg, #1a3a26 0%, #3a2f1e 100%) !important;
+  border-color: #2a3340 !important;
+  color: #e5eaf0 !important;
+}
+html[data-theme="dark"] .chip-mixto strong { color: #86d4a3 !important; }
+html[data-theme="dark"] .chip-mixto strong:last-of-type { color: #f3d3a3 !important; }
+html[data-theme="dark"] .chip-mixto .ic { color: #f3d3a3 !important; }
+html[data-theme="dark"] .chip-mixto.chip-saldada {
+  background: linear-gradient(90deg, #1a3a26 0%, #223a2c 100%) !important;
+  border-color: #86d4a3 !important; color: #86d4a3 !important;
+}
+html[data-theme="dark"] .chip-mixto.chip-saldada strong { color: #86d4a3 !important; }
+html[data-theme="dark"] .chip-mixto.chip-saldada .ic { color: #86d4a3 !important; }
+
+/* Sugerencia Debe/Haber en formulario de asiento */
+html[data-theme="dark"] td.lado-sugerido {
+  background: linear-gradient(90deg, rgba(134,212,163,.12) 0%, rgba(134,212,163,.04) 100%) !important;
+  box-shadow: inset 2px 0 0 #86d4a3 !important;
+}
+html[data-theme="dark"] td.lado-sugerido .cell-input {
+  border-color: #1e8449 !important;
+  background: rgba(26,58,38,.4) !important;
+  color: #86d4a3 !important;
+}
+html[data-theme="dark"] td.lado-sugerido .cell-input:focus {
+  background: #141b23 !important;
+  box-shadow: 0 0 0 3px rgba(134,212,163,.2) !important;
+}
+html[data-theme="dark"] td.lado-sugerido::after { color: #86d4a3 !important; }
+html[data-theme="dark"] td.lado-opuesto .cell-input {
+  background: #141b23 !important;
+  opacity: .4 !important;
+}
+html[data-theme="dark"] td.lado-opuesto .cell-input:focus { opacity: 1 !important; background: #1a2129 !important; }
+html[data-theme="dark"] .ms-modal {
+  background: #1a2129 !important; color: #e5eaf0 !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,.75) !important;
+}
+html[data-theme="dark"] .ms-head { background: linear-gradient(135deg, #0a1118 0%, #1a2838 100%) !important; }
+html[data-theme="dark"] .ms-body { background: #1a2129 !important; }
+html[data-theme="dark"] .ms-foot { background: #141b23 !important; border-top-color: #2a3340 !important; }
+html[data-theme="dark"] .ms-modal h3 { color: #fff !important; }
+html[data-theme="dark"] .ms-sub-box {
+  background: #141b23 !important; border-color: #2a3340 !important; color: #a4c2e5 !important;
+}
+html[data-theme="dark"] .ms-sub-box .saldo-val { color: #f3d3a3 !important; }
+html[data-theme="dark"] .ms-modal label { color: #8a95a4 !important; }
+html[data-theme="dark"] .ms-modal input {
+  background: #141b23 !important; color: #e5eaf0 !important; border-color: #2a3340 !important;
+}
+html[data-theme="dark"] .ms-modal input#ms-monto { color: #a4c2e5 !important; }
+html[data-theme="dark"] .ms-modal input:focus {
+  border-color: #5a9ad1 !important; box-shadow: 0 0 0 3px rgba(90,154,209,.2) !important;
+}
+html[data-theme="dark"] .ms-medio-opt {
+  background: #141b23 !important; border-color: #2a3340 !important; color: #a4c2e5 !important;
+}
+html[data-theme="dark"] .ms-medio-opt:hover { background: #253040 !important; border-color: #5a9ad1 !important; }
+html[data-theme="dark"] .ms-medio-opt.active {
+  background: #1e3a52 !important; border-color: #5a9ad1 !important; color: #e5eaf0 !important;
+}
+html[data-theme="dark"] .ms-medio-opt .ic { color: #8a95a4 !important; }
+html[data-theme="dark"] .ms-medio-opt.active .ic { color: #a4c2e5 !important; }
+html[data-theme="dark"] .ms-modal .btn-cancel {
+  background: #253040 !important; color: #e5eaf0 !important; border-color: #2a3340 !important;
+}
+html[data-theme="dark"] .ms-modal .btn-cancel:hover { background: #2c3b4e !important; }
+
+/* ========================================
    PRINT STYLES
    ======================================== */
 @media print {

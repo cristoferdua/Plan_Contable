@@ -76,7 +76,114 @@
       transition: all .22s cubic-bezier(.2,.9,.3,1);
     }
     .op-item.open .op-ver .op-expand { background: var(--primary-2); color: #fff; transform: rotate(90deg); }
-    .op-actions { display: flex; gap: .4rem; align-items: center; justify-content: flex-end; }
+    .op-actions { display: flex; gap: .4rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+    .chip-mixto {
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .35rem .7rem; border-radius: 999px;
+      background: linear-gradient(90deg, #e8f6ee 0%, #fff5e6 100%);
+      border: 1px solid #d6ebe0;
+      color: #1e3a5f; font-size: .78rem; font-weight: 600;
+      white-space: nowrap; cursor: help;
+      box-shadow: 0 1px 3px rgba(15,23,42,.06);
+    }
+    .chip-mixto strong { color: #1e8449; font-weight: 800; }
+    .chip-mixto strong + .chip-sep + strong,
+    .chip-mixto strong:last-of-type { color: #b7791f; }
+    .chip-mixto .chip-sep { color: #94a3b2; margin: 0 .15rem; }
+    .chip-mixto .ic { color: #8b6914; }
+    .chip-mixto.chip-saldada {
+      background: linear-gradient(90deg, #d1f0dc 0%, #e8f6ee 100%);
+      border-color: #86d4a3;
+      color: #0f5e2d;
+    }
+    .chip-mixto.chip-saldada strong { color: #0f5e2d; font-weight: 800; letter-spacing: .03em; }
+    .chip-mixto.chip-saldada .ic { color: #1e8449; }
+    .chip-mixto.chip-saldada .chip-sep { color: #1e8449; opacity: .5; }
+    .btn-cancelar-saldo {
+      background: #b7791f !important; color: #fff !important; border: 1px solid #b7791f !important;
+      padding: .35rem .75rem !important; border-radius: 8px !important;
+      font-size: .78rem !important; font-weight: 700 !important; cursor: pointer;
+      display: inline-flex !important; align-items: center; gap: .3rem; white-space: nowrap;
+    }
+    .btn-cancelar-saldo:hover { background: #8b6914 !important; }
+
+    .ms-backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,.55);
+      display: none; align-items: center; justify-content: center; z-index: 1000;
+      backdrop-filter: blur(2px);
+    }
+    .ms-backdrop.open { display: flex; }
+    .ms-modal {
+      background: #fff; border-radius: 16px; padding: 0;
+      box-shadow: 0 24px 60px rgba(0,0,0,.35);
+      min-width: 460px; max-width: 92vw; overflow: hidden;
+      animation: msFadeIn .18s cubic-bezier(.2,.9,.3,1);
+    }
+    @keyframes msFadeIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+    .ms-head {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); color: #fff;
+      padding: 1rem 1.3rem; display: flex; align-items: center; gap: .6rem;
+    }
+    .ms-head .ic { font-size: 1.4rem; }
+    .ms-head h3 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+    .ms-body { padding: 1.1rem 1.3rem; }
+    .ms-sub-box {
+      background: #f4f8fd; border: 1px solid #d8dee7; border-radius: 10px;
+      padding: .7rem .85rem; margin-bottom: 1rem; font-size: .82rem; color: #4a5568;
+      line-height: 1.5;
+    }
+    .ms-sub-box .saldo-val { color: #b7791f; font-weight: 800; font-size: 1rem; }
+    .ms-modal .field { margin-bottom: .85rem; }
+    .ms-modal label { display: block; font-size: .72rem; font-weight: 700; color: #4a5568;
+                      text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+    .ms-modal input[type="text"],
+    .ms-modal input[type="date"],
+    .ms-modal input[inputmode="decimal"] {
+      width: 100%; padding: .65rem .8rem; border: 1px solid #d8dee7; border-radius: 10px;
+      font-size: .95rem; box-sizing: border-box; font-family: inherit;
+      background: #fff; color: #1f2937;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .ms-modal input:focus {
+      outline: none; border-color: #2c5282;
+      box-shadow: 0 0 0 3px rgba(44,82,130,.14);
+    }
+    .ms-modal input#ms-monto {
+      font-size: 1.15rem; font-weight: 700; color: #1e3a5f;
+      font-variant-numeric: tabular-nums; letter-spacing: .01em;
+    }
+    .ms-medios {
+      display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
+    }
+    .ms-medio-opt {
+      border: 2px solid #d8dee7; border-radius: 10px; padding: .7rem .5rem;
+      text-align: center; cursor: pointer; background: #fff;
+      font-size: .85rem; font-weight: 600; color: #4a5568;
+      display: flex; flex-direction: column; align-items: center; gap: .25rem;
+      transition: all .15s;
+    }
+    .ms-medio-opt:hover { border-color: #2c5282; background: #f4f8fd; }
+    .ms-medio-opt.active { border-color: #2c5282; background: #eef5ff; color: #1e3a5f; }
+    .ms-medio-opt.active .ic { color: #2c5282; }
+    .ms-medio-opt .ic { font-size: 1.3rem; color: #6b7785; }
+    .ms-foot {
+      display: flex; justify-content: flex-end; gap: .6rem;
+      padding: .9rem 1.3rem; background: #fafbfd; border-top: 1px solid #edf0f4;
+    }
+    .ms-modal .btn-ok {
+      background: #1e8449; color: #fff; border: none; padding: .65rem 1.3rem;
+      border-radius: 10px; font-weight: 700; cursor: pointer; font-size: .9rem;
+      display: inline-flex; align-items: center; gap: .35rem;
+      transition: all .15s;
+    }
+    .ms-modal .btn-ok:hover:not(:disabled) { background: #166a3a; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30,132,73,.3); }
+    .ms-modal .btn-ok:disabled { opacity: .6; cursor: wait; }
+    .ms-modal .btn-cancel {
+      background: #fff; color: #4a5568; border: 1px solid #d8dee7;
+      padding: .65rem 1.1rem; border-radius: 10px; cursor: pointer; font-size: .9rem;
+      font-weight: 600;
+    }
+    .ms-modal .btn-cancel:hover { background: #f4f8fd; }
     .op-btn {
       display: inline-flex;
       align-items: center;
@@ -240,6 +347,39 @@
               {% endif %}
             </div>
             <div class="op-actions" onclick="event.stopPropagation();">
+              {% if op.mixto %}
+                {% set _saldo_num = op.mixto.saldo_pendiente|float if op.mixto.saldo_pendiente else 0 %}
+                {% if _saldo_num <= 0.01 %}
+                  <span class="chip-mixto chip-saldada" title="Operacion mixta totalmente cancelada. Contado: {{ op.mixto.pct_contado }}% (S/ {{ op.mixto.monto_contado }}) + Credito pagado: S/ {{ op.mixto.cancelado }}">
+                    <span class="ic sm">check_circle</span>
+                    <strong>CANCELADA</strong>
+                    <span class="chip-sep">·</span>
+                    {{ op.mixto.pct_contado }}% + {{ op.mixto.pct_credito }}%
+                  </span>
+                {% else %}
+                  <span class="chip-mixto" title="Pagado al contado: {{ op.mixto.pct_contado }}% (S/ {{ op.mixto.monto_contado }}) — Credito pendiente: {{ op.mixto.pct_credito }}% (S/ {{ op.mixto.monto_credito }}){% if op.mixto.cancelado and op.mixto.cancelado != '0.00' %} — Ya cancelado: S/ {{ op.mixto.cancelado }}{% endif %}">
+                    <span class="ic sm">pie_chart</span>
+                    <strong>{{ op.mixto.pct_contado }}%</strong> contado
+                    <span class="chip-sep">/</span>
+                    <strong>{{ op.mixto.pct_credito }}%</strong> credito
+                  </span>
+                {% endif %}
+                {% if _saldo_num > 0.01 %}
+                <button type="button" class="op-btn btn-cancelar-saldo"
+                        data-tipo="{{ op.mixto.tipo_op }}"
+                        data-cuenta="{{ op.mixto.cuenta_credito }}"
+                        data-saldo="{{ op.mixto.saldo_pendiente }}"
+                        data-correlativo="{{ op.mixto.correlativo_base }}"
+                        data-glosa="{{ op.mixto.glosa_base }}"
+                        data-ruc="{{ op.mixto.ruc }}"
+                        data-rs="{{ op.mixto.razon_social }}"
+                        data-fecha="{{ op.mixto.fecha }}"
+                        onclick="event.stopPropagation(); abrirModalSaldo(this);"
+                        title="Crear asiento para cancelar el saldo pendiente">
+                  <span class="ic sm">payments</span> Cancelar saldo S/ {{ op.mixto.saldo_pendiente }}
+                </button>
+                {% endif %}
+              {% endif %}
               {% if op.n_asientos > 1 %}
                 <a class="op-btn excel" href="/operaciones/excel?ids={{ op.ids|join(',') }}" title="Descargar Excel de los {{ op.n_asientos }} asientos"><span class="ic sm">download</span> Excel</a>
                 <button type="button" class="op-btn danger" onclick="eliminarOperacion([{{ op.ids|join(',') }}], '{{ op.titulo|replace("'", "\\'") }}')" title="Eliminar los {{ op.n_asientos }} asientos de esta operacion"><span class="ic sm">delete</span> Eliminar</button>
@@ -285,7 +425,137 @@
     </div>
   </main>
 
+  <div class="ms-backdrop" id="ms-backdrop" onclick="if(event.target.id==='ms-backdrop')cerrarModalSaldo()">
+    <div class="ms-modal">
+      <div class="ms-head">
+        <span class="ic">payments</span>
+        <h3 id="ms-title">Cancelar saldo pendiente</h3>
+      </div>
+      <div class="ms-body">
+        <div class="ms-sub-box" id="ms-sub"></div>
+        <div class="field">
+          <label for="ms-monto">Monto a cancelar (S/)</label>
+          <input type="text" id="ms-monto" inputmode="decimal" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label>Como se cancela?</label>
+          <div class="ms-medios">
+            <div class="ms-medio-opt active" data-value="efectivo" id="ms-opt-efectivo">
+              <span class="ic">payments</span>
+              <span>Caja / Efectivo</span>
+            </div>
+            <div class="ms-medio-opt" data-value="banco" id="ms-opt-banco">
+              <span class="ic">account_balance</span>
+              <span>Banco / Transferencia</span>
+            </div>
+          </div>
+          <input type="hidden" id="ms-medio" value="efectivo">
+        </div>
+        <div class="field">
+          <label for="ms-fecha">Fecha del asiento</label>
+          <input type="date" id="ms-fecha">
+        </div>
+      </div>
+      <div class="ms-foot">
+        <button type="button" class="btn-cancel" onclick="cerrarModalSaldo()">Cancelar</button>
+        <button type="button" class="btn-ok" id="ms-ok"><span class="ic sm">check</span> Crear asiento</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    (function () {
+      var backdrop = document.getElementById('ms-backdrop');
+      var elTitle = document.getElementById('ms-title');
+      var elSub = document.getElementById('ms-sub');
+      var elMonto = document.getElementById('ms-monto');
+      var elMedio = document.getElementById('ms-medio');
+      var elFecha = document.getElementById('ms-fecha');
+      var btnOk = document.getElementById('ms-ok');
+      var ctx = null;
+
+      window.cerrarModalSaldo = function () { backdrop.classList.remove('open'); ctx = null; };
+
+      // Selector de medio por tiles
+      document.getElementById('ms-opt-efectivo').addEventListener('click', function () { seleccionarMedio('efectivo'); });
+      document.getElementById('ms-opt-banco').addEventListener('click', function () { seleccionarMedio('banco'); });
+      function seleccionarMedio(v) {
+        elMedio.value = v;
+        document.getElementById('ms-opt-efectivo').classList.toggle('active', v === 'efectivo');
+        document.getElementById('ms-opt-banco').classList.toggle('active', v === 'banco');
+      }
+
+      window.abrirModalSaldo = function (btn) {
+        ctx = {
+          tipo: btn.dataset.tipo,
+          cuenta: btn.dataset.cuenta,
+          saldo: btn.dataset.saldo,
+          correlativo: btn.dataset.correlativo,
+          glosa: btn.dataset.glosa,
+          ruc: btn.dataset.ruc,
+          rs: btn.dataset.rs,
+          fecha: btn.dataset.fecha
+        };
+        elTitle.textContent = ctx.tipo === 'compra'
+          ? 'Pagar saldo pendiente al proveedor'
+          : 'Cobrar saldo pendiente del cliente';
+        elSub.innerHTML = '<div><strong>Operacion:</strong> ' + (ctx.glosa || '-') + '</div>' +
+                         (ctx.rs ? '<div><strong>Tercero:</strong> ' + ctx.rs + (ctx.ruc ? ' <span style="color:#8a95a4;font-size:.78rem;">(' + ctx.ruc + ')</span>' : '') + '</div>' : '') +
+                         '<div style="margin-top:.3rem;"><strong>Saldo pendiente:</strong> <span class="saldo-val">S/ ' + ctx.saldo + '</span></div>';
+        elMonto.value = ctx.saldo;
+        seleccionarMedio('efectivo');
+        var hoy = new Date().toISOString().slice(0, 10);
+        elFecha.value = hoy;
+        elFecha.max = hoy;
+        backdrop.classList.add('open');
+        setTimeout(function () { elMonto.focus(); elMonto.select(); }, 80);
+      };
+
+      btnOk.addEventListener('click', function () {
+        if (!ctx) return;
+        var monto = parseFloat((elMonto.value || '').replace(',', '.'));
+        if (!isFinite(monto) || monto <= 0) { UI.warning('Monto invalido.', 'Error'); return; }
+        var saldoNum = parseFloat(ctx.saldo);
+        if (monto > saldoNum + 0.01) {
+          UI.warning('El monto excede el saldo pendiente (S/ ' + ctx.saldo + ').', 'Error');
+          return;
+        }
+        btnOk.disabled = true;
+        btnOk.textContent = 'Creando...';
+        fetch('/operaciones/cancelar-saldo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            correlativo_base: ctx.correlativo,
+            cuenta_credito: ctx.cuenta,
+            monto: monto,
+            medio: elMedio.value,
+            fecha: elFecha.value,
+            glosa_base: ctx.glosa,
+            ruc: ctx.ruc,
+            razon_social: ctx.rs
+          })
+        })
+          .then(function (r) { return r.json().then(function (b) { return { s: r.status, b: b }; }); })
+          .then(function (o) {
+            btnOk.disabled = false;
+            btnOk.textContent = 'Crear asiento';
+            if (o.s === 200 && o.b.ok) {
+              UI.success('Asiento ' + o.b.numero + ' creado y relacionado a la operacion.');
+              cerrarModalSaldo();
+              setTimeout(function () { location.reload(); }, 600);
+            } else {
+              UI.warning(o.b.error || 'Error al crear el asiento.', 'Error');
+            }
+          })
+          .catch(function () {
+            btnOk.disabled = false;
+            btnOk.textContent = 'Crear asiento';
+            UI.warning('Error de red.', 'Error');
+          });
+      });
+    })();
+
     function toggleOp(el) {
       var item = el.parentElement;
       if (!item.querySelector('.op-detail')) return;

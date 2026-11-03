@@ -666,16 +666,28 @@ def asientos_listado():
             stmt = stmt.limit(500)
         rows = session.execute(stmt).scalars().all()
 
-        # Agrupar asientos relacionados: misma fecha + mismo documento (o misma glosa base si no hay doc).
+        # Agrupar asientos relacionados: misma fecha + mismo correlativo base,
+        # o mismo documento, o misma glosa base (sin prefijo N) y sin sufijo [MIXTO: ...])
+        import re
         def grupo_key(a):
+            # 1) Correlativo con sufijo -N: ej "2026-11-0008-1", "2026-11-0008-2" -> base "2026-11-0008"
+            corr = (a.numero_correlativo or "").strip()
+            if corr:
+                m = re.match(r"^(.+?)-(\d+)$", corr)
+                if m:
+                    base_corr = m.group(1)
+                    # Solo agrupar si la base parece correlativo (YYYY-MM-NNNN)
+                    if re.match(r"^\d{4}-\d{2}-\d+$", base_corr):
+                        return ("corr", a.fecha.isoformat(), base_corr)
+            # 2) Documento
             doc = (a.numero_documento or "").strip()
             if doc:
                 return ("doc", a.fecha.isoformat(), doc)
-            # fallback: glosa base (sin el "1) Provision - " prefix)
+            # 3) Glosa base: quita "N) tipo - ", "Cancelacion saldo pendiente - " y sufijo " [MIXTO: ...]"
             glosa = (a.glosa or "").strip()
-            # quitar prefijos "1) ", "2) " etc.
-            import re
-            glosa_base = re.sub(r"^\d+\)\s*[A-Za-z]+\s*-\s*", "", glosa)
+            glosa_base = re.sub(r"^\d+\)\s*[A-Za-z]+\s*(parcial\s*)?-\s*", "", glosa)
+            glosa_base = re.sub(r"^Cancelacion\s+saldo\s+pendiente\s*-\s*", "", glosa_base, flags=re.IGNORECASE)
+            glosa_base = re.sub(r"\s*\[MIXTO:[^\]]*\]\s*$", "", glosa_base)
             return ("glosa", a.fecha.isoformat(), glosa_base or f"solo-{a.id}")
 
         grupos = {}
@@ -699,6 +711,56 @@ def asientos_listado():
             glosa_primera = (asientos[0].glosa or "").strip()
             titulo = re.sub(r"^\d+\)\s*[A-Za-z]+\s*-\s*", "", glosa_primera) or glosa_primera or "Operacion"
             f = asientos[0].fecha
+            # Detectar si es mixto: buscar sufijo [MIXTO: X% contado ... Y% credito ...] en alguna glosa
+            mixto_info = None
+            for a in asientos:
+                m = re.search(r"\[MIXTO:\s*(\d+(?:\.\d+)?)%\s*contado\s*S/\s*([\d.,]+)\s*-\s*(\d+(?:\.\d+)?)%\s*credito\s*S/\s*([\d.,]+)\]", a.glosa or "")
+                if m:
+                    monto_credito_original = Decimal(m.group(4).replace(",", ""))
+                    # Detectar si es compra (4212 en haber en algun asiento) o venta (1212 en debe)
+                    tipo_op = None
+                    cuenta_credito = None
+                    for aa in asientos:
+                        for ll in aa.lineas:
+                            if ll.cuenta_codigo == "4212" and ll.haber > 0:
+                                tipo_op = "compra"
+                                cuenta_credito = "4212"
+                            elif ll.cuenta_codigo == "1212" and ll.debe > 0:
+                                tipo_op = "venta"
+                                cuenta_credito = "1212"
+                        if tipo_op:
+                            break
+                    # Calcular saldo pendiente: monto credito original - cancelaciones posteriores
+                    # Una cancelacion posterior es un asiento con cuenta_credito en el lado contrario
+                    cancelado = Decimal("0")
+                    for aa in asientos:
+                        g = aa.glosa or ""
+                        # Si la glosa contiene "Cancelacion saldo" (los nuevos que creamos aqui)
+                        # o es una cancelacion posterior sin [MIXTO] (contado)
+                        if "Cancelacion saldo" in g or "Cancelacion pendiente" in g:
+                            for ll in aa.lineas:
+                                if ll.cuenta_codigo == cuenta_credito:
+                                    if tipo_op == "compra" and ll.debe > 0:
+                                        cancelado += ll.debe
+                                    elif tipo_op == "venta" and ll.haber > 0:
+                                        cancelado += ll.haber
+                    saldo_pendiente = monto_credito_original - cancelado
+                    mixto_info = {
+                        "pct_contado": m.group(1),
+                        "monto_contado": m.group(2),
+                        "pct_credito": m.group(3),
+                        "monto_credito": m.group(4),
+                        "tipo_op": tipo_op,
+                        "cuenta_credito": cuenta_credito,
+                        "saldo_pendiente": f"{saldo_pendiente:.2f}" if tipo_op else None,
+                        "cancelado": f"{cancelado:.2f}",
+                        "correlativo_base": re.sub(r"-\d+$", "", (asientos[0].numero_correlativo or "")) if asientos[0].numero_correlativo else "",
+                        "ruc": asientos[0].ruc_tercero or "",
+                        "razon_social": asientos[0].razon_social_tercero or "",
+                        "fecha": asientos[0].fecha.isoformat(),
+                        "glosa_base": re.sub(r"\s*\[MIXTO:[^\]]*\]\s*$", "", re.sub(r"^\d+\)\s*[A-Za-z]+\s*(parcial\s*)?-\s*", "", asientos[0].glosa or "")),
+                    }
+                    break
             operaciones.append({
                 "key": "|".join(k),
                 "titulo": titulo,
@@ -712,6 +774,7 @@ def asientos_listado():
                 "asientos": asientos,
                 "ids": [a.id for a in asientos],
                 "cerrado": (f.year, f.month) in cerrados,
+                "mixto": mixto_info,
             })
     total_debe_filtro = Decimal("0")
     total_haber_filtro = Decimal("0")
@@ -1000,6 +1063,118 @@ def asientos_reversa(asiento_id):
             original.anulado_por_id = reversa.id
         session.refresh(reversa)
         return {"ok": True, "id": reversa.id, "numero": reversa.numero}
+
+
+@app.route("/operaciones/cancelar-saldo", methods=["POST"])
+def operaciones_cancelar_saldo():
+    """Crea un asiento de cancelacion de saldo pendiente para una operacion mixta.
+
+    Payload esperado:
+      - correlativo_base: str (ej "2026-11-0008") -> se usa para enlazar
+      - cuenta_credito: "4212" (compra) o "1212" (venta)
+      - monto: Decimal/str - monto a cancelar
+      - medio: "efectivo" | "banco" -> 1011 o 1041
+      - fecha: YYYY-MM-DD (opcional, default hoy)
+      - glosa_base: str - glosa descriptiva de la operacion original
+      - ruc / razon_social: opcionales para persistir en el asiento
+    """
+    payload = request.get_json(silent=True) or {}
+    correlativo_base = (payload.get("correlativo_base") or "").strip()
+    cuenta_credito = (payload.get("cuenta_credito") or "").strip()
+    medio_in = (payload.get("medio") or "efectivo").strip()
+    glosa_base = (payload.get("glosa_base") or "").strip() or "Operacion"
+    ruc = (payload.get("ruc") or "").strip()
+    razon_social = (payload.get("razon_social") or "").strip()
+
+    if cuenta_credito not in ("4212", "1212"):
+        return {"ok": False, "error": "Cuenta de credito invalida."}, 400
+    if medio_in not in ("efectivo", "banco"):
+        return {"ok": False, "error": "Medio de pago invalido."}, 400
+    try:
+        monto = _parse_decimal(payload.get("monto") or "0")
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}, 400
+    if monto <= 0:
+        return {"ok": False, "error": "El monto debe ser positivo."}, 400
+
+    fecha_str = (payload.get("fecha") or "").strip() or date.today().isoformat()
+    try:
+        fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+    except ValueError:
+        return {"ok": False, "error": "Fecha invalida (YYYY-MM-DD)."}, 400
+    if fecha_obj > date.today():
+        return {"ok": False, "error": "La fecha no puede ser futura."}, 400
+
+    cuenta_medio = "1041" if medio_in == "banco" else "1011"
+    tipo_op = "compra" if cuenta_credito == "4212" else "venta"
+    glosa_asiento = f"Cancelacion saldo pendiente - {glosa_base}"
+
+    import re
+    with SessionLocal() as session:
+        if _mes_cerrado(session, fecha_obj):
+            return {"ok": False, "error": f"El mes {fecha_obj.year}-{fecha_obj.month:02d} esta cerrado."}, 400
+
+        # Buscar el siguiente sufijo del correlativo base para que caiga en la misma operacion
+        correlativo_final = ""
+        if correlativo_base and re.match(r"^\d{4}-\d{2}-\d+$", correlativo_base):
+            existentes = session.execute(
+                select(Asiento.numero_correlativo).where(
+                    Asiento.numero_correlativo.like(correlativo_base + "-%")
+                )
+            ).scalars().all()
+            maxsuf = 0
+            for c in existentes:
+                m = re.match(r"^.+-(\d+)$", c or "")
+                if m:
+                    try:
+                        maxsuf = max(maxsuf, int(m.group(1)))
+                    except ValueError:
+                        pass
+            correlativo_final = f"{correlativo_base}-{maxsuf + 1}"
+
+        session.rollback()
+        with session.begin():
+            numero = _generar_numero(session, fecha_obj)
+            asiento = Asiento(
+                numero=numero,
+                fecha=fecha_obj,
+                glosa=glosa_asiento,
+                moneda="PEN",
+                tipo_cambio=Decimal("1"),
+                codigo_libro="05",
+                numero_correlativo=correlativo_final,
+                ruc_tercero=ruc or None,
+                razon_social_tercero=razon_social or None,
+            )
+            if tipo_op == "compra":
+                # Pago a proveedor: 4212 Debe (bajo cuenta por pagar) / 1011|1041 Haber
+                asiento.lineas.append(AsientoLinea(
+                    orden=1, cuenta_codigo=cuenta_credito,
+                    glosa_linea="Cancelacion saldo pendiente",
+                    debe=monto, haber=Decimal("0"), es_titulo=False,
+                ))
+                asiento.lineas.append(AsientoLinea(
+                    orden=2, cuenta_codigo=cuenta_medio,
+                    glosa_linea=f"Pago desde {'banco' if medio_in == 'banco' else 'caja'}",
+                    debe=Decimal("0"), haber=monto, es_titulo=False,
+                ))
+            else:
+                # Cobro de cliente: 1011|1041 Debe / 1212 Haber (bajo cuenta por cobrar)
+                asiento.lineas.append(AsientoLinea(
+                    orden=1, cuenta_codigo=cuenta_medio,
+                    glosa_linea=f"Cobro en {'banco' if medio_in == 'banco' else 'caja'}",
+                    debe=monto, haber=Decimal("0"), es_titulo=False,
+                ))
+                asiento.lineas.append(AsientoLinea(
+                    orden=2, cuenta_codigo=cuenta_credito,
+                    glosa_linea="Cancelacion saldo pendiente",
+                    debe=Decimal("0"), haber=monto, es_titulo=False,
+                ))
+            session.add(asiento)
+            session.flush()
+            asiento_id = asiento.id
+            asiento_numero = asiento.numero
+        return {"ok": True, "id": asiento_id, "numero": asiento_numero}
 
 
 @app.route("/dashboard")

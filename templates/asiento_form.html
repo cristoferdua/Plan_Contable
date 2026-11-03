@@ -160,6 +160,46 @@
       box-shadow: 0 0 0 3px rgba(44, 82, 130, .12);
     }
     .num-input { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* --- Sugerencia visual Debe/Haber segun elemento PCGE --- */
+    td.celda-debe, td.celda-haber { position: relative; transition: background .15s; }
+    td.lado-sugerido {
+      background: rgba(30,132,73,.05);
+    }
+    td.lado-sugerido .cell-input {
+      border: 1px solid #86d4a3;
+      background: rgba(255,255,255,.9);
+      color: #0f5e2d;
+      font-weight: 700;
+    }
+    td.lado-sugerido .cell-input:focus {
+      border-color: #1e8449;
+      box-shadow: 0 0 0 3px rgba(30,132,73,.18);
+      background: #fff;
+    }
+    /* chip "SUGERIDO" tipo pastilla a la izquierda del input */
+    td.lado-sugerido::before {
+      content: "SUGERIDO";
+      position: absolute;
+      left: 6px; top: 50%; transform: translateY(-50%);
+      padding: .12rem .4rem;
+      background: #1e8449; color: #fff;
+      border-radius: 999px; font-size: .58rem; font-weight: 800;
+      letter-spacing: .05em;
+      pointer-events: none; z-index: 1;
+      box-shadow: 0 1px 3px rgba(30,132,73,.35);
+      line-height: 1;
+    }
+    td.lado-sugerido .cell-input { padding-left: 4.6rem; }
+    td.lado-opuesto .cell-input {
+      opacity: .45;
+      background: #f6f7f9;
+    }
+    td.lado-opuesto .cell-input:focus {
+      opacity: 1;
+      background: #fff;
+    }
+    td.lado-opuesto .cell-input::placeholder { color: #c3c9d2; }
     .desc-cuenta { font-size: .72rem; color: var(--muted); padding: .1rem .45rem 0; min-height: 0; }
     .row-msg { font-size: .7rem; color: var(--warn); padding: .08rem .45rem 0; }
     .row-msg:empty { display: none; }
@@ -919,6 +959,64 @@
       function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
       function money(n) { return round2(n).toFixed(2); }
 
+      // ======== Sugerencia de lado Debe/Haber segun PCGE ========
+      // Casos especiales (cuentas con comportamiento no derivado del elemento)
+      var CUENTAS_LADO_ESPECIAL = {
+        // Depreciacion acumulada (39xx): aunque es elemento 3 (activo), tiene saldo acreedor
+        '391': 'haber', '392': 'haber', '393': 'haber', '394': 'haber', '395': 'haber',
+        // Variaciones de inventario (61xx): saldo acreedor en estados financieros
+        // (se dejan default por elemento 6 = debe, el contador ajusta)
+      };
+      function ladoSugerido(codigo, elemento) {
+        if (!codigo) return null;
+        // Casos especiales por prefijo (3 digitos)
+        var pref3 = String(codigo).slice(0, 3);
+        if (CUENTAS_LADO_ESPECIAL[pref3]) return CUENTAS_LADO_ESPECIAL[pref3];
+        var e = Number(elemento);
+        switch (e) {
+          case 1: // Activo disponible y exigible
+          case 2: // Activo realizable
+          case 3: // Activo inmovilizado
+            return 'debe';
+          case 4: // Pasivo
+          case 5: // Patrimonio
+            return 'haber';
+          case 6: // Gastos por naturaleza
+            return 'debe';
+          case 7: // Ingresos
+            return 'haber';
+          case 8: // Saldos intermediarios y resultado
+            return 'haber';
+          case 9: // Costos por funcion
+            return 'debe';
+          case 0: // Cuentas de orden
+          default:
+            return null;
+        }
+      }
+      function aplicarSugerenciaLado(tr, codigo, elemento) {
+        var lado = ladoSugerido(codigo, elemento);
+        var celdaDebe = tr.querySelector('.celda-debe');
+        var celdaHaber = tr.querySelector('.celda-haber');
+        if (!celdaDebe || !celdaHaber) return;
+        celdaDebe.classList.remove('lado-sugerido', 'lado-opuesto');
+        celdaHaber.classList.remove('lado-sugerido', 'lado-opuesto');
+        if (!lado) return;
+        if (lado === 'debe') {
+          celdaDebe.classList.add('lado-sugerido');
+          celdaHaber.classList.add('lado-opuesto');
+        } else {
+          celdaHaber.classList.add('lado-sugerido');
+          celdaDebe.classList.add('lado-opuesto');
+        }
+      }
+      function limpiarSugerenciaLado(tr) {
+        var cd = tr.querySelector('.celda-debe');
+        var ch = tr.querySelector('.celda-haber');
+        if (cd) cd.classList.remove('lado-sugerido', 'lado-opuesto');
+        if (ch) ch.classList.remove('lado-sugerido', 'lado-opuesto');
+      }
+
       function parseAmount(value) {
         var s = String(value == null ? '' : value).trim().replace(/\s+/g, '');
         if (!s) return 0;
@@ -1047,6 +1145,7 @@
           tr.dataset.validado = '1';
           descEl.textContent = item.descripcion;
           descEl.title = item.descripcion;
+          aplicarSugerenciaLado(tr, item.codigo, item.elemento);
           cerrar();
         }
 
@@ -1124,6 +1223,7 @@
             tr.dataset.nivel = '';
             descEl.textContent = '';
             descEl.title = '';
+            limpiarSugerenciaLado(tr);
           }
           clearTimeout(timer);
           if (!v) { cerrar(); recalc(); return; }
@@ -1798,11 +1898,11 @@
               { v: 'credito', t: 'Al credito (100% despues)' },
               { v: 'mixto', t: 'Mixto (parte contado, parte credito)' }
             ]},
-            { id: 'medio', label: 'Si cobras al contado, donde entra?', tipo: 'select', opts: [
+            { id: 'medio', label: 'Donde entra el pago?', tipo: 'select', showIf: { forma: ['contado', 'mixto'] }, opts: [
               { v: 'efectivo', t: 'Caja (efectivo)' },
               { v: 'banco', t: 'Banco (deposito)' }
             ]},
-            { id: 'pct_contado', label: 'Si es mixto, % cobrado al contado', tipo: 'num', placeholder: '40' },
+            { id: 'pct_contado', label: '% cobrado al contado (resto queda al credito)', tipo: 'num', showIf: { forma: 'mixto' }, placeholder: '40' },
             { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Venta segun factura F001-...' }
           ],
           build: function (d) {
@@ -1823,19 +1923,28 @@
 
             // Asiento 2: Cancelacion (contado 100% o parcial mixto)
             var cobrar = 0;
+            var sufijoMixto = '';
             if (d.forma === 'contado') cobrar = total;
             else if (d.forma === 'mixto') {
               var pct = Number(d.pct_contado) || 0;
               cobrar = round2(total * pct / 100);
+              var pctCred = round2(100 - pct);
+              var queda = round2(total - cobrar);
+              sufijoMixto = ' [MIXTO: ' + pct + '% contado S/ ' + money(cobrar) +
+                            ' - ' + pctCred + '% credito S/ ' + money(queda) + ']';
             }
             if (cobrar > 0) {
               asientos.push({
-                glosa: '2) Cancelacion - ' + g,
+                glosa: '2) Cancelacion ' + (d.forma === 'mixto' ? 'parcial ' : '') + '- ' + g + sufijoMixto,
                 lineas: [
-                  { codigo: medio, debe: cobrar, haber: 0, g: g },
+                  { codigo: medio, debe: cobrar, haber: 0, g: d.forma === 'mixto' ? ('Cobro ' + pct + '% al contado') : g },
                   { codigo: '1212', debe: 0, haber: cobrar, g: g }
                 ]
               });
+            }
+            // Si es mixto, anotar tambien el porcentaje en la glosa de la provision
+            if (d.forma === 'mixto' && sufijoMixto) {
+              asientos[0].glosa = asientos[0].glosa + sufijoMixto;
             }
             return { asientos: asientos };
           }
@@ -1854,11 +1963,11 @@
               { v: 'credito', t: 'Al credito (100% despues)' },
               { v: 'mixto', t: 'Mixto (parte contado, parte credito)' }
             ]},
-            { id: 'medio', label: 'Si pagas al contado, con que?', tipo: 'select', opts: [
+            { id: 'medio', label: 'Con que pagas?', tipo: 'select', showIf: { forma: ['contado', 'mixto'] }, opts: [
               { v: 'efectivo', t: 'Caja (efectivo)' },
               { v: 'banco', t: 'Banco (transferencia)' }
             ]},
-            { id: 'pct_contado', label: 'Si es mixto, % pagado al contado', tipo: 'num', placeholder: '40' },
+            { id: 'pct_contado', label: '% pagado al contado (resto queda al credito)', tipo: 'num', showIf: { forma: 'mixto' }, placeholder: '40' },
             { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Compra segun factura F001-...' }
           ],
           build: function (d) {
@@ -1895,19 +2004,28 @@
 
             // Asiento 3: Cancelacion (contado 100% o parcial si mixto)
             var pagar = 0;
+            var sufijoMixto = '';
             if (d.forma === 'contado') pagar = total;
             else if (d.forma === 'mixto') {
               var pct = Number(d.pct_contado) || 0;
               pagar = round2(total * pct / 100);
+              var pctCred = round2(100 - pct);
+              var queda = round2(total - pagar);
+              sufijoMixto = ' [MIXTO: ' + pct + '% contado S/ ' + money(pagar) +
+                            ' - ' + pctCred + '% credito S/ ' + money(queda) + ']';
             }
             if (pagar > 0) {
               asientos.push({
-                glosa: (cuentaDestino ? '3' : '2') + ') Cancelacion - ' + g,
+                glosa: (cuentaDestino ? '3' : '2') + ') Cancelacion ' + (d.forma === 'mixto' ? 'parcial ' : '') + '- ' + g + sufijoMixto,
                 lineas: [
                   { codigo: '4212', debe: pagar, haber: 0, g: g },
-                  { codigo: medio, debe: 0, haber: pagar, g: g }
+                  { codigo: medio, debe: 0, haber: pagar, g: d.forma === 'mixto' ? ('Pago ' + pct + '% al contado') : g }
                 ]
               });
+            }
+            // Si es mixto, anotar tambien el porcentaje en la glosa de la provision
+            if (d.forma === 'mixto' && sufijoMixto) {
+              asientos[0].glosa = asientos[0].glosa + sufijoMixto;
             }
             return { asientos: asientos };
           }
@@ -2185,14 +2303,68 @@
         abrirModal();
       }
 
+      // Plantillas que involucran un tercero externo con RUC
+      var PLANTILLAS_CON_TERCERO = ['venta', 'venta_sin_igv', 'compra', 'compra_sin_igv', 'gasto', 'cobranza', 'pago_prov', 'nota_credito'];
+
+      // Razon social obtenida al consultar RUC desde la plantilla
+      var tplRazonSocial = '';
+
+      function camposConRuc(tpl, key) {
+        if (PLANTILLAS_CON_TERCERO.indexOf(key) === -1) return tpl.campos;
+        var yaTiene = tpl.campos.some(function (c) { return c.id === 'ruc'; });
+        if (yaTiene) return tpl.campos;
+        var rucCampo = { id: 'ruc', label: 'RUC del tercero (opcional)', tipo: 'ruc', placeholder: '20131312955' };
+        return [rucCampo].concat(tpl.campos);
+      }
+
+      function evaluarShowIf(c, valoresActuales) {
+        if (!c.showIf) return true;
+        var ok = true;
+        Object.keys(c.showIf).forEach(function (k) {
+          var esperado = c.showIf[k];
+          var actual = valoresActuales[k];
+          if (Array.isArray(esperado)) {
+            if (esperado.indexOf(actual) === -1) ok = false;
+          } else {
+            if (actual !== esperado) ok = false;
+          }
+        });
+        return ok;
+      }
+
+      function leerValoresCrudos() {
+        var tpl = PLANTILLAS[plantillaActual];
+        if (!tpl) return {};
+        var out = {};
+        camposConRuc(tpl, plantillaActual).forEach(function (c) {
+          var el = document.getElementById('tpl-' + c.id);
+          if (el) out[c.id] = el.value;
+        });
+        return out;
+      }
+
+      function aplicarShowIf() {
+        var tpl = PLANTILLAS[plantillaActual];
+        if (!tpl) return;
+        var valores = leerValoresCrudos();
+        camposConRuc(tpl, plantillaActual).forEach(function (c) {
+          var wrap = document.getElementById('tpl-wrap-' + c.id);
+          if (!wrap) return;
+          wrap.style.display = evaluarShowIf(c, valores) ? '' : 'none';
+        });
+      }
+
       function abrirFormularioPlantilla(key) {
         var tpl = PLANTILLAS[key];
         if (!tpl) return;
         plantillaActual = key;
+        tplRazonSocial = '';
         // Cerrar modal de seleccion y abrir modal del formulario
         cerrarModal();
         modalTitulo2.textContent = tpl.nombre;
         modalForm.hidden = false;
+
+        var campos = camposConRuc(tpl, key);
 
         var html = '<div class="plantilla-layout">';
         html += '<div class="plantilla-form">';
@@ -2202,14 +2374,20 @@
                 '<input type="date" id="tpl-fecha" value="' + escapeHtml(fechaEl.value || HOY) + '" max="' + HOY + '">' +
                 '<div style="font-size:.7rem;color:var(--muted);font-style:italic;margin-top:.15rem;">Puede ser hoy o un dia anterior.</div>' +
                 '</div>';
-        tpl.campos.forEach(function (c) {
-          html += '<div class="field"><label for="tpl-' + c.id + '">' + escapeHtml(c.label) + '</label>';
+        campos.forEach(function (c) {
+          html += '<div class="field" id="tpl-wrap-' + c.id + '"><label for="tpl-' + c.id + '">' + escapeHtml(c.label) + '</label>';
           if (c.tipo === 'select') {
             html += '<select id="tpl-' + c.id + '" data-custom>';
             c.opts.forEach(function (o) {
               html += '<option value="' + escapeHtml(o.v) + '">' + escapeHtml(o.t) + '</option>';
             });
             html += '</select>';
+          } else if (c.tipo === 'ruc') {
+            html += '<div style="display:flex;gap:.4rem;align-items:center;">' +
+                    '<input type="text" id="tpl-' + c.id + '" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="' + escapeHtml(c.placeholder || '20131312955') + '" style="flex:1;font-family:ui-monospace,Consolas,monospace;letter-spacing:.05em;" value="' + escapeHtml((rucEl.value || '').trim()) + '">' +
+                    '<button type="button" id="btn-tpl-sunat" class="btn" style="padding:.5rem .8rem;display:inline-flex;align-items:center;gap:.3rem;background:#2c5282;color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;"><span class="ic sm">verified</span> SUNAT</button>' +
+                    '</div>' +
+                    '<div id="tpl-sunat-result" style="display:none;margin-top:.4rem;padding:.5rem .7rem;border-radius:8px;font-size:.82rem;"></div>';
           } else {
             var im = c.tipo === 'num' ? ' inputmode="decimal"' : '';
             html += '<input type="text" id="tpl-' + c.id + '"' + im +
@@ -2222,25 +2400,84 @@
         html += '</div>';
         modalFormBody.innerHTML = html;
 
-        tpl.campos.forEach(function (c) {
+        campos.forEach(function (c) {
           var el = document.getElementById('tpl-' + c.id);
-          if (el) el.addEventListener('input', actualizarPreview);
-          if (el) el.addEventListener('change', actualizarPreview);
+          if (el) {
+            el.addEventListener('input', function () { actualizarPreview(); aplicarShowIf(); });
+            el.addEventListener('change', function () { actualizarPreview(); aplicarShowIf(); });
+          }
         });
+
+        // Boton consultar SUNAT en plantilla
+        var btnTplSunat = document.getElementById('btn-tpl-sunat');
+        var tplRucEl = document.getElementById('tpl-ruc');
+        if (btnTplSunat && tplRucEl) {
+          // Si ya habia RUC previo + razon social, mostrarla
+          if (tplRucEl.value && razonSocialTercero) {
+            tplRazonSocial = razonSocialTercero;
+            var pre = document.getElementById('tpl-sunat-result');
+            if (pre) {
+              pre.style.display = 'block';
+              pre.style.background = '#e8f6ee';
+              pre.style.color = '#1e8449';
+              pre.innerHTML = '<strong>' + escapeHtml(razonSocialTercero) + '</strong> <span style="font-size:.72rem;opacity:.7;">(cache)</span>';
+            }
+          }
+          tplRucEl.addEventListener('input', function () {
+            tplRucEl.value = (tplRucEl.value || '').replace(/\D/g, '').slice(0, 11);
+          });
+          var consultarTplSunat = function () {
+            var ruc = (tplRucEl.value || '').trim();
+            if (ruc.length !== 11) { UI.warning('El RUC debe tener 11 digitos.', 'RUC invalido'); return; }
+            var pre = document.getElementById('tpl-sunat-result');
+            btnTplSunat.disabled = true;
+            pre.style.display = 'block';
+            pre.style.background = '#eef1f5';
+            pre.style.color = '#4a5568';
+            pre.innerHTML = '<span class="ic sm">hourglass_empty</span> Consultando...';
+            fetch('/sunat/ruc/' + ruc)
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                btnTplSunat.disabled = false;
+                if (d.ok && d.data && d.data.razon_social) {
+                  tplRazonSocial = d.data.razon_social;
+                  pre.style.background = '#e8f6ee';
+                  pre.style.color = '#1e8449';
+                  pre.innerHTML = '<strong>' + escapeHtml(d.data.razon_social) + '</strong>' +
+                                  '<div style="font-size:.72rem;opacity:.8;">Estado: ' + escapeHtml(d.data.estado || '-') +
+                                  ' / Condicion: ' + escapeHtml(d.data.condicion || '-') + '</div>';
+                } else {
+                  tplRazonSocial = '';
+                  pre.style.background = '#fdecea';
+                  pre.style.color = '#c0392b';
+                  pre.innerHTML = '<span class="ic sm">error</span> ' + escapeHtml(d.error || 'No encontrado');
+                }
+              })
+              .catch(function () {
+                btnTplSunat.disabled = false;
+                pre.style.background = '#fdecea';
+                pre.style.color = '#c0392b';
+                pre.innerHTML = '<span class="ic sm">error</span> Error de red';
+              });
+          };
+          btnTplSunat.addEventListener('click', consultarTplSunat);
+          tplRucEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); consultarTplSunat(); }
+          });
+          tplRucEl.addEventListener('blur', function () {
+            if ((tplRucEl.value || '').length === 11 && !tplRazonSocial) consultarTplSunat();
+          });
+        }
 
         // Inicializar los selects custom nuevos
         modalFormBody.querySelectorAll('select[data-custom]').forEach(function (sel) {
-          // Disparamos un evento ficticio para que polish.js (que escanea en carga) convierta
           if (window.initCustomSelectForElement) window.initCustomSelectForElement(sel);
-          else {
-            // Fallback: re-ejecutar init manual mediante el polish.js global expuesto
-            var e = new Event('DOMContentLoaded');
-          }
         });
-        // Como polish.js solo escanea en carga, lo invocamos directamente
         if (window.polishInitAll) window.polishInitAll();
 
-        var primero = modalFormBody.querySelector('input[inputmode="decimal"], input, .custom-select-trigger');
+        aplicarShowIf();
+
+        var primero = modalFormBody.querySelector('input[inputmode="decimal"], input:not([type="date"]):not(#tpl-ruc), .custom-select-trigger');
         if (primero) setTimeout(function () { primero.focus(); }, 80);
       }
 
@@ -2248,13 +2485,25 @@
         var tpl = PLANTILLAS[plantillaActual];
         var d = {};
         var ok = true;
-        tpl.campos.forEach(function (c) {
+        var valoresCrudos = leerValoresCrudos();
+        camposConRuc(tpl, plantillaActual).forEach(function (c) {
           var el = document.getElementById('tpl-' + c.id);
           if (!el) return;
+          // Campos ocultos por showIf no se validan ni se incluyen
+          if (!evaluarShowIf(c, valoresCrudos)) { d[c.id] = ''; return; }
           if (c.tipo === 'num') {
+            var requerido = c.req !== false && c.id !== 'pct_contado' ? true : false;
+            // Si el campo es "req: true" explicito, exigir monto > 0
+            if (c.req === true) requerido = true;
             var n = parseAmount(el.value);
-            if (!isFinite(n) || n <= 0) { ok = false; d[c.id] = 0; }
-            else d[c.id] = n;
+            if (c.req === true) {
+              if (!isFinite(n) || n <= 0) { ok = false; d[c.id] = 0; }
+              else d[c.id] = n;
+            } else {
+              d[c.id] = isFinite(n) ? n : 0;
+            }
+          } else if (c.tipo === 'ruc') {
+            d[c.id] = (el.value || '').trim();
           } else {
             d[c.id] = el.value.trim();
           }
@@ -2450,6 +2699,14 @@
             return;
           }
           fechaEl.value = fechaTpl.value;
+        }
+        // Propagar RUC de la plantilla al editor principal (si se lleno)
+        if (r.datos.ruc && /^\d{11}$/.test(r.datos.ruc)) {
+          rucEl.value = r.datos.ruc;
+          if (tplRazonSocial) {
+            razonSocialTercero = tplRazonSocial;
+            pintarSunat({ ok: true, fuente: 'plantilla', data: { razon_social: tplRazonSocial, estado: 'ACTIVO', condicion: 'HABIDO' } });
+          }
         }
         var resultado = tpl.build(r.datos);
         var asientos = Array.isArray(resultado) ? resultado :

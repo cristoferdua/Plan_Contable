@@ -125,6 +125,25 @@
       background: #fff;
       color: var(--text);
       font-family: inherit;
+      box-sizing: border-box;
+    }
+    .search-input-wrap {
+      position: relative;
+      display: block;
+    }
+    .search-input-wrap .search-ic {
+      position: absolute;
+      left: .75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #6b7785;
+      pointer-events: none;
+      font-size: 1.1rem;
+      line-height: 1;
+      z-index: 2;
+    }
+    .search-form .search-input-wrap input {
+      padding-left: 2.4rem !important;
     }
     .search-form input:focus, .search-form select:focus {
       outline: none;
@@ -340,9 +359,9 @@
       </div>
       <div class="card-body">
         <form id="form" class="search-form" method="get" onsubmit="return false;">
-          <div style="position:relative;">
-            <span class="ic" style="position:absolute;left:.9rem;top:50%;transform:translateY(-50%);color:#6b7785;pointer-events:none;">search</span>
-            <input type="text" id="q" name="q" placeholder="Buscar por descripcion o codigo (ej: ventas, caja, 70)" value="{{ q }}" autofocus autocomplete="off" style="padding-left:2.5rem;">
+          <div class="search-input-wrap">
+            <span class="ic search-ic">search</span>
+            <input type="text" id="q" name="q" placeholder="Buscar por descripcion o codigo (ej: ventas, caja, 70)" value="{{ q }}" autofocus autocomplete="off">
           </div>
           <select id="elemento" name="elemento" data-custom>
             <option value="">Todos los elementos</option>
