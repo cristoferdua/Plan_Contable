@@ -11123,6 +11123,27 @@
   "elemento_nombre": "Ingresos por Naturaleza"
  },
  {
+  "codigo": "7911",
+  "descripcion": "Cargas imputables a cuenta de costos y gastos",
+  "nivel": 4,
+  "elemento": 7,
+  "elemento_nombre": "Ingresos"
+ },
+ {
+  "codigo": "7912",
+  "descripcion": "Cargas imputables a cuenta de costos y gastos - admin",
+  "nivel": 4,
+  "elemento": 7,
+  "elemento_nombre": "Ingresos"
+ },
+ {
+  "codigo": "7913",
+  "descripcion": "Cargas imputables a cuenta de costos y gastos - ventas",
+  "nivel": 4,
+  "elemento": 7,
+  "elemento_nombre": "Ingresos"
+ },
+ {
   "codigo": "792",
   "descripcion": "Gastos financieros imputables a cuentas de inventarios",
   "nivel": 3,
@@ -11144,6 +11165,13 @@
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
  {
+  "codigo": "8011",
+  "descripcion": "Margen comercial",
+  "nivel": 4,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
   "codigo": "81",
   "descripcion": "PRODUCCIÓN DEL EJERCICIO",
   "nivel": 2,
@@ -11158,6 +11186,13 @@
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
  {
+  "codigo": "8111",
+  "descripcion": "Produccion de bienes",
+  "nivel": 4,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
   "codigo": "812",
   "descripcion": "Producción de servicios",
   "nivel": 3,
@@ -11165,9 +11200,23 @@
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
  {
+  "codigo": "8121",
+  "descripcion": "Produccion de servicios",
+  "nivel": 4,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
   "codigo": "813",
   "descripcion": "Producción de activo inmovilizado",
   "nivel": 3,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
+  "codigo": "8131",
+  "descripcion": "Produccion de activo inmovilizado",
+  "nivel": 4,
   "elemento": 8,
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
@@ -11186,6 +11235,13 @@
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
  {
+  "codigo": "8211",
+  "descripcion": "Valor agregado",
+  "nivel": 4,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
   "codigo": "83",
   "descripcion": "EXCEDENTE BRUTO (INSUFICIENCIA BRUTA) DE EXPLOTACIÓN",
   "nivel": 2,
@@ -11196,6 +11252,13 @@
   "codigo": "831",
   "descripcion": "Excedente bruto (insuficiencia bruta) de explotación",
   "nivel": 3,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
+  "codigo": "8311",
+  "descripcion": "Excedente bruto de explotacion",
+  "nivel": 4,
   "elemento": 8,
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
@@ -11214,6 +11277,13 @@
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
  {
+  "codigo": "8411",
+  "descripcion": "Resultado de operacion",
+  "nivel": 4,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
   "codigo": "85",
   "descripcion": "RESULTADO ANTES DE IMPUESTO A LAS GANANCIAS Y FINANCIAMIENTO",
   "nivel": 2,
@@ -11221,9 +11291,37 @@
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
  {
+  "codigo": "851",
+  "descripcion": "Resultado antes de impuesto a las ganancias y financiamiento",
+  "nivel": 3,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
+  "codigo": "8511",
+  "descripcion": "Resultado antes de impuesto a las ganancias y financiamiento",
+  "nivel": 4,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
   "codigo": "86",
   "descripcion": "RESULTADO ANTES DE IMPUESTO A LAS GANANCIAS",
   "nivel": 2,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
+  "codigo": "861",
+  "descripcion": "Resultado antes de impuesto a las ganancias",
+  "nivel": 3,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
+  "codigo": "8611",
+  "descripcion": "Resultado antes de impuesto a las ganancias",
+  "nivel": 4,
   "elemento": 8,
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
@@ -11242,9 +11340,23 @@
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
  {
+  "codigo": "8811",
+  "descripcion": "Impuesto a las ganancias - Corriente",
+  "nivel": 4,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
   "codigo": "882",
   "descripcion": "Impuesto a las ganancias – Diferido",
   "nivel": 3,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
+  "codigo": "8821",
+  "descripcion": "Impuesto a las ganancias - Diferido",
+  "nivel": 4,
   "elemento": 8,
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
@@ -11284,9 +11396,23 @@
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
  {
+  "codigo": "8911",
+  "descripcion": "Utilidad",
+  "nivel": 4,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
   "codigo": "892",
   "descripcion": "Pérdida",
   "nivel": 3,
+  "elemento": 8,
+  "elemento_nombre": "Saldos Intermediarios de Gestion"
+ },
+ {
+  "codigo": "8921",
+  "descripcion": "Perdida",
+  "nivel": 4,
   "elemento": 8,
   "elemento_nombre": "Saldos Intermediarios de Gestion"
  },
@@ -11298,9 +11424,37 @@
   "elemento_nombre": "Gastos por Categoria"
  },
  {
+  "codigo": "911",
+  "descripcion": "Gastos de operacion",
+  "nivel": 3,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9111",
+  "descripcion": "Gastos de operacion",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
   "codigo": "92",
   "descripcion": "GASTOS DE INVERSIÓN",
   "nivel": 2,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "921",
+  "descripcion": "Gastos de inversion",
+  "nivel": 3,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9211",
+  "descripcion": "Gastos de inversion",
+  "nivel": 4,
   "elemento": 9,
   "elemento_nombre": "Gastos por Categoria"
  },
@@ -11310,5 +11464,201 @@
   "nivel": 2,
   "elemento": 9,
   "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "931",
+  "descripcion": "Gastos de financiamiento",
+  "nivel": 3,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9311",
+  "descripcion": "Gastos de financiamiento",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "94",
+  "descripcion": "GASTOS ADMINISTRATIVOS",
+  "nivel": 2,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "941",
+  "descripcion": "Gastos administrativos",
+  "nivel": 3,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9411",
+  "descripcion": "Gastos administrativos",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9412",
+  "descripcion": "Gastos de administracion - personal",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9413",
+  "descripcion": "Gastos de administracion - servicios de terceros",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9414",
+  "descripcion": "Gastos de administracion - tributos",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9415",
+  "descripcion": "Gastos de administracion - cargas diversas",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9416",
+  "descripcion": "Gastos de administracion - depreciacion y amortizacion",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "95",
+  "descripcion": "GASTOS DE VENTAS",
+  "nivel": 2,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "951",
+  "descripcion": "Gastos de ventas",
+  "nivel": 3,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9511",
+  "descripcion": "Gastos de ventas",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9512",
+  "descripcion": "Gastos de ventas - personal",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9513",
+  "descripcion": "Gastos de ventas - servicios de terceros",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9514",
+  "descripcion": "Gastos de ventas - publicidad",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9515",
+  "descripcion": "Gastos de ventas - cargas diversas",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9516",
+  "descripcion": "Gastos de ventas - depreciacion",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "97",
+  "descripcion": "GASTOS FINANCIEROS",
+  "nivel": 2,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "971",
+  "descripcion": "Gastos financieros",
+  "nivel": 3,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9711",
+  "descripcion": "Gastos financieros - intereses",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9712",
+  "descripcion": "Gastos financieros - otros",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "98",
+  "descripcion": "GASTOS DE EXPLOTACION",
+  "nivel": 2,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "981",
+  "descripcion": "Gastos de explotacion",
+  "nivel": 3,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "9811",
+  "descripcion": "Gastos de explotacion",
+  "nivel": 4,
+  "elemento": 9,
+  "elemento_nombre": "Gastos por Categoria"
+ },
+ {
+  "codigo": "1011",
+  "descripcion": "Caja - Efectivo",
+  "nivel": 4,
+  "elemento": 1,
+  "elemento_nombre": "Activo Disponible y Exigible"
+ },
+ {
+  "codigo": "1012",
+  "descripcion": "Caja - Cheques",
+  "nivel": 4,
+  "elemento": 1,
+  "elemento_nombre": "Activo Disponible y Exigible"
+ },
+ {
+  "codigo": "1021",
+  "descripcion": "Fondos fijos",
+  "nivel": 4,
+  "elemento": 1,
+  "elemento_nombre": "Activo Disponible y Exigible"
  }
 ]

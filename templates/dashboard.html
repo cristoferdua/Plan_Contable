@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; }
+    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+    .topbar nav { display:flex; gap:.4rem; align-items:center; }
+    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
+    .topbar a:hover { background:rgba(255,255,255,.24); }
+    .topbar a.cta { background:#e67e22; font-weight:600; }
+    .wrap { max-width:1200px; margin:0 auto; padding:1.4rem; }
+
+    .dash-hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+      color: #fff;
+      border-radius: 14px;
+      padding: 1.8rem;
+      margin-bottom: 1.4rem;
+      box-shadow: 0 10px 30px rgba(30, 58, 95, .18);
+    }
+    .dash-hero h2 { margin:0 0 .3rem; font-size: 1.4rem; }
+    .dash-hero p { margin:0; opacity: .9; font-size: .9rem; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.4rem;
+    }
+    @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .stats-grid { grid-template-columns: 1fr; } }
+
+    .stat-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 1.4rem;
+      box-shadow: 0 2px 10px rgba(15,23,42,.06);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      transition: all .22s cubic-bezier(.2,.9,.3,1);
+    }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(15,23,42,.1); }
+    .stat-icon {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      display:flex; align-items:center; justify-content:center;
+      font-family:'Material Symbols Rounded'; font-size: 1.8rem;
+      flex-shrink: 0;
+    }
+    .stat-icon.c-blue { background: #eaf1fb; color: #2c5282; }
+    .stat-icon.c-green { background: #e8f6ee; color: #1e8449; }
+    .stat-icon.c-orange { background: #fff5e6; color: #e67e22; }
+    .stat-icon.c-purple { background: #f0e6f6; color: #6b4c93; }
+    .stat-body { flex: 1; }
+    .stat-label { font-size: .75rem; color: #6b7785; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: .2rem; }
+    .stat-value { font-size: 1.5rem; font-weight: 800; color: #1f2937; line-height: 1.1; }
+    .stat-sub { font-size: .75rem; color: #6b7785; margin-top: .15rem; }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 760px) { .quick-grid { grid-template-columns: 1fr; } }
+
+    .quick-link {
+      background: #fff;
+      border-radius: 14px;
+      padding: 1.2rem;
+      text-decoration: none;
+      color: #1f2937;
+      box-shadow: 0 2px 10px rgba(15,23,42,.05);
+      transition: all .22s cubic-bezier(.2,.9,.3,1);
+      display: flex;
+      align-items: center;
+      gap: .8rem;
+    }
+    .quick-link:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(44, 82, 130, .15); border-color: #2c5282; }
+    .quick-link .ic { font-size: 1.8rem; color: #2c5282; }
+    .quick-link strong { display: block; font-size: .95rem; color: #1e3a5f; margin-bottom: .1rem; }
+    .quick-link span.ds { font-size: .78rem; color: #6b7785; }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 1.6rem 0 .8rem;
+    }
+    .section-head h3 { margin:0; font-size: 1rem; color: #4a5568; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1><span class="ic">dashboard</span> Dashboard</h1>
+    </div>
+    <nav>
+      <a href="/"><span class="ic sm">home</span> Inicio</a>
+      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <a href="/asientos/nuevo" class="cta"><span class="ic sm">add</span> Nuevo</a>
+      <button type="button" class="theme-toggle">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="dash-hero">
+      <h2>Resumen de tu contabilidad</h2>
+      <p>Vista general de las operaciones del mes de {{ hoy.strftime('%B de %Y') }}.</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon c-blue">receipt_long</div>
+        <div class="stat-body">
+          <div class="stat-label">Total asientos</div>
+          <div class="stat-value">{{ total_asientos }}</div>
+          <div class="stat-sub">registrados en total</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon c-purple">calendar_month</div>
+        <div class="stat-body">
+          <div class="stat-label">Asientos este mes</div>
+          <div class="stat-value">{{ asientos_mes }}</div>
+          <div class="stat-sub">operaciones del mes</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon c-green">trending_up</div>
+        <div class="stat-body">
+          <div class="stat-label">Ventas del mes</div>
+          <div class="stat-value">S/ {{ '%.0f'|format(ventas_mes) }}</div>
+          <div class="stat-sub">ingresos registrados</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon c-orange">shopping_cart</div>
+        <div class="stat-body">
+          <div class="stat-label">Compras del mes</div>
+          <div class="stat-value">S/ {{ '%.0f'|format(compras_mes) }}</div>
+          <div class="stat-sub">gastos registrados</div>
+        </div>
+      </div>
+    </div>
+
+    {% if ultima_op %}
+    <div class="stat-card" style="background: linear-gradient(90deg, #fbfcfe 0%, #f4f8fd 100%);">
+      <div class="stat-icon c-blue">bolt</div>
+      <div class="stat-body">
+        <div class="stat-label">Ultima operacion</div>
+        <div class="stat-value" style="font-size:1.05rem;">{{ ultima_glosa }}</div>
+        <div class="stat-sub">{{ ultima_op.fecha }} &middot; {{ ultima_op.numero }}</div>
+      </div>
+      <a href="/asientos/{{ ultima_op.id }}" class="op-btn" style="background:#2c5282;color:#fff;">Ver</a>
+    </div>
+    {% endif %}
+
+    <div class="section-head"><h3>Accesos rapidos</h3></div>
+    <div class="quick-grid">
+      <a href="/asientos/nuevo" class="quick-link">
+        <span class="ic">edit_note</span>
+        <div>
+          <strong>Crear nuevo asiento</strong>
+          <span class="ds">Registra una operacion</span>
+        </div>
+      </a>
+      <a href="/asientos" class="quick-link">
+        <span class="ic">receipt_long</span>
+        <div>
+          <strong>Ver operaciones</strong>
+          <span class="ds">Historial completo</span>
+        </div>
+      </a>
+      <a href="/" class="quick-link">
+        <span class="ic">manage_search</span>
+        <div>
+          <strong>Buscar cuenta PCGE</strong>
+          <span class="ds">Catalogo contable</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="section-head"><h3>Reportes contables</h3></div>
+    <div class="quick-grid">
+      <a href="/reportes/libro-mayor" class="quick-link">
+        <span class="ic" style="color:#1e8449;">menu_book</span>
+        <div>
+          <strong>Libro Mayor</strong>
+          <span class="ds">Movimientos por cuenta</span>
+        </div>
+      </a>
+      <a href="/reportes/balance" class="quick-link">
+        <span class="ic" style="color:#e67e22;">balance</span>
+        <div>
+          <strong>Balance de comprobacion</strong>
+          <span class="ds">Verifica que todo cuadre</span>
+        </div>
+      </a>
+    </div>
+  </main>
+</body>
+</html>

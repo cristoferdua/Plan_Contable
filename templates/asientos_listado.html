@@ -2,50 +2,296 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Asientos contables</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operaciones contables</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; background: #f5f6f8; color: #222; }
-    h1 { font-size: 1.4rem; }
-    nav { margin-bottom: 1rem; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { border: 1px solid #ddd; padding: .4rem .6rem; font-size: .9rem; text-align: left; }
-    th { background: #2c3e50; color: #fff; }
-    tr.anulado td { text-decoration: line-through; color: #888; }
-    tr.reversa td { background: #fff6e5; }
-    .btn { display: inline-block; padding: .4rem .8rem; background: #2c3e50; color: #fff; text-decoration: none; border-radius: 3px; }
+    :root {
+      --bg: #f2f5f9;
+      --card: #ffffff;
+      --border: #d8dee7;
+      --muted: #6b7785;
+      --text: #1f2937;
+      --primary: #1e3a5f;
+      --primary-2: #2c5282;
+      --accent: #e67e22;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 14px; }
+    .topbar { background: var(--primary); color: #fff; padding: .8rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .topbar h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+    .topbar nav { display: flex; gap: .4rem; }
+    .topbar a { color: #fff; text-decoration: none; font-size: .82rem; padding: .35rem .6rem; border-radius: 6px; background: rgba(255,255,255,.12); }
+    .topbar a:hover { background: rgba(255,255,255,.24); }
+    .topbar a.cta { background: var(--accent); font-weight: 600; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 1.1rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 1px 2px rgba(15,23,42,.04); margin-bottom: 1rem; overflow: hidden; }
+    .card-head { padding: .8rem 1rem; border-bottom: 1px solid var(--border); background: #fbfcfe; display: flex; justify-content: space-between; align-items: center; }
+    .card-head h2 { font-size: .9rem; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .op-list { display: flex; flex-direction: column; }
+    .op-item { border-bottom: 1px solid var(--border); }
+    .op-item:last-child { border-bottom: none; }
+    .op-header {
+      display: grid;
+      grid-template-columns: 95px minmax(0, 1fr) 100px 110px 60px 260px;
+      gap: 1rem;
+      align-items: center;
+      padding: .8rem 1rem;
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .op-header:hover { background: #f4f8fd; }
+    .op-fecha { font-weight: 600; color: var(--primary); font-size: .85rem; }
+    .op-titulo { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .op-doc { font-size: .75rem; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+    .op-badge {
+      background: var(--primary-2);
+      color: #fff;
+      padding: .18rem .55rem;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .op-badge.unico { background: #6b7785; }
+    .op-monto { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--primary); }
+    .op-ver { text-align: center; min-width: 60px; }
+    .op-ver a { color: var(--primary-2); font-size: .8rem; text-decoration: none; font-weight: 600; }
+    .op-ver a:hover { text-decoration: underline; }
+    .op-ver .op-expand {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #eaf1fb;
+      color: var(--primary-2);
+      font-size: .75rem;
+      cursor: pointer;
+      transition: all .22s cubic-bezier(.2,.9,.3,1);
+    }
+    .op-item.open .op-ver .op-expand { background: var(--primary-2); color: #fff; transform: rotate(90deg); }
+    .op-actions { display: flex; gap: .4rem; align-items: center; justify-content: flex-end; }
+    .op-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .35rem .65rem;
+      border-radius: 6px;
+      font-size: .75rem;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .op-btn:hover { background: #eef3f8; border-color: var(--primary-2); color: var(--primary-2); }
+    .op-btn.excel { background: #1e8449; color: #fff; border-color: #1e8449; }
+    .op-btn.excel:hover { background: #15733b; color: #fff; }
+    .op-btn.danger { background: #fff; color: #c0392b; border-color: #e8b7b1; cursor: pointer; }
+    .op-btn.danger:hover { background: #c0392b; color: #fff; border-color: #c0392b; }
+    .op-expand { font-size: .9rem; color: var(--muted); transition: transform .15s; display: inline-block; }
+    .op-item.open .op-expand { transform: rotate(90deg); }
+    .op-detail {
+      display: none;
+      padding: .3rem 1rem 1rem 2.2rem;
+      background: #fafbfd;
+      border-top: 1px dashed var(--border);
+    }
+    .op-item.open .op-detail { display: block; }
+    .sub-asiento {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .7rem .9rem;
+      margin: .5rem 0;
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr) 110px 210px;
+      gap: .8rem;
+      align-items: center;
+    }
+    .sub-ver { display: flex; gap: .3rem; justify-content: flex-end; flex-wrap: nowrap; }
+    .sub-ver a {
+      display: inline-block;
+      padding: .3rem .55rem;
+      border-radius: 6px;
+      font-size: .72rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      color: var(--primary-2);
+      background: #fff;
+      white-space: nowrap;
+    }
+    .sub-ver a:hover { background: var(--primary-2); color: #fff; }
+    .sub-ver a.excel-btn { background: #1e8449; color: #fff; border-color: #1e8449; }
+    .sub-ver a.excel-btn:hover { background: #15733b; }
+    .sub-num { background: var(--primary); color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .85rem; }
+    .sub-glosa { color: var(--text); font-size: .88rem; }
+    .sub-numero { font-family: ui-monospace, Consolas, monospace; font-size: .75rem; color: var(--muted); }
+    .sub-ver a { color: var(--primary-2); font-size: .78rem; text-decoration: none; padding: .3rem .7rem; border: 1px solid var(--primary-2); border-radius: 6px; }
+    .sub-ver a:hover { background: var(--primary-2); color: #fff; }
+    .empty { text-align: center; padding: 2rem; color: var(--muted); }
+    @media (max-width: 760px) {
+      .op-header { grid-template-columns: 1fr auto; gap: .5rem; }
+      .op-fecha, .op-doc, .op-monto { grid-column: 1 / -1; font-size: .75rem; }
+      .op-ver { grid-column: 1 / -1; text-align: left; }
+      .sub-asiento { grid-template-columns: 32px 1fr; }
+      .sub-numero, .sub-ver { grid-column: 2; }
+    }
   </style>
 </head>
 <body>
-  <h1>Asientos contables</h1>
-  <nav>
-    <a href="/">Buscador</a> |
-    <a href="/asientos">Asientos</a> |
-    <a href="/asientos/nuevo" class="btn">+ Nuevo asiento</a>
-  </nav>
-  <table>
-    <thead>
-      <tr>
-        <th>Numero</th><th>Fecha</th><th>Glosa</th><th>Moneda</th>
-        <th style="text-align:right;">Monto</th><th>Estado</th><th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for a in asientos %}
-      <tr class="{% if a.anulado_por_id %}anulado{% endif %}{% if a.reversa_de_id %} reversa{% endif %}">
-        <td>{{ a.numero }}</td>
-        <td>{{ a.fecha }}</td>
-        <td>{{ a.glosa }}</td>
-        <td>{{ a.moneda }}</td>
-        <td style="text-align:right;">{{ '%.2f'|format(totales[a.id]) }}</td>
-        <td>
-          {% if a.reversa_de_id %}Reversa{% elif a.anulado_por_id %}Anulado{% else %}Vigente{% endif %}
-        </td>
-        <td><a href="/asientos/{{ a.id }}">Ver</a></td>
-      </tr>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" title="Volver atras" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;color:#fff;text-decoration:none;font-size:.82rem;font-weight:600;display:inline-flex;align-items:center;gap:.25rem;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1 style="margin:0;display:flex;align-items:center;gap:.5rem;"><span class="ic">receipt_long</span> Operaciones contables</h1>
+    </div>
+    <nav>
+      <a href="/" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">home</span> Inicio</a>
+      <a href="/asientos" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <a href="/asientos/nuevo" class="cta" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">add</span> Nueva operacion</a>
+      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="card">
+      <div class="card-head">
+        <h2>Historial de operaciones</h2>
+        <span style="font-size:.78rem;color:var(--muted);">{{ operaciones|length }} operacion(es)</span>
+      </div>
+      {% if operaciones %}
+      <div class="op-list">
+        {% for op in operaciones %}
+        <div class="op-item" data-key="{{ op.key }}">
+          <div class="op-header" onclick="toggleOp(this)">
+            <div class="op-fecha">{{ op.fecha }}</div>
+            <div>
+              <div class="op-titulo">{{ op.titulo }}</div>
+              {% if op.numero_documento %}<div class="op-doc">Doc: {{ op.numero_documento }}</div>{% endif %}
+            </div>
+            <div>
+              {% if op.n_asientos > 1 %}
+                <span class="op-badge">{{ op.n_asientos }} asientos</span>
+              {% else %}
+                <span class="op-badge unico">1 asiento</span>
+              {% endif %}
+            </div>
+            <div class="op-monto">S/ {{ '%.2f'|format(op.total_debe) }}</div>
+            <div class="op-ver">
+              {% if op.n_asientos > 1 %}
+                <span class="op-expand"><span class="ic">chevron_right</span></span>
+              {% else %}
+                <a href="/asientos/{{ op.ids[0] }}" style="display:inline-flex;align-items:center;gap:.2rem;">Ver <span class="ic sm">arrow_forward</span></a>
+              {% endif %}
+            </div>
+            <div class="op-actions" onclick="event.stopPropagation();">
+              {% if op.n_asientos > 1 %}
+                <a class="op-btn excel" href="/operaciones/excel?ids={{ op.ids|join(',') }}" title="Descargar Excel de los {{ op.n_asientos }} asientos"><span class="ic sm">download</span> Excel</a>
+                <button type="button" class="op-btn danger" onclick="eliminarOperacion([{{ op.ids|join(',') }}], '{{ op.titulo|replace("'", "\\'") }}')" title="Eliminar los {{ op.n_asientos }} asientos de esta operacion"><span class="ic sm">delete</span> Eliminar</button>
+              {% else %}
+                <a class="op-btn excel" href="/asientos/{{ op.ids[0] }}/excel" title="Descargar Excel"><span class="ic sm">download</span> Excel</a>
+                <a class="op-btn" href="/asientos/nuevo?editar={{ op.ids[0] }}" title="Editar"><span class="ic sm">edit</span> Editar</a>
+                <button type="button" class="op-btn danger" onclick="eliminarAsientoUnico({{ op.ids[0] }})" title="Eliminar"><span class="ic sm">delete</span></button>
+              {% endif %}
+            </div>
+          </div>
+          {% if op.n_asientos > 1 %}
+          <div class="op-detail">
+            <div style="font-size:.78rem;color:var(--muted);margin-bottom:.3rem;">
+              Esta operacion esta compuesta por {{ op.n_asientos }} asientos relacionados:
+            </div>
+            {% for a in op.asientos %}
+            <div class="sub-asiento">
+              <div class="sub-num">{{ loop.index }}</div>
+              <div class="sub-glosa">{{ a.glosa }}</div>
+              <div class="sub-numero">{{ a.numero }}</div>
+              <div class="sub-ver">
+                <a href="/asientos/{{ a.id }}">Ver</a>
+                <a href="/asientos/nuevo?editar={{ a.id }}">Editar</a>
+                <a class="excel-btn" href="/asientos/{{ a.id }}/excel">Excel</a>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
       {% else %}
-      <tr><td colspan="7">Sin asientos registrados.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      <div class="empty-state">
+        <div class="empty-icon">receipt_long</div>
+        <h3>Aun no hay operaciones</h3>
+        <p>Cuando crees tu primer asiento contable aparecera aqui.<br>Puedes empezar con una plantilla rapida o un asiento en blanco.</p>
+        <a href="/asientos/nuevo" class="empty-cta">
+          <span class="ic sm">add_circle</span> Crear mi primera operacion
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+
+  <script>
+    function toggleOp(el) {
+      var item = el.parentElement;
+      if (!item.querySelector('.op-detail')) return;
+      item.classList.toggle('open');
+    }
+    async function eliminarAsientoUnico(id) {
+      var ok = await UI.confirm({
+        type: 'danger',
+        icon: 'delete',
+        title: 'Eliminar asiento',
+        msg: 'Esta accion no se puede deshacer. El asiento se borrara permanentemente.',
+        confirmText: 'Si, eliminar',
+        cancelText: 'Cancelar'
+      });
+      if (!ok) return;
+      fetch('/asientos/' + id, { method: 'DELETE' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) {
+            UI.success('Asiento eliminado correctamente.', 'Listo');
+            setTimeout(function () { location.reload(); }, 700);
+          } else {
+            UI.error(d.error || 'Error desconocido', 'No se pudo eliminar');
+          }
+        })
+        .catch(function () { UI.error('Error de red al eliminar.', 'Sin conexion'); });
+    }
+    async function eliminarOperacion(ids, titulo) {
+      var ok = await UI.confirm({
+        type: 'danger',
+        icon: 'delete_sweep',
+        title: 'Eliminar operacion completa',
+        msg: 'Se borraran los ' + ids.length + ' asientos de "' + titulo + '".\nEsta accion no se puede deshacer.',
+        confirmText: 'Si, eliminar todo',
+        cancelText: 'Cancelar'
+      });
+      if (!ok) return;
+      fetch('/operaciones/eliminar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) {
+            UI.success(d.eliminados + ' asientos eliminados.', 'Operacion borrada');
+            setTimeout(function () { location.reload(); }, 700);
+          } else {
+            UI.error(d.error || 'Error desconocido', 'No se pudo eliminar');
+          }
+        })
+        .catch(function () { UI.error('Error de red.', 'Sin conexion'); });
+    }
+  </script>
 </body>
 </html>

@@ -2,316 +2,2508 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nuevo asiento - Libro Diario (Formato SUNAT 5.1)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 1.5rem; background: #f5f6f8; color: #222; }
-    h1 { font-size: 1.3rem; }
-    nav { margin-bottom: 1rem; }
-    .card { background: #fff; padding: 1rem; border: 1px solid #ccc; margin-bottom: 1rem; }
-    label { display: block; font-size: .75rem; color: #555; margin-bottom: .2rem; }
-    input, textarea, select { padding: .35rem; font-size: .85rem; box-sizing: border-box; }
-    .cabecera { display: grid; grid-template-columns: 130px 90px 90px 130px 150px 150px 1fr; gap: .6rem; }
-    .cabecera input, .cabecera select { width: 100%; }
-    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #999; }
-    th, td { border: 1px solid #bbb; padding: .25rem .4rem; font-size: .82rem; vertical-align: middle; }
-    th { background: #2c3e50; color: #fff; font-weight: normal; text-align: center; }
-    td.c { text-align: center; }
-    td.num { text-align: right; font-variant-numeric: tabular-nums; }
-    td input, td textarea { width: 100%; border: none; outline: none; background: transparent; font-size: .82rem; padding: .15rem; }
-    tr.titulo td { background: #eef1f5; font-weight: bold; color: #333; }
-    tr.glosa td { background: #fffbea; font-style: italic; }
-    tfoot td { font-weight: bold; background: #e8edf3; }
-    .btn { padding: .4rem .8rem; background: #2c3e50; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: .85rem; }
-    .btn:disabled { background: #999; cursor: not-allowed; }
-    .btn.sec { background: #7f8c8d; }
-    .btn.dh { padding: .15rem .4rem; width: 100%; }
-    .btn.dh.d { background: #2c3e50; }
-    .btn.dh.h { background: #e67e22; }
-    .suggest { position: absolute; background: #fff; border: 1px solid #999; max-height: 180px; overflow: auto; z-index: 10; font-size: .78rem; min-width: 320px; }
-    .suggest div { padding: .25rem .4rem; cursor: pointer; }
-    .suggest div:hover, .suggest div.active { background: #e8edf3; }
-    .suggest .codigo { font-weight: bold; margin-right: .4rem; }
-    .suggest .nivel { color: #888; font-size: .7rem; margin-left: .3rem; }
-    .errores { background: #fdecea; border: 1px solid #c0392b; padding: .6rem; margin-bottom: 1rem; color: #c0392b; }
-    .errores ul { margin: .3rem 0 0 1.2rem; }
-    .acciones { display: flex; gap: .5rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
-    .diff-ok { color: #27ae60; }
-    .diff-bad { color: #c0392b; }
+    :root {
+      --bg: #f2f5f9;
+      --card: #ffffff;
+      --border: #d8dee7;
+      --muted: #6b7785;
+      --text: #1f2937;
+      --primary: #1e3a5f;
+      --primary-2: #2c5282;
+      --accent: #e67e22;
+      --ok: #1e8449;
+      --danger: #c0392b;
+      --warn: #b7791f;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 14px;
+    }
+    .topbar {
+      background: var(--primary);
+      color: #fff;
+      padding: .8rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .topbar h1 { font-size: 1rem; margin: 0; font-weight: 600; letter-spacing: .01em; }
+    .topbar nav { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+    .topbar a {
+      color: #fff;
+      text-decoration: none;
+      font-size: .82rem;
+      padding: .35rem .6rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, .12);
+    }
+    .topbar a:hover { background: rgba(255, 255, 255, .24); }
+    .wrap { max-width: 1260px; margin: 0 auto; padding: 1.1rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .card-head {
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      flex-wrap: wrap;
+      background: #fbfcfe;
+    }
+    .card-head h2 { font-size: .85rem; margin: 0; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    .card-body { padding: 1rem; }
+    .hint { font-size: .78rem; color: var(--muted); }
+    .hint kbd {
+      background: #eef1f5;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 0 .3rem;
+      font-family: inherit;
+      font-size: .72rem;
+    }
+    .cabecera {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: .75rem;
+    }
+    .field { display: flex; flex-direction: column; gap: .25rem; }
+    .field label {
+      font-size: .7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      font-weight: 600;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: .45rem .55rem;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: .85rem;
+      background: #fff;
+      color: var(--text);
+    }
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: var(--primary-2);
+      box-shadow: 0 0 0 3px rgba(44, 82, 130, .12);
+    }
+    .field input:disabled { background: #f1f4f8; color: var(--muted); }
+    input.invalid, select.invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(192, 57, 43, .1) !important; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 920px; }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--primary);
+      color: #fff;
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: .55rem .5rem;
+      text-align: left;
+      white-space: nowrap;
+    }
+    thead th.num, tbody td.num, thead th.c, tbody td.c { text-align: center; }
+    tbody td {
+      padding: .3rem .4rem;
+      border-bottom: 1px solid #edf0f4;
+      vertical-align: top;
+      background: #fff;
+    }
+    tbody tr:nth-child(even) td { background: #fafbfd; }
+    tbody tr.fila-titulo td { background: #eaf0f7; }
+    tbody tr.fila-titulo .in-cuenta { font-weight: 600; }
+    tbody tr.fila-error td.celda-cuenta { background: #fff8f7; }
+    td.orden { color: var(--muted); font-size: .75rem; padding-top: .65rem; width: 34px; }
+    .cuenta-box { position: relative; }
+    .cell-input {
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: .4rem .45rem;
+      font-size: .84rem;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+    }
+    .cell-input:hover { border-color: #e3e8ef; }
+    .cell-input:focus {
+      outline: none;
+      border-color: var(--primary-2);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(44, 82, 130, .12);
+    }
+    .num-input { text-align: right; font-variant-numeric: tabular-nums; }
+    .desc-cuenta { font-size: .72rem; color: var(--muted); padding: .1rem .45rem 0; min-height: 0; }
+    .row-msg { font-size: .7rem; color: var(--warn); padding: .08rem .45rem 0; }
+    .row-msg:empty { display: none; }
+    .dash { color: #b6c0cc; font-size: .8rem; display: inline-block; padding-top: .4rem; }
+    .suggest {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      z-index: 30;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, .16);
+      min-width: 360px;
+      max-width: min(620px, 82vw);
+      max-height: 270px;
+      overflow: auto;
+    }
+    .suggest[hidden] { display: none; }
+    .suggest div {
+      display: flex;
+      align-items: baseline;
+      gap: .55rem;
+      padding: .45rem .6rem;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f3f6;
+      font-size: .8rem;
+    }
+    .suggest div:last-child { border-bottom: none; }
+    .suggest div:hover, .suggest div.active { background: #eaf1fb; }
+    .suggest .codigo {
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      color: var(--primary);
+      min-width: 44px;
+    }
+    .suggest .desc { flex: 1; }
+    .suggest .nivel {
+      font-size: .66rem;
+      color: var(--muted);
+      background: #eef1f5;
+      border-radius: 999px;
+      padding: .02rem .4rem;
+      white-space: nowrap;
+    }
+    .row-actions { display: flex; gap: 2px; justify-content: center; }
+    .icon-btn {
+      width: 25px;
+      height: 25px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--muted);
+      font-size: .78rem;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .icon-btn:hover { background: #eef3f8; color: var(--text); }
+    .icon-btn.danger:hover { background: #fdecea; border-color: #f5b7b1; color: var(--danger); }
+    .totales {
+      display: flex;
+      justify-content: flex-end;
+      align-items: stretch;
+      gap: .75rem;
+      padding: .8rem 1rem;
+      border-top: 1px solid var(--border);
+      background: #fbfcfd;
+      flex-wrap: wrap;
+    }
+    .total-item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: .1rem;
+      min-width: 110px;
+      padding: .2rem .7rem;
+      border-left: 1px solid var(--border);
+    }
+    .total-item:first-child { border-left: none; }
+    .total-item span {
+      font-size: .66rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      font-weight: 600;
+    }
+    .total-item strong { font-size: 1.02rem; font-variant-numeric: tabular-nums; }
+    #td-diff.ok { color: var(--ok); }
+    #td-diff.bad { color: var(--danger); }
+    .acciones { display: flex; gap: .5rem; align-items: center; padding: 0 1rem 1rem; flex-wrap: wrap; }
+    .acciones .spacer { flex: 1; }
+    .btn {
+      border: 1px solid transparent;
+      border-radius: 7px;
+      padding: .45rem .8rem;
+      font-size: .82rem;
+      font-family: inherit;
+      cursor: pointer;
+      background: #fff;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.ghost { border-color: var(--border); }
+    .btn.ghost:hover:not(:disabled) { background: #f1f5f9; }
+    .btn.primary { background: var(--primary); color: #fff; }
+    .btn.primary:hover:not(:disabled) { background: var(--primary-2); }
+    .btn.secondary { background: #4a5568; color: #fff; }
+    .btn.secondary:hover:not(:disabled) { background: #2d3748; }
+    .estado {
+      font-size: .8rem;
+      font-weight: 600;
+      padding: .35rem .65rem;
+      border-radius: 999px;
+      background: #eef1f5;
+    }
+    .estado.ok { color: var(--ok); background: #e8f6ee; }
+    .estado.bad { color: var(--danger); background: #fdecea; }
+    .estado.muted { color: var(--muted); }
+    .errores {
+      background: #fdecea;
+      border: 1px solid #f1a9a0;
+      border-left: 4px solid var(--danger);
+      color: #8c2418;
+      padding: .7rem .9rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: .84rem;
+    }
+    .errores ul { margin: .35rem 0 0 1.1rem; padding: 0; }
+    .errores li { margin-bottom: .15rem; }
+    #glosa { width: 100%; resize: vertical; min-height: 58px; padding: .5rem .6rem; border: 1px solid var(--border); border-radius: 7px; font-size: .85rem; font-family: inherit; }
+    #glosa:focus { outline: none; border-color: var(--primary-2); box-shadow: 0 0 0 3px rgba(44, 82, 130, .12); }
+    .plantilla-bar {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      padding: .7rem 1rem;
+      background: linear-gradient(90deg, #eaf1fb 0%, #f4f8fd 100%);
+      border-bottom: 1px solid var(--border);
+    }
+    .plantilla-bar .pb-text { font-size: .85rem; color: var(--primary); font-weight: 600; }
+    .plantilla-bar .pb-hint { font-size: .75rem; color: var(--muted); flex: 1; }
+    .btn.plantilla {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      padding: .5rem 1rem;
+    }
+    .btn.plantilla:hover:not(:disabled) { background: #d35400; }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, .55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 1rem;
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      max-width: 560px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+    }
+    .modal.wide { max-width: 820px; }
+    .modal-body { flex: 1; overflow-y: auto; }
+    .modal-head {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-head h3 { margin: 0; font-size: 1.05rem; color: var(--primary); }
+    .modal-close {
+      border: none;
+      background: transparent;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+    }
+    .modal-close:hover { color: var(--danger); }
+    .modal-body { padding: 1.1rem 1.25rem; }
+    .plantillas-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: .7rem;
+    }
+    .plantilla-card {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      background: #fff;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      transition: all .15s;
+    }
+    .plantilla-card:hover {
+      border-color: var(--accent);
+      background: #fff8f0;
+      transform: translateY(-2px);
+    }
+    .plantilla-card .ic { display: block; margin-bottom: .4rem; }
+    .plantilla-card .tt { font-size: .95rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: .2rem; }
+    .plantilla-card .ds { font-size: .75rem; color: var(--muted); line-height: 1.3; }
+    .plantilla-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+    @media (max-width: 700px) {
+      .plantilla-layout { grid-template-columns: 1fr; }
+    }
+    .plantilla-form { display: flex; flex-direction: column; gap: .7rem; }
+    .plantilla-form .field label { font-size: .78rem; }
+    .plantilla-form .field input,
+    .plantilla-form .field select {
+      padding: .55rem .65rem;
+      font-size: .95rem;
+    }
+    .plantilla-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+    .plantilla-preview {
+      padding: .8rem;
+      background: #f4f8fd;
+      border-radius: 8px;
+      border-left: 3px solid var(--primary-2);
+      font-size: .78rem;
+      color: var(--text);
+      max-height: 420px;
+      overflow-y: auto;
+      position: sticky;
+      top: 0;
+    }
+    .plantilla-preview .pp-section-title {
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: .5rem;
+      padding-top: .4rem;
+      border-top: 1px dashed #c5d2e2;
+    }
+    .plantilla-preview .pp-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+    .plantilla-preview .pp-line {
+      display: flex;
+      justify-content: space-between;
+      padding: .15rem 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .plantilla-preview .pp-line .cta { color: var(--muted); }
+    .modal-foot {
+      padding: .8rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: .5rem;
+      background: #fbfcfe;
+    }
+    @media (max-width: 560px) {
+      .plantillas-grid { grid-template-columns: 1fr; }
+      .plantilla-form .row { grid-template-columns: 1fr; }
+    }
+    .label-row { display: flex; align-items: center; gap: .3rem; }
+    .help-ic {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #cbd5e0;
+      color: #fff;
+      font-size: .68rem;
+      font-weight: 700;
+      cursor: help;
+      position: relative;
+    }
+    .help-ic:hover { background: var(--primary-2); }
+    .help-ic::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1f2937;
+      color: #fff;
+      padding: .45rem .6rem;
+      border-radius: 6px;
+      font-size: .72rem;
+      font-weight: 400;
+      white-space: pre-line;
+      min-width: 180px;
+      max-width: 260px;
+      text-align: left;
+      line-height: 1.35;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s;
+      z-index: 50;
+    }
+    .help-ic:hover::after { opacity: 1; }
+    .field-hint {
+      font-size: .7rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: .1rem;
+    }
+    .panel-ayuda {
+      background: #fff8e8;
+      border: 1px solid #f0d78a;
+      border-radius: var(--radius);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .panel-ayuda summary {
+      cursor: pointer;
+      padding: .7rem 1rem;
+      font-weight: 600;
+      color: #7a5c0d;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      user-select: none;
+    }
+    .panel-ayuda summary::marker { color: var(--accent); }
+    .panel-ayuda .pa-body {
+      padding: .3rem 1.1rem 1rem;
+      font-size: .85rem;
+      line-height: 1.5;
+      color: #5c4705;
+    }
+    .panel-ayuda .pa-body h4 { margin: .7rem 0 .25rem; color: var(--primary); font-size: .9rem; }
+    .panel-ayuda .pa-body ul { margin: .3rem 0 .5rem 1.1rem; padding: 0; }
+    .panel-ayuda .pa-body li { margin-bottom: .2rem; }
+    .panel-ayuda .pa-body .ejemplo {
+      background: #fff;
+      border-left: 3px solid var(--primary-2);
+      padding: .5rem .7rem;
+      margin: .4rem 0;
+      border-radius: 4px;
+      font-size: .78rem;
+    }
+    @media (max-width: 900px) {
+      .cabecera { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .wrap { padding: .75rem; }
+      .acciones .spacer { flex-basis: 100%; }
+    }
+    @media (max-width: 560px) {
+      .cabecera { grid-template-columns: 1fr; }
+      .total-item { min-width: 90px; padding: .2rem .45rem; }
+      .suggest { min-width: 260px; max-width: 88vw; }
+      .btn { flex: 1 1 auto; }
+    }
   </style>
 </head>
 <body>
-  <h1>Formato 5.1: "Libro Diario" &mdash; Nuevo asiento</h1>
-  <nav>
-    <a href="/">Buscador</a> |
-    <a href="/asientos">Asientos</a>
-  </nav>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" class="topbar-back" title="Volver atras" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;color:#fff;text-decoration:none;font-size:.82rem;font-weight:600;display:inline-flex;align-items:center;gap:.25rem;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1 style="margin:0;display:flex;align-items:center;gap:.5rem;"><span class="ic">edit_note</span> Libro Diario &mdash; Nuevo asiento</h1>
+    </div>
+    <nav>
+      <a href="/dashboard" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">home</span> Inicio</a>
+      <a href="/asientos" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">receipt_long</span> Asientos</a>
+      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
+    </nav>
+  </header>
 
-  <div id="errores" class="errores" style="display:none;"></div>
+  <main class="wrap">
+    <div id="errores" class="errores" style="display:none;"></div>
+    <div id="draft-banner-slot"></div>
 
-  <div class="card">
-    <div class="cabecera">
-      <div><label>Fecha de la operacion</label><input type="date" id="fecha" value="{{ hoy }}" max="{{ hoy }}"></div>
-      <div><label>Cod. libro</label><input type="text" id="codigo_libro" placeholder="5" maxlength="10"></div>
-      <div><label>N&deg; correlativo</label><input type="text" id="numero_correlativo" placeholder="001" maxlength="20"></div>
-      <div><label>N&deg; documento</label><input type="text" id="numero_documento" placeholder="F001-1234" maxlength="30"></div>
-      <div><label>Moneda</label><select id="moneda"><option value="PEN">PEN</option><option value="USD">USD</option></select></div>
-      <div><label>Tipo cambio</label><input type="number" id="tipo_cambio" step="0.0001" value="1"></div>
-      <div></div>
+    <details class="panel-ayuda">
+      <summary><span class="ic" style="color:#b7791f;">lightbulb</span> Primera vez? Haz click aqui para entender que es un asiento contable</summary>
+      <div class="pa-body">
+        <p>Un <strong>asiento contable</strong> es como anotar en un cuaderno cada movimiento de plata de tu negocio. Cada vez que entra o sale dinero, lo registras aqui.</p>
+
+        <h4>Las 2 columnas magicas: Debe y Haber</h4>
+        <ul>
+          <li><strong>Debe (izquierda):</strong> lo que ENTRA o lo que posees (plata que recibes, cosas que compras, lo que te deben).</li>
+          <li><strong>Haber (derecha):</strong> lo que SALE o lo que debes (plata que pagas, lo que vendes, lo que debes a otros).</li>
+        </ul>
+
+        <h4>Regla de oro</h4>
+        <p>El total del <strong>Debe</strong> SIEMPRE debe ser igual al total del <strong>Haber</strong>. Si no cuadra, el asiento esta mal. (El sistema te avisa abajo con la "Diferencia").</p>
+
+        <div class="ejemplo">
+          <strong>Ejemplo simple:</strong> Vendes algo por S/ 100 en efectivo.<br>
+          &bull; Debe (Caja 1011): 100 &rarr; entro plata<br>
+          &bull; Haber (Ventas 7011): 100 &rarr; vendiste<br>
+          Total Debe = 100, Total Haber = 100. &#9989; Cuadra!
+        </div>
+
+        <h4>Lo mas facil: usa plantillas</h4>
+        <p>Si no sabes que cuenta usar, haz click en el boton naranja <strong>"Usar plantilla"</strong>. Elige lo que hiciste (venta, compra, pago, etc.) y el sistema arma el asiento solo. Tu solo pones el monto.</p>
+      </div>
+    </details>
+
+    <section class="card">
+      <div class="plantilla-bar">
+        <span class="pb-text" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic" style="color:#2c5282;">auto_awesome</span> Nuevo aqui?</span>
+        <span class="pb-hint">Usa una plantilla y nosotros armamos el asiento por ti.</span>
+        <button type="button" class="btn plantilla" id="btn-plantillas" style="display:inline-flex;align-items:center;gap:.4rem;"><span class="ic sm">dashboard_customize</span> Usar plantilla</button>
+      </div>
+      <div class="card-head">
+        <h2>Datos del asiento</h2>
+        <span class="hint">La fecha no puede ser futura y el tipo de cambio se exige solo en moneda extranjera.</span>
+      </div>
+      <div class="card-body">
+        <div class="cabecera">
+          <div class="field">
+            <div class="label-row">
+              <label for="fecha">Fecha de la operacion</label>
+              <span class="help-ic" data-tip="El dia en que ocurrio el movimiento. No puede ser una fecha futura.">?</span>
+            </div>
+            <input type="date" id="fecha" value="{{ hoy }}" max="{{ hoy }}">
+            <div class="field-hint">Ej: hoy o un dia anterior.</div>
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="moneda">Moneda</label>
+              <span class="help-ic" data-tip="En que moneda esta la operacion. Si no vendes en dolares, deja Soles (PEN).">?</span>
+            </div>
+            <select id="moneda" data-custom>
+              <option value="PEN">PEN - Soles</option>
+              <option value="USD">USD - Dolares</option>
+            </select>
+            <div class="field-hint">Usa PEN si todo es en soles.</div>
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="tipo_cambio">Tipo de cambio</label>
+              <span class="help-ic" data-tip="Cuantos soles vale 1 dolar hoy segun SUNAT. Solo se usa si la moneda es USD.">?</span>
+            </div>
+            <input type="text" id="tipo_cambio" inputmode="decimal" value="1" placeholder="1.0000">
+            <div class="field-hint">Solo si vendes en USD. En PEN se queda en 1.</div>
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="codigo_libro">Cod. libro</label>
+              <span class="help-ic" data-tip="Codigo SUNAT del libro contable. Para el Libro Diario es '5'.">?</span>
+            </div>
+            <input type="text" id="codigo_libro" maxlength="10" placeholder="5">
+            <div class="field-hint">Normalmente: 5 (Libro Diario).</div>
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="numero_correlativo">N&deg; correlativo</label>
+              <span class="help-ic" data-tip="Numero consecutivo del asiento dentro del libro. Si es tu primero, pon 001.">?</span>
+            </div>
+            <input type="text" id="numero_correlativo" maxlength="20" placeholder="001">
+            <div class="field-hint">Ej: 001, 002, 003...</div>
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="numero_documento">N&deg; documento</label>
+              <span class="help-ic" data-tip="Numero de la factura, boleta o recibo que respalda la operacion.">?</span>
+            </div>
+            <input type="text" id="numero_documento" maxlength="30" placeholder="F001-1234">
+            <div class="field-hint">Ej: F001-1234, B001-56, R001-...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Detalle del asiento</h2>
+        <span class="hint"><kbd>Enter</kbd> agrega/mueve a la siguiente linea &middot; <kbd>Ctrl</kbd> + <kbd>Enter</kbd> guarda</span>
+      </div>
+      <div class="table-wrap">
+        <table id="tabla">
+          <thead>
+            <tr>
+              <th class="c" style="width:34px;">#</th>
+              <th>Cuenta / Denominacion</th>
+              <th style="width:22%;">Glosa linea</th>
+              <th class="num" style="width:120px;">Debe</th>
+              <th class="num" style="width:120px;">Haber</th>
+              <th class="c" style="width:120px;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="totales">
+        <div class="total-item">
+          <span>Total debe</span>
+          <strong id="td-debe">0.00</strong>
+        </div>
+        <div class="total-item">
+          <span>Total haber</span>
+          <strong id="td-haber">0.00</strong>
+        </div>
+        <div class="total-item">
+          <span>Diferencia</span>
+          <strong id="td-diff" class="bad">0.00</strong>
+        </div>
+      </div>
+
+      <div class="acciones">
+        <button type="button" class="btn ghost" id="btn-add-mov">+ Linea de cuenta</button>
+        <button type="button" class="btn ghost" id="btn-add-titulo">+ Titulo (nivel 2-3)</button>
+        <button type="button" class="btn ghost" id="btn-cuadrar">Cuadrar ultima linea</button>
+        <button type="button" class="btn ghost" id="btn-limpiar">Limpiar</button>
+        <span class="spacer"></span>
+        <span id="estado" class="estado muted">Agrega al menos dos lineas de cuenta.</span>
+        <button type="button" class="btn secondary" id="btn-guardar-otro" disabled>Guardar y crear otro</button>
+        <button type="button" class="btn primary" id="btn-guardar" disabled>Guardar asiento</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Glosa del asiento</h2>
+        <span class="hint">Concepto general de la operacion (se guarda al final del asiento).</span>
+      </div>
+      <div class="card-body">
+        <textarea id="glosa" rows="2" maxlength="500" placeholder="Ej: Por aumento de capital de Jose Perez"></textarea>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal-plantillas" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h3 id="modal-titulo">Elige el tipo de operacion</h3>
+        <button type="button" class="modal-close" id="modal-close" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <div class="plantillas-grid" id="plantillas-grid">
+          <button type="button" class="plantilla-card" data-tpl="venta">
+            <span class="ic xl" style="color:#1e8449;">point_of_sale</span>
+            <span class="tt">Venta con IGV</span>
+            <span class="ds">Factura o boleta: cobras al cliente, declaras IGV y registras tu venta.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="venta_sin_igv">
+            <span class="ic xl" style="color:#1e8449;">sell</span>
+            <span class="tt">Venta SIN IGV (RUS/exonerada)</span>
+            <span class="ds">Boleta sin IGV o regimen RUS. Solo registras lo que vendes.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="compra">
+            <span class="ic xl" style="color:#2c5282;">shopping_cart</span>
+            <span class="tt">Compra con IGV</span>
+            <span class="ds">Compras mercaderia o servicios con factura, usas el IGV como credito fiscal.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="compra_sin_igv">
+            <span class="ic xl" style="color:#2c5282;">inventory_2</span>
+            <span class="tt">Compra SIN IGV</span>
+            <span class="ds">Compra a RUS, boleta o exonerada: no hay IGV que recuperar.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="gasto">
+            <span class="ic xl" style="color:#e67e22;">payments</span>
+            <span class="tt">Pago de gasto / servicio</span>
+            <span class="ds">Luz, agua, alquiler, telefono: pagas y lo registras como gasto.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="cobranza">
+            <span class="ic xl" style="color:#1e8449;">account_balance_wallet</span>
+            <span class="tt">Cobranza de factura</span>
+            <span class="ds">El cliente paga una factura pendiente: entra plata, baja lo que te debian.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="pago_prov">
+            <span class="ic xl" style="color:#c0392b;">credit_card</span>
+            <span class="tt">Pago a proveedor</span>
+            <span class="ds">Pagas una factura pendiente: sale plata, baja lo que debias.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="caja_banco">
+            <span class="ic xl" style="color:#2c5282;">account_balance</span>
+            <span class="tt">Deposito caja a banco</span>
+            <span class="ds">Mueves efectivo de caja al banco (o del banco a caja).</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="prestamo">
+            <span class="ic xl" style="color:#7c4a0f;">request_quote</span>
+            <span class="tt">Prestamo bancario</span>
+            <span class="ds">El banco te presta dinero: entra plata y queda una deuda.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="planilla">
+            <span class="ic xl" style="color:#5b4b8a;">groups</span>
+            <span class="tt">Planilla / sueldos</span>
+            <span class="ds">Registras los sueldos del mes como gasto por pagar al trabajador.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="nota_credito">
+            <span class="ic xl" style="color:#c0392b;">keyboard_return</span>
+            <span class="tt">Devolucion de venta</span>
+            <span class="ds">Nota de credito: el cliente devuelve mercaderia o le haces un descuento.</span>
+          </button>
+          <button type="button" class="plantilla-card" data-tpl="capital">
+            <span class="ic xl" style="color:#2c5282;">corporate_fare</span>
+            <span class="tt">Aporte de capital</span>
+            <span class="ds">El dueno o socio aporta dinero al negocio (entra a caja o banco).</span>
+          </button>
+        </div>
+        <div id="plantilla-form-wrap" hidden></div>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <table id="tabla">
-      <thead>
-        <tr>
-          <th style="width:28px;">#</th>
-          <th style="width:95px;">Codigo</th>
-          <th>Denominacion</th>
-          <th style="width:55px;">D/H</th>
-          <th style="width:110px;">Monto</th>
-          <th style="width:110px;">Debe</th>
-          <th style="width:110px;">Haber</th>
-          <th style="width:28px;"></th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-      <tfoot>
-        <tr>
-          <td colspan="5" style="text-align:right;">TOTALES</td>
-          <td class="num" id="td-debe">0.00</td>
-          <td class="num" id="td-haber">0.00</td>
-          <td></td>
-        </tr>
-        <tr>
-          <td colspan="5" style="text-align:right;">DIFERENCIA</td>
-          <td class="num" colspan="2" id="td-diff">0.00</td>
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
-    <div class="acciones">
-      <button class="btn sec" onclick="agregarFila(false)">+ Linea de cuenta</button>
-      <button class="btn sec" onclick="agregarFila(true)">+ Titulo (nivel 2-3)</button>
-      <button class="btn sec" onclick="cuadrarUltima()">Cuadrar en ultima linea</button>
-      <button class="btn" id="btn-guardar" onclick="guardar()" disabled>Guardar asiento</button>
+  <div id="modal-plantilla-form" class="modal-backdrop" hidden>
+    <div class="modal wide" role="dialog" aria-modal="true">
+      <div class="modal-head" style="background:linear-gradient(90deg,#eaf1fb 0%,#f4f8fd 100%);border-bottom:2px solid var(--primary-2);">
+        <div style="display:flex;align-items:center;gap:.6rem;">
+          <button type="button" style="background:transparent;border:none;cursor:pointer;color:var(--primary-2);font-size:1rem;font-weight:700;padding:.3rem .5rem;border-radius:8px;display:inline-flex;align-items:center;gap:.3rem;" id="btn-tpl-volver2" title="Volver a plantillas"><span class="ic sm">arrow_back</span> Volver</button>
+          <h3 id="modal-titulo2" style="margin:0;color:var(--primary);">Plantilla</h3>
+        </div>
+        <button type="button" class="modal-close" id="modal-close2" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-form-body"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn ghost" id="btn-tpl-volver" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">dashboard</span> Elegir otra plantilla</button>
+        <span style="flex:1;"></span>
+        <button type="button" class="btn primary" id="btn-tpl-aplicar" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">check</span> Aplicar plantilla</button>
+      </div>
     </div>
-    <p style="font-size:.8rem;color:#666;margin-top:.5rem;">
-      La <strong>glosa del asiento</strong> va abajo, al final de todas las lineas de cuenta (como en el formato SUNAT).
-    </p>
-  </div>
-
-  <div class="card">
-    <label style="font-size:.9rem;font-weight:bold;">Glosa del asiento (concepto / descripcion de la operacion)</label>
-    <textarea id="glosa" rows="2" style="width:100%;" placeholder="Ej: Por aumento de capital de Jose Perez"></textarea>
   </div>
 
   <script>
-    let autoId = 0;
-    const tbody = document.getElementById('tbody');
+    (function () {
+      'use strict';
 
-    function money(n) { return (Math.round(n * 100) / 100).toFixed(2); }
-    function escapeHtml(s) {
-      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
+      var HOY = "{{ hoy }}";
+      var EDITAR = {{ asiento_edit|tojson if asiento_edit else 'null' }};
+      var tbody = document.getElementById('tbody');
+      var estadoEl = document.getElementById('estado');
+      var errBox = document.getElementById('errores');
+      var btnGuardar = document.getElementById('btn-guardar');
+      var btnGuardarOtro = document.getElementById('btn-guardar-otro');
+      var fechaEl = document.getElementById('fecha');
+      var monedaEl = document.getElementById('moneda');
+      var tcEl = document.getElementById('tipo_cambio');
+      var glosaEl = document.getElementById('glosa');
+      var codigoLibroEl = document.getElementById('codigo_libro');
+      var correlativoEl = document.getElementById('numero_correlativo');
+      var documentoEl = document.getElementById('numero_documento');
+      var guardando = false;
 
-    function agregarFila(soloTitulo) {
-      const id = ++autoId;
-      const tr = document.createElement('tr');
-      tr.dataset.id = id;
-      tr.dataset.titulo = soloTitulo ? '1' : '0';
-      if (soloTitulo) tr.classList.add('titulo');
-      tr.innerHTML = `
-        <td class="c orden"></td>
-        <td style="position:relative;">
-          <input class="in-cuenta" placeholder="Buscar..." autocomplete="off">
-          <div class="suggest" style="display:none;"></div>
-        </td>
-        <td class="desc-cuenta" style="color:#555;"></td>
-        <td class="c">${soloTitulo ? '' : '<button type="button" class="btn dh d" data-val="D">D</button>'}</td>
-        <td class="num">${soloTitulo ? '' : '<input class="in-monto" type="number" step="0.01" min="0" placeholder="0.00">'}</td>
-        <td class="num celda-debe">${soloTitulo ? '' : '0.00'}</td>
-        <td class="num celda-haber">${soloTitulo ? '' : '0.00'}</td>
-        <td class="c"><button class="btn sec" style="padding:.1rem .35rem;" onclick="eliminarFila(this)">X</button></td>
-      `;
-      tbody.appendChild(tr);
-      wireFila(tr);
-      renumerar();
-      recalc();
-      return tr;
-    }
+      function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+      function money(n) { return round2(n).toFixed(2); }
 
-    function eliminarFila(btn) { btn.closest('tr').remove(); renumerar(); recalc(); }
-    function renumerar() {
-      Array.from(tbody.children).forEach((tr, i) => {
-        tr.querySelector('.orden').textContent = (i + 1);
-      });
-    }
-
-    function wireFila(tr) {
-      const esTitulo = tr.dataset.titulo === '1';
-      const cuenta = tr.querySelector('.in-cuenta');
-      const suggest = tr.querySelector('.suggest');
-
-      if (!esTitulo) {
-        const monto = tr.querySelector('.in-monto');
-        const btnDH = tr.querySelector('.btn.dh');
-        function pintarDH() {
-          const esDebe = btnDH.dataset.val === 'D';
-          btnDH.textContent = esDebe ? 'D' : 'H';
-          btnDH.classList.toggle('d', esDebe);
-          btnDH.classList.toggle('h', !esDebe);
+      function parseAmount(value) {
+        var s = String(value == null ? '' : value).trim().replace(/\s+/g, '');
+        if (!s) return 0;
+        if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+          s = s.replace(/,/g, '');
+        } else if (s.indexOf(',') !== -1) {
+          s = s.replace(',', '.');
         }
-        function recalcFila() {
-          const m = parseFloat(monto.value) || 0;
-          const esDebe = btnDH.dataset.val === 'D';
-          tr.querySelector('.celda-debe').textContent = money(esDebe ? m : 0);
-          tr.querySelector('.celda-haber').textContent = money(esDebe ? 0 : m);
-        }
-        btnDH.addEventListener('click', () => {
-          btnDH.dataset.val = btnDH.dataset.val === 'D' ? 'H' : 'D';
-          pintarDH(); recalcFila(); recalc();
-        });
-        monto.addEventListener('input', () => { recalcFila(); recalc(); });
+        var n = Number(s);
+        return isFinite(n) && n >= 0 ? round2(n) : NaN;
       }
 
-      let timer = null;
-      let activeIdx = -1;
-      cuenta.addEventListener('input', () => {
-        clearTimeout(timer);
-        const q = cuenta.value.trim();
-        if (!q) { suggest.style.display = 'none'; tr.querySelector('.desc-cuenta').textContent = ''; return; }
-        timer = setTimeout(() => buscarCuenta(q, suggest, cuenta, tr, esTitulo), 200);
-      });
-      cuenta.addEventListener('keydown', (e) => {
-        const items = suggest.querySelectorAll('div');
-        if (suggest.style.display === 'none' || items.length === 0) return;
-        if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx + 1) % items.length; }
-        else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx - 1 + items.length) % items.length; }
-        else if (e.key === 'Enter') { e.preventDefault(); if (activeIdx >= 0) items[activeIdx].click(); }
-        else if (e.key === 'Escape') { suggest.style.display = 'none'; return; }
-        items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
-      });
-      cuenta.addEventListener('blur', () => { setTimeout(() => suggest.style.display = 'none', 200); });
-    }
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
 
-    function buscarCuenta(q, suggestEl, cuentaEl, tr, esTitulo) {
-      const soloMov = esTitulo ? '' : '&solo_movimiento=1';
-      fetch('/buscar?q=' + encodeURIComponent(q) + soloMov)
-        .then(r => r.json())
-        .then(d => {
-          const items = d.resultados.slice(0, 15);
-          if (items.length === 0) { suggestEl.style.display = 'none'; return; }
-          suggestEl.innerHTML = items.map(r =>
-            `<div data-codigo="${r.codigo}" data-desc="${escapeHtml(r.descripcion)}"><span class="codigo">${r.codigo}</span>${escapeHtml(r.descripcion)}<span class="nivel">(N${r.nivel})</span></div>`
-          ).join('');
-          suggestEl.style.display = 'block';
-          suggestEl.querySelectorAll('div').forEach(el => {
-            el.addEventListener('click', () => {
-              cuentaEl.value = el.dataset.codigo;
-              if (tr) tr.querySelector('.desc-cuenta').textContent = el.dataset.desc;
-              suggestEl.style.display = 'none';
+      function fechaValida() {
+        var v = fechaEl.value;
+        return /^\d{4}-\d{2}-\d{2}$/.test(v) && v <= HOY;
+      }
+
+      function tcValido() {
+        if (monedaEl.value === 'PEN') return true;
+        var n = Number(String(tcEl.value).replace(',', '.'));
+        return isFinite(n) && n > 0;
+      }
+
+      function filaVacia(tr) {
+        if (tr.classList && tr.classList.contains('fila-separador')) return true;
+        var cuenta = tr.querySelector('.in-cuenta');
+        if (!cuenta) return true;
+        var glosa = tr.querySelector('.in-glosa');
+        var debe = tr.querySelector('.in-debe');
+        var haber = tr.querySelector('.in-haber');
+        var code = cuenta ? cuenta.value.trim() : '';
+        var g = glosa ? glosa.value.trim() : '';
+        var d = debe ? parseAmount(debe.value) : 0;
+        var h = haber ? parseAmount(haber.value) : 0;
+        if (!isFinite(d)) d = 0;
+        if (!isFinite(h)) h = 0;
+        return !code && !g && d === 0 && h === 0;
+      }
+
+      function renumerar() {
+        var n = 0;
+        Array.prototype.forEach.call(tbody.children, function (tr) {
+          if (tr.classList.contains('fila-separador')) return;
+          var celda = tr.querySelector('.orden');
+          if (celda) { n += 1; celda.textContent = String(n); }
+        });
+      }
+
+      function actualizarMensajeFila(tr, msg) {
+        var el = tr.querySelector('.row-msg');
+        if (el) el.textContent = msg || '';
+        tr.classList.toggle('fila-error', !!msg);
+      }
+
+      function crearFila(tipo, opciones) {
+        var esTitulo = tipo === 'titulo';
+        var id = String(Date.now()) + '-' + String(Math.random()).slice(2, 7);
+        var tr = document.createElement('tr');
+        tr.dataset.id = id;
+        tr.dataset.tipo = tipo;
+        if (esTitulo) tr.classList.add('fila-titulo');
+        tr.innerHTML =
+          '<td class="orden c"></td>' +
+          '<td class="celda-cuenta">' +
+            '<div class="cuenta-box">' +
+              '<input class="in-cuenta cell-input" type="text" autocomplete="off" spellcheck="false" placeholder="' + (esTitulo ? 'Buscar titulo nivel 2-3' : 'Buscar cuenta nivel 4-5') + '">' +
+              '<div class="suggest" hidden></div>' +
+            '</div>' +
+            '<div class="desc-cuenta"></div>' +
+            '<div class="row-msg"></div>' +
+          '</td>' +
+          '<td class="celda-glosa">' + (esTitulo ? '<span class="dash">--</span>' : '<input class="in-glosa cell-input" type="text" maxlength="500" placeholder="Detalle (opcional)">') + '</td>' +
+          '<td class="num celda-debe">' + (esTitulo ? '<span class="dash">--</span>' : '<input class="in-debe cell-input num-input" type="text" inputmode="decimal" placeholder="0.00">') + '</td>' +
+          '<td class="num celda-haber">' + (esTitulo ? '<span class="dash">--</span>' : '<input class="in-haber cell-input num-input" type="text" inputmode="decimal" placeholder="0.00">') + '</td>' +
+          '<td class="c celda-acciones">' +
+            '<div class="row-actions">' +
+              '<button type="button" class="icon-btn" data-act="dup" title="Duplicar linea">&#10697;</button>' +
+              '<button type="button" class="icon-btn" data-act="up" title="Subir">&#8593;</button>' +
+              '<button type="button" class="icon-btn" data-act="down" title="Bajar">&#8595;</button>' +
+              '<button type="button" class="icon-btn danger" data-act="del" title="Eliminar">&#215;</button>' +
+            '</div>' +
+          '</td>';
+        tbody.appendChild(tr);
+        prepararFila(tr, esTitulo);
+        renumerar();
+        if (!opciones || opciones.focus !== false) {
+          var input = tr.querySelector('.in-cuenta');
+          if (input) input.focus();
+        }
+        return tr;
+      }
+
+      function prepararFila(tr, esTitulo) {
+        var cuenta = tr.querySelector('.in-cuenta');
+        var suggest = tr.querySelector('.suggest');
+        var descEl = tr.querySelector('.desc-cuenta');
+        var timer = null;
+        var activeIdx = -1;
+        var lastResults = [];
+
+        function cerrar() {
+          suggest.hidden = true;
+          suggest.innerHTML = '';
+          activeIdx = -1;
+        }
+
+        function marcar(items) {
+          items.forEach(function (el, i) {
+            el.classList.toggle('active', i === activeIdx);
+          });
+          if (activeIdx >= 0 && items[activeIdx]) {
+            items[activeIdx].scrollIntoView({ block: 'nearest' });
+          }
+        }
+
+        function aplicar(item) {
+          cuenta.value = item.codigo;
+          tr.dataset.codigo = item.codigo;
+          tr.dataset.nivel = String(item.nivel);
+          tr.dataset.validado = '1';
+          descEl.textContent = item.descripcion;
+          descEl.title = item.descripcion;
+          cerrar();
+        }
+
+        function seleccionar(item) {
+          aplicar(item);
+          recalc();
+        }
+
+        function pintar(items) {
+          lastResults = items;
+          activeIdx = -1;
+          if (!items.length) { cerrar(); return; }
+          suggest.innerHTML = items.map(function (r, i) {
+            var fav = r.es_favorita ? '<span style="color:#e67e22;font-family:\'Material Symbols Rounded\';font-size:.9rem;font-variation-settings:\'FILL\' 1;" title="Favorita">star</span>' : '';
+            return '<div data-idx="' + i + '">' +
+              fav +
+              '<span class="codigo">' + escapeHtml(r.codigo) + '</span>' +
+              '<span class="desc">' + escapeHtml(r.descripcion) + '</span>' +
+              '<span class="nivel">N' + r.nivel + '</span>' +
+            '</div>';
+          }).join('');
+          suggest.hidden = false;
+          Array.prototype.forEach.call(suggest.querySelectorAll('div[data-idx]'), function (el) {
+            el.addEventListener('mousedown', function (ev) {
+              ev.preventDefault();
+              var idx = Number(el.dataset.idx);
+              if (lastResults[idx]) seleccionar(lastResults[idx]);
             });
           });
+        }
+
+        function buscar(q) {
+          var niveles = esTitulo ? '2,3' : '4,5';
+          fetch('/buscar?q=' + encodeURIComponent(q) + '&niveles=' + niveles)
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (cuenta.value.trim() !== q) return;
+              var items = (d.resultados || []).slice(0, 15);
+              pintar(items);
+              var exacto = (d.resultados || []).find(function (r) { return r.codigo === q; });
+              if (exacto) { aplicar(exacto); recalc(); }
+            })
+            .catch(function () { cerrar(); });
+        }
+
+        function verificar() {
+          var v = cuenta.value.trim();
+          if (!v) return;
+          if (tr.dataset.validado === '1' && tr.dataset.codigo === v) return;
+          var niveles = esTitulo ? '2,3' : '4,5';
+          fetch('/buscar?q=' + encodeURIComponent(v) + '&niveles=' + niveles)
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (cuenta.value.trim() !== v) return;
+              var exacto = (d.resultados || []).find(function (r) { return r.codigo === v; });
+              if (exacto) {
+                aplicar(exacto);
+              } else {
+                tr.dataset.validado = '0';
+                tr.dataset.codigo = '';
+                tr.dataset.nivel = '';
+                descEl.textContent = 'Cuenta no encontrada en el catalogo';
+              }
+              recalc();
+            })
+            .catch(function () { recalc(); });
+        }
+
+        cuenta.addEventListener('input', function () {
+          tr.dataset.dirty = '1';
+          tr.dataset.validado = '0';
+          var v = cuenta.value.trim();
+          if (tr.dataset.codigo !== v) {
+            tr.dataset.codigo = '';
+            tr.dataset.nivel = '';
+            descEl.textContent = '';
+            descEl.title = '';
+          }
+          clearTimeout(timer);
+          if (!v) { cerrar(); recalc(); return; }
+          timer = setTimeout(function () { buscar(v); }, 180);
+          recalc();
         });
-    }
 
-    function recalc() {
-      let td = 0, th = 0, nMov = 0;
-      Array.from(tbody.children).forEach(tr => {
-        if (tr.dataset.titulo === '1') return;
-        const m = parseFloat(tr.querySelector('.in-monto').value) || 0;
-        if (m > 0) nMov++;
-        const esDebe = tr.querySelector('.btn.dh').dataset.val === 'D';
-        td += esDebe ? m : 0;
-        th += esDebe ? 0 : m;
-      });
-      document.getElementById('td-debe').textContent = money(td);
-      document.getElementById('td-haber').textContent = money(th);
-      const diff = td - th;
-      const diffEl = document.getElementById('td-diff');
-      diffEl.textContent = money(diff);
-      diffEl.className = 'num ' + (Math.abs(diff) < 0.005 && td > 0 ? 'diff-ok' : 'diff-bad');
-      document.getElementById('btn-guardar').disabled = !(Math.abs(diff) < 0.005 && td > 0 && nMov >= 2);
-    }
+        cuenta.addEventListener('blur', function () {
+          setTimeout(cerrar, 120);
+          verificar();
+        });
 
-    function cuadrarUltima() {
-      const filasMov = Array.from(tbody.children).filter(tr => tr.dataset.titulo === '0');
-      if (filasMov.length === 0) return;
-      let td = 0, th = 0;
-      filasMov.slice(0, -1).forEach(tr => {
-        const m = parseFloat(tr.querySelector('.in-monto').value) || 0;
-        const esDebe = tr.querySelector('.btn.dh').dataset.val === 'D';
-        td += esDebe ? m : 0;
-        th += esDebe ? 0 : m;
-      });
-      const ult = filasMov[filasMov.length - 1];
-      const diff = td - th;
-      if (Math.abs(diff) < 0.005) return;
-      const monto = ult.querySelector('.in-monto');
-      const btnDH = ult.querySelector('.btn.dh');
-      btnDH.dataset.val = diff > 0 ? 'H' : 'D';
-      monto.value = money(Math.abs(diff));
-      btnDH.classList.toggle('d', btnDH.dataset.val === 'D');
-      btnDH.classList.toggle('h', btnDH.dataset.val === 'H');
-      btnDH.textContent = btnDH.dataset.val;
-      monto.dispatchEvent(new Event('input'));
-    }
+        cuenta.addEventListener('keydown', function (e) {
+          var items = suggest.hidden ? [] : Array.prototype.slice.call(suggest.querySelectorAll('div[data-idx]'));
+          if (e.key === 'ArrowDown') {
+            if (!items.length) return;
+            e.preventDefault();
+            activeIdx = (activeIdx + 1) % items.length;
+            marcar(items);
+          } else if (e.key === 'ArrowUp') {
+            if (!items.length) return;
+            e.preventDefault();
+            activeIdx = (activeIdx - 1 + items.length) % items.length;
+            marcar(items);
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (items.length) {
+              var idx = activeIdx >= 0 ? activeIdx : 0;
+              if (lastResults[idx]) seleccionar(lastResults[idx]);
+            } else {
+              siguienteFila(tr);
+            }
+          } else if (e.key === 'Escape') {
+            cerrar();
+          }
+        });
 
-    function guardar() {
-      const lineas = Array.from(tbody.children).map(tr => {
-        const esTitulo = tr.dataset.titulo === '1';
-        if (esTitulo) {
-          return {
-            cuenta_codigo: tr.querySelector('.in-cuenta').value.trim(),
-            glosa_linea: '',
-            debe: 0,
-            haber: 0,
-          };
+        Array.prototype.forEach.call(tr.querySelectorAll('.icon-btn'), function (btn) {
+          btn.addEventListener('click', function () { accionFila(tr, btn.dataset.act); });
+        });
+
+        if (!esTitulo) {
+          var debe = tr.querySelector('.in-debe');
+          var haber = tr.querySelector('.in-haber');
+          var glosa = tr.querySelector('.in-glosa');
+
+          debe.addEventListener('input', function () {
+            tr.dataset.dirty = '1';
+            if (debe.value.trim()) { haber.value = ''; }
+            recalc();
+          });
+          haber.addEventListener('input', function () {
+            tr.dataset.dirty = '1';
+            if (haber.value.trim()) { debe.value = ''; }
+            recalc();
+          });
+          debe.addEventListener('blur', function () {
+            debe.value = normalizarMonto(debe.value);
+            recalc();
+          });
+          haber.addEventListener('blur', function () {
+            haber.value = normalizarMonto(haber.value);
+            recalc();
+          });
+          debe.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            siguienteFila(tr);
+          });
+          haber.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            siguienteFila(tr);
+          });
+          glosa.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            debe.focus();
+          });
         }
-        const m = parseFloat(tr.querySelector('.in-monto').value) || 0;
-        const esDebe = tr.querySelector('.btn.dh').dataset.val === 'D';
+      }
+
+      function normalizarMonto(value) {
+        if (!String(value).trim()) return '';
+        var n = parseAmount(value);
+        return isFinite(n) ? n.toFixed(2) : String(value).trim();
+      }
+
+      function siguienteFila(tr) {
+        var next = tr.nextElementSibling;
+        if (next) {
+          var input = next.querySelector('.in-cuenta');
+          if (input) { input.focus(); return; }
+        }
+        crearFila('mov');
+        recalc();
+      }
+
+      function accionFila(tr, act) {
+        if (act === 'del') {
+          if (!filaVacia(tr)) {
+            UI.confirm({
+              type: 'danger',
+              icon: 'delete',
+              title: 'Eliminar linea',
+              msg: 'Se quitara esta linea del asiento.',
+              confirmText: 'Eliminar',
+              cancelText: 'Cancelar'
+            }).then(function (ok) {
+              if (!ok) return;
+              tr.remove();
+              renumerar();
+              recalc();
+            });
+            return;
+          }
+          tr.remove();
+        } else if (act === 'dup') {
+          var copia = crearFila(tr.dataset.tipo, { focus: false });
+          copia.querySelector('.in-cuenta').value = tr.querySelector('.in-cuenta').value;
+          if (tr.dataset.codigo) {
+            copia.dataset.codigo = tr.dataset.codigo;
+            copia.dataset.nivel = tr.dataset.nivel;
+            copia.dataset.validado = tr.dataset.validado;
+            copia.querySelector('.desc-cuenta').textContent = tr.querySelector('.desc-cuenta').textContent;
+          }
+          var glosaOrigen = tr.querySelector('.in-glosa');
+          var glosaDestino = copia.querySelector('.in-glosa');
+          if (glosaOrigen && glosaDestino) glosaDestino.value = glosaOrigen.value;
+          tr.after(copia);
+          copia.querySelector('.in-cuenta').focus();
+        } else if (act === 'up') {
+          var prev = tr.previousElementSibling;
+          if (prev) prev.before(tr);
+        } else if (act === 'down') {
+          var next = tr.nextElementSibling;
+          if (next) next.after(tr);
+        }
+        renumerar();
+        recalc();
+      }
+
+      function analizar() {
+        var totalDebe = 0;
+        var totalHaber = 0;
+        var nMov = 0;
+        var filas = [];
+
+        Array.prototype.forEach.call(tbody.children, function (tr) {
+          if (tr.classList.contains('fila-separador')) return;
+          var tipo = tr.dataset.tipo;
+          var cEl = tr.querySelector('.in-cuenta');
+          if (!cEl) return;
+          var code = cEl.value.trim();
+          var validado = tr.dataset.validado === '1' && tr.dataset.codigo === code;
+          var nivel = validado ? Number(tr.dataset.nivel) : null;
+          var debeEl = tr.querySelector('.in-debe');
+          var haberEl = tr.querySelector('.in-haber');
+          var debe = debeEl ? parseAmount(debeEl.value) : 0;
+          var haber = haberEl ? parseAmount(haberEl.value) : 0;
+          var vacia = filaVacia(tr);
+          var msg = '';
+
+          if (!vacia) {
+            if (tipo === 'mov') {
+              if (!code) {
+                msg = 'Falta la cuenta.';
+              } else if (!validado) {
+                msg = 'Selecciona la cuenta desde la lista.';
+              } else if (!(nivel >= 4 && nivel <= 5)) {
+                msg = 'La cuenta debe ser de nivel 4 o 5.';
+              } else if (!isFinite(debe) || !isFinite(haber)) {
+                msg = 'Monto invalido.';
+              } else if (debe <= 0 && haber <= 0) {
+                msg = 'Ingresa un monto en Debe o Haber.';
+              } else if (debe > 0 && haber > 0) {
+                msg = 'Usa solo Debe o Haber.';
+              }
+              if (!msg) {
+                totalDebe += debe;
+                totalHaber += haber;
+                nMov += 1;
+              }
+            } else {
+              if (!code) {
+                msg = 'Falta el titulo.';
+              } else if (!validado) {
+                msg = 'Selecciona el titulo desde la lista.';
+              } else if (!(nivel >= 2 && nivel <= 3)) {
+                msg = 'El titulo debe ser de nivel 2 o 3.';
+              }
+            }
+          }
+
+          actualizarMensajeFila(tr, msg);
+          filas.push({ tr: tr, msg: msg, vacia: vacia });
+        });
+
         return {
-          cuenta_codigo: tr.querySelector('.in-cuenta').value.trim(),
-          glosa_linea: '',
-          debe: esDebe ? m : 0,
-          haber: esDebe ? 0 : m,
+          totalDebe: round2(totalDebe),
+          totalHaber: round2(totalHaber),
+          nMov: nMov,
+          filas: filas
         };
-      });
-      const payload = {
-        fecha: document.getElementById('fecha').value,
-        glosa: document.getElementById('glosa').value.trim(),
-        moneda: document.getElementById('moneda').value,
-        tipo_cambio: document.getElementById('tipo_cambio').value || '1',
-        codigo_libro: document.getElementById('codigo_libro').value.trim(),
-        numero_correlativo: document.getElementById('numero_correlativo').value.trim(),
-        numero_documento: document.getElementById('numero_documento').value.trim(),
-        lineas,
-      };
-      const errBox = document.getElementById('errores');
-      errBox.style.display = 'none';
-      const btn = document.getElementById('btn-guardar');
-      btn.disabled = true;
-      fetch('/asientos', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-      })
-      .then(r => r.json().then(d => ({ status: r.status, body: d })))
-      .then(({ status, body }) => {
-        if (status === 200 && body.ok) {
-          location.href = '/asientos/' + body.id;
+      }
+
+      function recalc() {
+        var r = analizar();
+        var diff = round2(r.totalDebe - r.totalHaber);
+        document.getElementById('td-debe').textContent = money(r.totalDebe);
+        document.getElementById('td-haber').textContent = money(r.totalHaber);
+        var diffEl = document.getElementById('td-diff');
+        diffEl.textContent = money(diff);
+
+        var cuadra = Math.abs(diff) < 0.005 && r.totalDebe > 0;
+        diffEl.className = cuadra ? 'ok' : 'bad';
+
+        var hayDatos = r.filas.some(function (f) { return !f.vacia; });
+        var errores = r.filas.filter(function (f) { return !!f.msg; }).map(function (f) {
+          return 'Linea ' + f.tr.querySelector('.orden').textContent + ': ' + f.msg;
+        });
+        var fOk = fechaValida();
+        var tOk = tcValido();
+        var listo = hayDatos && errores.length === 0 && r.nMov >= 2 && cuadra && fOk && tOk;
+
+        btnGuardar.disabled = !listo || guardando;
+        btnGuardarOtro.disabled = !listo || guardando;
+
+        var estado;
+        var clase;
+        if (!fOk) {
+          estado = 'Selecciona una fecha valida y no futura.';
+          clase = 'bad';
+        } else if (!tOk) {
+          estado = 'Ingresa un tipo de cambio valido.';
+          clase = 'bad';
+        } else if (!hayDatos) {
+          estado = 'Agrega al menos dos lineas de cuenta.';
+          clase = 'muted';
+        } else if (errores.length) {
+          estado = errores[0];
+          clase = 'bad';
+        } else if (r.nMov < 2) {
+          estado = 'Se requieren al menos 2 lineas de movimiento.';
+          clase = 'bad';
+        } else if (!cuadra) {
+          estado = 'Diferencia: ' + money(diff);
+          clase = 'bad';
         } else {
-          errBox.style.display = 'block';
-          errBox.innerHTML = '<strong>No se pudo guardar:</strong><ul>' +
-            (body.errores || [body.error || 'error desconocido']).map(e => '<li>' + escapeHtml(e) + '</li>').join('') +
-            '</ul>';
-          btn.disabled = false;
+          estado = 'Asiento cuadrado. Listo para guardar.';
+          clase = 'ok';
+        }
+        estadoEl.textContent = estado;
+        estadoEl.className = 'estado ' + clase;
+        fechaEl.classList.toggle('invalid', !fOk);
+        tcEl.classList.toggle('invalid', !tOk);
+      }
+
+      function cuadrarUltima() {
+        var filas = Array.prototype.filter.call(tbody.children, function (tr) {
+          return tr.dataset.tipo === 'mov';
+        });
+        if (filas.length < 2) {
+          estadoEl.textContent = 'Agrega al menos dos lineas de cuenta para cuadrar.';
+          estadoEl.className = 'estado bad';
+          return;
+        }
+        var td = 0;
+        var th = 0;
+        filas.slice(0, -1).forEach(function (tr) {
+          var d = parseAmount(tr.querySelector('.in-debe').value);
+          var h = parseAmount(tr.querySelector('.in-haber').value);
+          if (isFinite(d)) td += d;
+          if (isFinite(h)) th += h;
+        });
+        var diff = round2(td - th);
+        if (Math.abs(diff) < 0.005) return;
+        var ultima = filas[filas.length - 1];
+        var debeEl = ultima.querySelector('.in-debe');
+        var haberEl = ultima.querySelector('.in-haber');
+        ultima.dataset.dirty = '1';
+        if (diff > 0) {
+          haberEl.value = money(diff);
+          debeEl.value = '';
+        } else {
+          debeEl.value = money(-diff);
+          haberEl.value = '';
+        }
+        renumerar();
+        recalc();
+      }
+
+      function recolectarLineas() {
+        var lineas = [];
+        Array.prototype.forEach.call(tbody.children, function (tr) {
+          if (filaVacia(tr)) return;
+          var code = tr.querySelector('.in-cuenta').value.trim();
+          if (tr.dataset.tipo === 'titulo') {
+            lineas.push({ cuenta_codigo: code, glosa_linea: '', debe: 0, haber: 0 });
+            return;
+          }
+          var glosa = tr.querySelector('.in-glosa');
+          var debe = parseAmount(tr.querySelector('.in-debe').value);
+          var haber = parseAmount(tr.querySelector('.in-haber').value);
+          lineas.push({
+            cuenta_codigo: code,
+            glosa_linea: glosa ? glosa.value.trim() : '',
+            debe: isFinite(debe) ? debe : 0,
+            haber: isFinite(haber) ? haber : 0
+          });
+        });
+        return lineas;
+      }
+
+      function mostrarErrores(lista) {
+        errBox.style.display = 'block';
+        errBox.innerHTML = '<strong>No se pudo guardar el asiento:</strong><ul>' +
+          lista.map(function (e) { return '<li>' + escapeHtml(String(e)) + '</li>'; }).join('') +
+          '</ul>';
+        errBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      function ocultarErrores() {
+        errBox.style.display = 'none';
+        errBox.innerHTML = '';
+      }
+
+      function setGuardando(on) {
+        guardando = on;
+        if (window.UI && UI.loading) {
+          UI.loading.btn(btnGuardar, on);
+          UI.loading.btn(btnGuardarOtro, on);
+        }
+        btnGuardar.disabled = on;
+        btnGuardarOtro.disabled = on;
+        if (!on) recalc();
+      }
+
+      function guardarMultiBloques(modo) {
+        // Agrupa las filas por data-bloque y las envia como N POSTs secuenciales.
+        var grupos = {};
+        var orden = [];
+        Array.prototype.forEach.call(tbody.children, function (tr) {
+          if (tr.classList.contains('fila-separador')) return;
+          if (filaVacia(tr)) return;
+          var b = tr.dataset.bloque || '0';
+          if (!(b in grupos)) { grupos[b] = []; orden.push(b); }
+          var code = tr.querySelector('.in-cuenta').value.trim();
+          var glosa = tr.querySelector('.in-glosa');
+          var debe = parseAmount(tr.querySelector('.in-debe').value);
+          var haber = parseAmount(tr.querySelector('.in-haber').value);
+          grupos[b].push({
+            cuenta_codigo: code,
+            glosa_linea: glosa ? glosa.value.trim() : '',
+            debe: isFinite(debe) ? debe : 0,
+            haber: isFinite(haber) ? haber : 0
+          });
+        });
+
+        var meta = {
+          fecha: fechaEl.value,
+          moneda: monedaEl.value,
+          tipo_cambio: monedaEl.value === 'PEN' ? '1' : tcEl.value,
+          codigo_libro: codigoLibroEl.value.trim(),
+          numero_correlativo: correlativoEl.value.trim(),
+          numero_documento: documentoEl.value.trim()
+        };
+        var info = window._plantillaMulti || [];
+
+        ocultarErrores();
+        setGuardando(true);
+        var ids = [];
+        function enviar(i) {
+          if (i >= orden.length) {
+            window._plantillaMulti = null;
+            if (window.limpiarBorradorActual) window.limpiarBorradorActual();
+            UI.success(ids.length + ' asientos guardados correctamente.', 'Operacion completa');
+            setTimeout(function () {
+              if (modo === 'otro') window.location.href = '/asientos/nuevo';
+              else window.location.href = '/asientos/' + ids[0];
+            }, 700);
+            return;
+          }
+          var b = orden[i];
+          var glosaBloque = (info[Number(b)] && info[Number(b)].glosa) || glosaEl.value.trim();
+          var correlativo = meta.numero_correlativo ? (meta.numero_correlativo + '-' + (i + 1)) : '';
+          fetch('/asientos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fecha: meta.fecha,
+              glosa: glosaBloque,
+              moneda: meta.moneda,
+              tipo_cambio: meta.tipo_cambio,
+              codigo_libro: meta.codigo_libro,
+              numero_correlativo: correlativo,
+              numero_documento: meta.numero_documento,
+              lineas: grupos[b]
+            })
+          }).then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
+            .then(function (out) {
+              if (out.status === 200 && out.body.ok) {
+                ids.push(out.body.id);
+                enviar(i + 1);
+              } else {
+                var errs = (out.body.errores || [out.body.error || 'Error']).map(function (e) {
+                  return 'Asiento ' + (i + 1) + ': ' + e;
+                });
+                if (ids.length) {
+                  errs.unshift('Se guardaron ' + ids.length + ' asiento(s) antes del error. IDs: ' + ids.join(', '));
+                }
+                mostrarErrores(errs);
+                setGuardando(false);
+              }
+            })
+            .catch(function () {
+              mostrarErrores(['Error de red al guardar el asiento ' + (i + 1) + '.']);
+              setGuardando(false);
+            });
+        }
+        enviar(0);
+      }
+
+      function guardar(modo) {
+        // Si hay plantilla multi-bloque cargada, dividir y enviar N asientos.
+        if (window._plantillaMulti && window._plantillaMulti.length > 1) {
+          guardarMultiBloques(modo);
+          return;
+        }
+        var r = analizar();
+        var errores = r.filas.filter(function (f) { return !!f.msg; }).map(function (f) {
+          return 'Linea ' + f.tr.querySelector('.orden').textContent + ': ' + f.msg;
+        });
+        if (!fechaValida()) errores.unshift('Selecciona una fecha valida y no futura.');
+        if (!tcValido()) errores.unshift('Ingresa un tipo de cambio valido.');
+        if (r.nMov < 2) errores.push('Se requieren al menos 2 lineas de movimiento.');
+        if (Math.abs(round2(r.totalDebe - r.totalHaber)) >= 0.005) {
+          errores.push('El asiento no cuadra: Debe ' + money(r.totalDebe) + ' / Haber ' + money(r.totalHaber) + '.');
+        }
+        var lineas = recolectarLineas();
+        if (!lineas.length) errores.push('Agrega lineas al asiento.');
+        if (errores.length) { mostrarErrores(errores); return; }
+
+        ocultarErrores();
+        setGuardando(true);
+        var url = EDITAR ? '/asientos/' + EDITAR.id : '/asientos';
+        var method = EDITAR ? 'PUT' : 'POST';
+        fetch(url, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fecha: fechaEl.value,
+            glosa: glosaEl.value.trim(),
+            moneda: monedaEl.value,
+            tipo_cambio: monedaEl.value === 'PEN' ? '1' : tcEl.value,
+            codigo_libro: codigoLibroEl.value.trim(),
+            numero_correlativo: correlativoEl.value.trim(),
+            numero_documento: documentoEl.value.trim(),
+            lineas: lineas
+          })
+        })
+        .then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
+        .then(function (out) {
+          if (out.status === 200 && out.body.ok) {
+            if (window.limpiarBorradorActual) window.limpiarBorradorActual();
+            UI.success('Asiento guardado correctamente.', 'Listo');
+            setTimeout(function () {
+              window.location.href = modo === 'otro' ? '/asientos/nuevo' : '/asientos/' + out.body.id;
+            }, 600);
+          } else {
+            mostrarErrores(out.body.errores || [out.body.error || 'Error desconocido']);
+            setGuardando(false);
+          }
+        })
+        .catch(function () {
+          mostrarErrores(['Error de red al guardar el asiento.']);
+          setGuardando(false);
+        });
+      }
+
+      function limpiar() {
+        var hayDatos = Array.prototype.some.call(tbody.children, function (tr) { return !filaVacia(tr); });
+        if (hayDatos) {
+          UI.confirm({
+            type: 'warning',
+            icon: 'cleaning_services',
+            title: 'Limpiar formulario',
+            msg: 'Se borraran todas las lineas y campos del asiento. Esta accion no se puede deshacer.',
+            confirmText: 'Si, limpiar',
+            cancelText: 'Cancelar'
+          }).then(function (ok) { if (ok) _limpiarAhora(); });
+          return;
+        }
+        _limpiarAhora();
+      }
+      function _limpiarAhora() {
+        tbody.innerHTML = '';
+        window._plantillaMulti = null;
+        fechaEl.value = HOY;
+        monedaEl.value = 'PEN';
+        tcEl.value = '1';
+        codigoLibroEl.value = '';
+        correlativoEl.value = '';
+        documentoEl.value = '';
+        glosaEl.value = '';
+        ocultarErrores();
+        crearFila('mov', { focus: false });
+        crearFila('mov', { focus: false });
+        var primero = tbody.querySelector('.in-cuenta');
+        if (primero) primero.focus();
+        recalc();
+      }
+
+      function syncMoneda() {
+        var esPen = monedaEl.value === 'PEN';
+        tcEl.disabled = esPen;
+        if (esPen) {
+          tcEl.value = '1';
+        } else if (!tcEl.value || tcEl.value === '1') {
+          tcEl.value = '';
+        }
+        recalc();
+      }
+
+      document.getElementById('btn-add-mov').addEventListener('click', function () {
+        crearFila('mov');
+        recalc();
+      });
+      document.getElementById('btn-add-titulo').addEventListener('click', function () {
+        crearFila('titulo');
+        recalc();
+      });
+      document.getElementById('btn-cuadrar').addEventListener('click', cuadrarUltima);
+      document.getElementById('btn-limpiar').addEventListener('click', limpiar);
+      btnGuardar.addEventListener('click', function () { guardar('detalle'); });
+      btnGuardarOtro.addEventListener('click', function () { guardar('otro'); });
+      monedaEl.addEventListener('change', syncMoneda);
+
+      [fechaEl, tcEl, glosaEl, codigoLibroEl, correlativoEl, documentoEl].forEach(function (el) {
+        el.addEventListener('input', recalc);
+        el.addEventListener('change', recalc);
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          if (!btnGuardar.disabled) {
+            e.preventDefault();
+            guardar('detalle');
+          }
         }
       });
-    }
 
-    agregarFila(false);
-    agregarFila(false);
+      // ========= PLANTILLAS =========
+      var IGV_RATE = 0.18;
+      var modal = document.getElementById('modal-plantillas');
+      var modalGrid = document.getElementById('plantillas-grid');
+      var modalFormWrap = document.getElementById('plantilla-form-wrap');
+      var modalFoot = document.getElementById('modal-foot');
+      var modalTitulo = document.getElementById('modal-titulo');
+      var plantillaActual = null;
+
+      var PLANTILLAS = {
+        venta: {
+          nombre: 'Venta con IGV',
+          campos: [
+            { id: 'base', label: 'Base imponible (sin IGV)', tipo: 'num', req: true, placeholder: '1000.00' },
+            { id: 'forma', label: 'Como te paga el cliente?', tipo: 'select', opts: [
+              { v: 'contado', t: 'Al contado (100% ya)' },
+              { v: 'credito', t: 'Al credito (100% despues)' },
+              { v: 'mixto', t: 'Mixto (parte contado, parte credito)' }
+            ]},
+            { id: 'medio', label: 'Si cobras al contado, donde entra?', tipo: 'select', opts: [
+              { v: 'efectivo', t: 'Caja (efectivo)' },
+              { v: 'banco', t: 'Banco (deposito)' }
+            ]},
+            { id: 'pct_contado', label: 'Si es mixto, % cobrado al contado', tipo: 'num', placeholder: '40' },
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Venta segun factura F001-...' }
+          ],
+          build: function (d) {
+            var base = d.base, igv = round2(base * IGV_RATE), total = round2(base + igv);
+            var medio = d.medio === 'banco' ? '1041' : '1011';
+            var g = d.glosa || 'Venta con IGV';
+            var asientos = [];
+
+            // Asiento 1: Provision (siempre)
+            asientos.push({
+              glosa: '1) Provision - ' + g,
+              lineas: [
+                { codigo: '1212', debe: total, haber: 0, g: g },
+                { codigo: '4011', debe: 0, haber: igv, g: 'IGV por pagar' },
+                { codigo: '7011', debe: 0, haber: base, g: g }
+              ]
+            });
+
+            // Asiento 2: Cancelacion (contado 100% o parcial mixto)
+            var cobrar = 0;
+            if (d.forma === 'contado') cobrar = total;
+            else if (d.forma === 'mixto') {
+              var pct = Number(d.pct_contado) || 0;
+              cobrar = round2(total * pct / 100);
+            }
+            if (cobrar > 0) {
+              asientos.push({
+                glosa: '2) Cancelacion - ' + g,
+                lineas: [
+                  { codigo: medio, debe: cobrar, haber: 0, g: g },
+                  { codigo: '1212', debe: 0, haber: cobrar, g: g }
+                ]
+              });
+            }
+            return { asientos: asientos };
+          }
+        },
+        compra: {
+          nombre: 'Compra con IGV',
+          campos: [
+            { id: 'base', label: 'Base imponible (sin IGV)', tipo: 'num', req: true, placeholder: '1000.00' },
+            { id: 'tipo', label: 'Que compraste?', tipo: 'select', opts: [
+              { v: 'mercaderia', t: 'Mercaderia (para revender)' },
+              { v: 'activo', t: 'Activo fijo (laptop, camioneta...)' },
+              { v: 'servicio', t: 'Servicio (publicidad, etc.)' }
+            ]},
+            { id: 'forma', label: 'Como pagas?', tipo: 'select', opts: [
+              { v: 'contado', t: 'Al contado (100% ya)' },
+              { v: 'credito', t: 'Al credito (100% despues)' },
+              { v: 'mixto', t: 'Mixto (parte contado, parte credito)' }
+            ]},
+            { id: 'medio', label: 'Si pagas al contado, con que?', tipo: 'select', opts: [
+              { v: 'efectivo', t: 'Caja (efectivo)' },
+              { v: 'banco', t: 'Banco (transferencia)' }
+            ]},
+            { id: 'pct_contado', label: 'Si es mixto, % pagado al contado', tipo: 'num', placeholder: '40' },
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Compra segun factura F001-...' }
+          ],
+          build: function (d) {
+            var base = d.base, igv = round2(base * IGV_RATE), total = round2(base + igv);
+            var cuentaCompra = d.tipo === 'servicio' ? '6361' :
+                                d.tipo === 'activo' ? '3361' : '6011';
+            var cuentaDestino = d.tipo === 'servicio' ? '9411' :
+                                 d.tipo === 'activo' ? null : '2011';
+            var cuentaVariacion = d.tipo === 'servicio' ? '7911' : '6111';
+            var medio = d.medio === 'banco' ? '1041' : '1011';
+            var g = d.glosa || 'Compra con IGV';
+            var asientos = [];
+
+            // Asiento 1: Provision
+            asientos.push({
+              glosa: '1) Provision - ' + g,
+              lineas: [
+                { codigo: cuentaCompra, debe: base, haber: 0, g: g },
+                { codigo: '40111', debe: igv, haber: 0, g: 'IGV credito fiscal' },
+                { codigo: '4212', debe: 0, haber: total, g: g }
+              ]
+            });
+
+            // Asiento 2: Destino (mercaderia o servicio)
+            if (cuentaDestino) {
+              asientos.push({
+                glosa: '2) Destino - ' + g,
+                lineas: [
+                  { codigo: cuentaDestino, debe: base, haber: 0, g: g },
+                  { codigo: cuentaVariacion, debe: 0, haber: base, g: g }
+                ]
+              });
+            }
+
+            // Asiento 3: Cancelacion (contado 100% o parcial si mixto)
+            var pagar = 0;
+            if (d.forma === 'contado') pagar = total;
+            else if (d.forma === 'mixto') {
+              var pct = Number(d.pct_contado) || 0;
+              pagar = round2(total * pct / 100);
+            }
+            if (pagar > 0) {
+              asientos.push({
+                glosa: (cuentaDestino ? '3' : '2') + ') Cancelacion - ' + g,
+                lineas: [
+                  { codigo: '4212', debe: pagar, haber: 0, g: g },
+                  { codigo: medio, debe: 0, haber: pagar, g: g }
+                ]
+              });
+            }
+            return { asientos: asientos };
+          }
+        },
+        gasto: {
+          nombre: 'Pago de gasto / servicio',
+          campos: [
+            { id: 'monto', label: 'Monto total pagado', tipo: 'num', req: true, placeholder: '150.00' },
+            { id: 'tipo', label: 'Que tipo de gasto?', tipo: 'select', opts: [
+              { v: 'luz', t: 'Luz / agua / energia' },
+              { v: 'tel', t: 'Telefono / internet' },
+              { v: 'alq', t: 'Alquiler' },
+              { v: 'otro', t: 'Otros servicios' }
+            ]},
+            { id: 'desde', label: 'De donde pagas?', tipo: 'select', opts: [
+              { v: 'efectivo', t: 'Caja (efectivo)' },
+              { v: 'banco', t: 'Banco (transferencia)' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Recibo luz julio' }
+          ],
+          build: function (d) {
+            var cuentaGasto = d.tipo === 'alq' ? { c: '6352', n: 'Alquileres' } :
+                               d.tipo === 'tel' ? { c: '6364', n: 'Telefono' } :
+                               d.tipo === 'luz' ? { c: '6361', n: 'Energia electrica' } :
+                                                   { c: '6391', n: 'Otros servicios' };
+            var cuentaPago = d.desde === 'banco' ? { c: '1041', n: 'Banco' } : { c: '1011', n: 'Caja' };
+            return {
+              glosa: d.glosa || 'Pago de gasto',
+              lineas: [
+                { codigo: cuentaGasto.c, debe: d.monto, haber: 0, g: d.glosa || '' },
+                { codigo: cuentaPago.c, debe: 0, haber: d.monto, g: d.glosa || '' }
+              ]
+            };
+          }
+        },
+        venta_sin_igv: {
+          nombre: 'Venta SIN IGV',
+          campos: [
+            { id: 'monto', label: 'Monto total vendido', tipo: 'num', req: true, placeholder: '500.00' },
+            { id: 'cobro', label: 'Como cobras?', tipo: 'select', opts: [
+              { v: 'credito', t: 'A credito (cliente debe)' },
+              { v: 'efectivo', t: 'Efectivo (caja)' },
+              { v: 'banco', t: 'Deposito en banco' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Venta segun boleta B001-...' }
+          ],
+          build: function (d) {
+            var cuentaCobro = d.cobro === 'efectivo' ? { c: '1011' } :
+                               d.cobro === 'banco' ? { c: '1041' } : { c: '1212' };
+            return {
+              glosa: d.glosa || 'Venta sin IGV',
+              lineas: [
+                { codigo: cuentaCobro.c, debe: d.monto, haber: 0, g: d.glosa || '' },
+                { codigo: '7011', debe: 0, haber: d.monto, g: d.glosa || '' }
+              ]
+            };
+          }
+        },
+        compra_sin_igv: {
+          nombre: 'Compra SIN IGV',
+          campos: [
+            { id: 'monto', label: 'Monto total', tipo: 'num', req: true, placeholder: '200.00' },
+            { id: 'tipo', label: 'Que compraste?', tipo: 'select', opts: [
+              { v: 'mercaderia', t: 'Mercaderia' },
+              { v: 'servicio', t: 'Servicio' }
+            ]},
+            { id: 'pago', label: 'Como pagas?', tipo: 'select', opts: [
+              { v: 'credito', t: 'A credito (debes al proveedor)' },
+              { v: 'efectivo', t: 'Efectivo (caja)' },
+              { v: 'banco', t: 'Banco' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Compra sin IGV' }
+          ],
+          build: function (d) {
+            var cuentaCompra = d.tipo === 'servicio' ? { c: '6391' } : { c: '6011' };
+            var cuentaPago = d.pago === 'efectivo' ? { c: '1011' } :
+                              d.pago === 'banco' ? { c: '1041' } : { c: '4212' };
+            return {
+              glosa: d.glosa || 'Compra sin IGV',
+              lineas: [
+                { codigo: cuentaCompra.c, debe: d.monto, haber: 0, g: d.glosa || '' },
+                { codigo: cuentaPago.c, debe: 0, haber: d.monto, g: d.glosa || '' }
+              ]
+            };
+          }
+        },
+        cobranza: {
+          nombre: 'Cobranza de factura',
+          campos: [
+            { id: 'monto', label: 'Monto cobrado', tipo: 'num', req: true, placeholder: '1180.00' },
+            { id: 'destino', label: 'Donde entra el dinero?', tipo: 'select', opts: [
+              { v: 'efectivo', t: 'Caja (efectivo)' },
+              { v: 'banco', t: 'Banco' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Cobranza factura F001-...' }
+          ],
+          build: function (d) {
+            var destino = d.destino === 'banco' ? { c: '1041' } : { c: '1011' };
+            return {
+              glosa: d.glosa || 'Cobranza de factura',
+              lineas: [
+                { codigo: destino.c, debe: d.monto, haber: 0, g: d.glosa || '' },
+                { codigo: '1212', debe: 0, haber: d.monto, g: d.glosa || '' }
+              ]
+            };
+          }
+        },
+        pago_prov: {
+          nombre: 'Pago a proveedor',
+          campos: [
+            { id: 'monto', label: 'Monto pagado', tipo: 'num', req: true, placeholder: '1180.00' },
+            { id: 'desde', label: 'De donde pagas?', tipo: 'select', opts: [
+              { v: 'efectivo', t: 'Caja (efectivo)' },
+              { v: 'banco', t: 'Banco' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Pago factura F001-...' }
+          ],
+          build: function (d) {
+            var desde = d.desde === 'banco' ? { c: '1041' } : { c: '1011' };
+            return {
+              glosa: d.glosa || 'Pago a proveedor',
+              lineas: [
+                { codigo: '4212', debe: d.monto, haber: 0, g: d.glosa || '' },
+                { codigo: desde.c, debe: 0, haber: d.monto, g: d.glosa || '' }
+              ]
+            };
+          }
+        },
+        caja_banco: {
+          nombre: 'Deposito caja a banco',
+          campos: [
+            { id: 'monto', label: 'Monto', tipo: 'num', req: true, placeholder: '2000.00' },
+            { id: 'direccion', label: 'Direccion del movimiento', tipo: 'select', opts: [
+              { v: 'cb', t: 'De caja -> a banco (deposito)' },
+              { v: 'bc', t: 'De banco -> a caja (retiro)' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Deposito en BCP' }
+          ],
+          build: function (d) {
+            var deb = d.direccion === 'cb' ? '1041' : '1011';
+            var hab = d.direccion === 'cb' ? '1011' : '1041';
+            return {
+              glosa: d.glosa || 'Movimiento caja/banco',
+              lineas: [
+                { codigo: deb, debe: d.monto, haber: 0, g: d.glosa || '' },
+                { codigo: hab, debe: 0, haber: d.monto, g: d.glosa || '' }
+              ]
+            };
+          }
+        },
+        prestamo: {
+          nombre: 'Prestamo bancario recibido',
+          campos: [
+            { id: 'monto', label: 'Monto del prestamo', tipo: 'num', req: true, placeholder: '10000.00' },
+            { id: 'plazo', label: 'Plazo del prestamo', tipo: 'select', opts: [
+              { v: 'corto', t: 'Corto plazo (menos de 1 ano)' },
+              { v: 'largo', t: 'Largo plazo (mas de 1 ano)' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Prestamo BCP' }
+          ],
+          build: function (d) {
+            var cuentaDeuda = d.plazo === 'largo' ? '4511' : '4511';
+            return {
+              glosa: d.glosa || 'Prestamo bancario',
+              lineas: [
+                { codigo: '1041', debe: d.monto, haber: 0, g: d.glosa || '' },
+                { codigo: cuentaDeuda, debe: 0, haber: d.monto, g: d.glosa || '' }
+              ]
+            };
+          }
+        },
+        planilla: {
+          nombre: 'Planilla / sueldos',
+          campos: [
+            { id: 'bruto', label: 'Total sueldos brutos', tipo: 'num', req: true, placeholder: '3000.00' },
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Planilla mes de ...' }
+          ],
+          build: function (d) {
+            return {
+              glosa: d.glosa || 'Planilla de sueldos',
+              lineas: [
+                { codigo: '6211', debe: d.bruto, haber: 0, g: d.glosa || '' },
+                { codigo: '4031', debe: 0, haber: d.bruto, g: d.glosa || '' }
+              ]
+            };
+          }
+        },
+        nota_credito: {
+          nombre: 'Devolucion de venta (nota de credito)',
+          campos: [
+            { id: 'base', label: 'Base devuelta (sin IGV)', tipo: 'num', req: true, placeholder: '500.00' },
+            { id: 'con_igv', label: 'La venta original tenia IGV?', tipo: 'select', opts: [
+              { v: 'si', t: 'Si (venta con IGV)' },
+              { v: 'no', t: 'No (venta sin IGV)' }
+            ]},
+            { id: 'reembolso', label: 'Como se reembolsa?', tipo: 'select', opts: [
+              { v: 'credito', t: 'Baja cuenta por cobrar al cliente' },
+              { v: 'efectivo', t: 'Devuelves efectivo (caja)' },
+              { v: 'banco', t: 'Transferencia desde banco' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'NC por devolucion de F001-...' }
+          ],
+          build: function (d) {
+            var base = d.base;
+            var igv = d.con_igv === 'si' ? round2(base * IGV_RATE) : 0;
+            var total = round2(base + igv);
+            var reemb = d.reembolso === 'efectivo' ? '1011' :
+                         d.reembolso === 'banco' ? '1041' : '1212';
+            var lineas = [
+              { codigo: '7011', debe: base, haber: 0, g: d.glosa || '' }
+            ];
+            if (igv > 0) lineas.push({ codigo: '4011', debe: igv, haber: 0, g: 'IGV de la NC' });
+            lineas.push({ codigo: reemb, debe: 0, haber: total, g: d.glosa || '' });
+            return { glosa: d.glosa || 'Devolucion de venta', lineas: lineas };
+          }
+        },
+        capital: {
+          nombre: 'Aporte de capital',
+          campos: [
+            { id: 'monto', label: 'Monto aportado', tipo: 'num', req: true, placeholder: '5000.00' },
+            { id: 'destino', label: 'Donde entra el dinero?', tipo: 'select', opts: [
+              { v: 'efectivo', t: 'Caja (efectivo)' },
+              { v: 'banco', t: 'Banco' }
+            ]},
+            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Aporte de capital de Jose Perez' }
+          ],
+          build: function (d) {
+            var medio = d.destino === 'banco' ? '1041' : '1011';
+            var g = d.glosa || 'Aporte de capital';
+            return {
+              asientos: [
+                {
+                  glosa: '1) Compromiso de aporte - ' + g,
+                  lineas: [
+                    { codigo: '1412', debe: d.monto, haber: 0, g: g },
+                    { codigo: '5011', debe: 0, haber: d.monto, g: g }
+                  ]
+                },
+                {
+                  glosa: '2) Cancelacion del aporte - ' + g,
+                  lineas: [
+                    { codigo: medio, debe: d.monto, haber: 0, g: g },
+                    { codigo: '1412', debe: 0, haber: d.monto, g: g }
+                  ]
+                }
+              ]
+            };
+          }
+        }
+      };
+
+      var modalForm = document.getElementById('modal-plantilla-form');
+      var modalFormBody = document.getElementById('modal-form-body');
+      var modalTitulo2 = document.getElementById('modal-titulo2');
+
+      function abrirModal() {
+        modal.hidden = false;
+        modalGrid.hidden = false;
+        modalTitulo.textContent = 'Elige el tipo de operacion';
+        plantillaActual = null;
+      }
+
+      function cerrarModal() {
+        modal.hidden = true;
+      }
+
+      function cerrarModalForm() {
+        modalForm.hidden = true;
+        modalFormBody.innerHTML = '';
+        plantillaActual = null;
+      }
+
+      function volverAPlantillas() {
+        cerrarModalForm();
+        abrirModal();
+      }
+
+      function abrirFormularioPlantilla(key) {
+        var tpl = PLANTILLAS[key];
+        if (!tpl) return;
+        plantillaActual = key;
+        // Cerrar modal de seleccion y abrir modal del formulario
+        cerrarModal();
+        modalTitulo2.textContent = tpl.nombre;
+        modalForm.hidden = false;
+
+        var html = '<div class="plantilla-layout">';
+        html += '<div class="plantilla-form">';
+        // Campo de fecha siempre primero
+        html += '<div class="field">' +
+                '<label for="tpl-fecha">Fecha de la operacion</label>' +
+                '<input type="date" id="tpl-fecha" value="' + escapeHtml(fechaEl.value || HOY) + '" max="' + HOY + '">' +
+                '<div style="font-size:.7rem;color:var(--muted);font-style:italic;margin-top:.15rem;">Puede ser hoy o un dia anterior.</div>' +
+                '</div>';
+        tpl.campos.forEach(function (c) {
+          html += '<div class="field"><label for="tpl-' + c.id + '">' + escapeHtml(c.label) + '</label>';
+          if (c.tipo === 'select') {
+            html += '<select id="tpl-' + c.id + '" data-custom>';
+            c.opts.forEach(function (o) {
+              html += '<option value="' + escapeHtml(o.v) + '">' + escapeHtml(o.t) + '</option>';
+            });
+            html += '</select>';
+          } else {
+            var im = c.tipo === 'num' ? ' inputmode="decimal"' : '';
+            html += '<input type="text" id="tpl-' + c.id + '"' + im +
+                    ' placeholder="' + escapeHtml(c.placeholder || '') + '">';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+        html += '<div class="plantilla-preview" id="tpl-preview"><em style="color:var(--muted);">Ingresa los datos para ver la vista previa.</em></div>';
+        html += '</div>';
+        modalFormBody.innerHTML = html;
+
+        tpl.campos.forEach(function (c) {
+          var el = document.getElementById('tpl-' + c.id);
+          if (el) el.addEventListener('input', actualizarPreview);
+          if (el) el.addEventListener('change', actualizarPreview);
+        });
+
+        // Inicializar los selects custom nuevos
+        modalFormBody.querySelectorAll('select[data-custom]').forEach(function (sel) {
+          // Disparamos un evento ficticio para que polish.js (que escanea en carga) convierta
+          if (window.initCustomSelectForElement) window.initCustomSelectForElement(sel);
+          else {
+            // Fallback: re-ejecutar init manual mediante el polish.js global expuesto
+            var e = new Event('DOMContentLoaded');
+          }
+        });
+        // Como polish.js solo escanea en carga, lo invocamos directamente
+        if (window.polishInitAll) window.polishInitAll();
+
+        var primero = modalFormBody.querySelector('input[inputmode="decimal"], input, .custom-select-trigger');
+        if (primero) setTimeout(function () { primero.focus(); }, 80);
+      }
+
+      function leerDatosPlantilla() {
+        var tpl = PLANTILLAS[plantillaActual];
+        var d = {};
+        var ok = true;
+        tpl.campos.forEach(function (c) {
+          var el = document.getElementById('tpl-' + c.id);
+          if (!el) return;
+          if (c.tipo === 'num') {
+            var n = parseAmount(el.value);
+            if (!isFinite(n) || n <= 0) { ok = false; d[c.id] = 0; }
+            else d[c.id] = n;
+          } else {
+            d[c.id] = el.value.trim();
+          }
+        });
+        return { ok: ok, datos: d };
+      }
+
+      function actualizarPreview() {
+        var tpl = PLANTILLAS[plantillaActual];
+        if (!tpl) return;
+        var r = leerDatosPlantilla();
+        var preview = document.getElementById('tpl-preview');
+        if (!r.ok) {
+          preview.innerHTML = '<em style="color:var(--muted);">Ingresa un monto valido para ver la vista previa.</em>';
+          return;
+        }
+        var resultado = tpl.build(r.datos);
+        var asientos = Array.isArray(resultado) ? resultado :
+                        (resultado.asientos ? resultado.asientos : [resultado]);
+        var html = '';
+        if (asientos.length > 1) {
+          html += '<div style="font-weight:600;margin-bottom:.4rem;color:var(--accent);">Se crearan ' +
+                   asientos.length + ' asientos consecutivos:</div>';
+        } else {
+          html += '<div style="font-weight:600;margin-bottom:.3rem;color:var(--primary);">Se crearan estas lineas:</div>';
+        }
+        asientos.forEach(function (a, i) {
+          if (asientos.length > 1) {
+            html += '<div style="margin-top:.4rem;font-weight:600;color:var(--primary);">' +
+                    escapeHtml(a.glosa) + '</div>';
+          }
+          a.lineas.forEach(function (l) {
+            html += '<div class="pp-line"><span class="cta">' + l.codigo + '</span>' +
+                    '<span>D: ' + money(l.debe) + ' / H: ' + money(l.haber) + '</span></div>';
+          });
+        });
+        preview.innerHTML = html;
+      }
+
+      function cargarAsientoEnTabla(asiento) {
+        tbody.innerHTML = '';
+        glosaEl.value = asiento.glosa;
+        var pendientes = asiento.lineas.length;
+        asiento.lineas.forEach(function (l) {
+          var tr = crearFila('mov', { focus: false });
+          var inCuenta = tr.querySelector('.in-cuenta');
+          var inGlosa = tr.querySelector('.in-glosa');
+          var inDebe = tr.querySelector('.in-debe');
+          var inHaber = tr.querySelector('.in-haber');
+          inCuenta.value = l.codigo;
+          if (inGlosa) inGlosa.value = l.g || '';
+          if (l.debe > 0 && inDebe) inDebe.value = money(l.debe);
+          if (l.haber > 0 && inHaber) inHaber.value = money(l.haber);
+          fetch('/buscar?q=' + encodeURIComponent(l.codigo) + '&niveles=4,5')
+            .then(function (res) { return res.json(); })
+            .then(function (d) {
+              var exacto = (d.resultados || []).find(function (r) { return r.codigo === l.codigo; });
+              if (exacto) {
+                tr.dataset.codigo = exacto.codigo;
+                tr.dataset.nivel = String(exacto.nivel);
+                tr.dataset.validado = '1';
+                var descEl = tr.querySelector('.desc-cuenta');
+                if (descEl) { descEl.textContent = exacto.descripcion; descEl.title = exacto.descripcion; }
+              }
+              pendientes -= 1;
+              if (pendientes === 0) recalc();
+            })
+            .catch(function () { pendientes -= 1; if (pendientes === 0) recalc(); });
+        });
+        renumerar();
+        recalc();
+      }
+
+      function guardarAsientosEnLote(asientos, metaBase) {
+        // Guarda N asientos consecutivos directamente al backend. Devuelve una promesa.
+        var guardados = [];
+        function siguiente(i) {
+          if (i >= asientos.length) return Promise.resolve(guardados);
+          var a = asientos[i];
+          var payload = {
+            fecha: metaBase.fecha,
+            glosa: a.glosa,
+            moneda: metaBase.moneda,
+            tipo_cambio: metaBase.tipo_cambio,
+            codigo_libro: metaBase.codigo_libro,
+            numero_correlativo: metaBase.numero_correlativo ? (metaBase.numero_correlativo + '-' + (i + 1)) : '',
+            numero_documento: metaBase.numero_documento,
+            lineas: a.lineas.map(function (l) {
+              return { cuenta_codigo: l.codigo, glosa_linea: l.g || '', debe: l.debe || 0, haber: l.haber || 0 };
+            })
+          };
+          return fetch('/asientos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }).then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
+            .then(function (out) {
+              if (out.status === 200 && out.body.ok) {
+                guardados.push(out.body.id);
+                return siguiente(i + 1);
+              }
+              throw new Error((out.body.errores || [out.body.error || 'Error']).join(' / ') + ' (asiento ' + (i + 1) + ')');
+            });
+        }
+        return siguiente(0);
+      }
+
+      function cargarMultiAsientoEnTabla(asientos) {
+        // Combina N sub-asientos en un unico asiento visible, con separadores "--- 1 ---" entre bloques.
+        tbody.innerHTML = '';
+        window._plantillaMulti = asientos.map(function (a) { return { glosa: a.glosa, nLineas: a.lineas.length }; });
+        var glosaFinal = asientos.map(function (a) { return a.glosa; }).join(' | ');
+        glosaEl.value = glosaFinal;
+
+        var filasPendientes = [];
+        asientos.forEach(function (a, idx) {
+          a.lineas.forEach(function (l) {
+            filasPendientes.push({ codigo: l.codigo, debe: l.debe, haber: l.haber, g: l.g, sep: null, bloque: idx });
+          });
+          if (filasPendientes.length) {
+            var primeraDelBloque = filasPendientes[filasPendientes.length - a.lineas.length];
+            primeraDelBloque.sep = (idx + 1) + ') ' + a.glosa;
+          }
+        });
+
+        var pendientes = filasPendientes.length;
+        filasPendientes.forEach(function (l) {
+          var tr = crearFila('mov', { focus: false });
+          tr.dataset.bloque = String(l.bloque);
+          if (l.sep) {
+            var sepTr = document.createElement('tr');
+            sepTr.className = 'fila-separador';
+            sepTr.innerHTML = '<td colspan="6" style="background:#eaf0f7;color:var(--primary);font-weight:700;padding:.5rem .7rem;border-top:2px solid var(--primary-2);text-align:center;letter-spacing:.05em;">&mdash;&mdash;&mdash; ' + escapeHtml(l.sep) + ' &mdash;&mdash;&mdash;</td>';
+            tr.before(sepTr);
+          }
+          var inCuenta = tr.querySelector('.in-cuenta');
+          var inGlosa = tr.querySelector('.in-glosa');
+          var inDebe = tr.querySelector('.in-debe');
+          var inHaber = tr.querySelector('.in-haber');
+          inCuenta.value = l.codigo;
+          if (inGlosa) inGlosa.value = l.g || '';
+          if (l.debe > 0 && inDebe) inDebe.value = money(l.debe);
+          if (l.haber > 0 && inHaber) inHaber.value = money(l.haber);
+          // Setear dataset DESPUES de los value: el listener 'input' que dispara setear value
+          // limpia el dataset.codigo, asi que lo marcamos al final sincronamente.
+          tr.dataset.codigo = l.codigo;
+          tr.dataset.validado = '1';
+          tr.dataset.nivel = '4';
+          fetch('/buscar?q=' + encodeURIComponent(l.codigo) + '&niveles=4,5')
+            .then(function (res) { return res.json(); })
+            .then(function (d) {
+              var exacto = (d.resultados || []).find(function (r) { return r.codigo === l.codigo; });
+              if (exacto) {
+                tr.dataset.codigo = exacto.codigo;
+                tr.dataset.nivel = String(exacto.nivel);
+                tr.dataset.validado = '1';
+                var descEl = tr.querySelector('.desc-cuenta');
+                if (descEl) { descEl.textContent = exacto.descripcion; descEl.title = exacto.descripcion; }
+              }
+              pendientes -= 1;
+              if (pendientes === 0) recalc();
+            })
+            .catch(function () { pendientes -= 1; if (pendientes === 0) recalc(); });
+        });
+        // Recalc inicial para habilitar el boton inmediatamente (antes de que lleguen los fetches)
+        setTimeout(recalc, 0);
+        renumerar();
+        recalc();
+      }
+
+      function aplicarPlantilla() {
+        var tpl = PLANTILLAS[plantillaActual];
+        if (!tpl) return;
+        var r = leerDatosPlantilla();
+        if (!r.ok) {
+          UI.warning('Ingresa un monto valido para la plantilla.', 'Datos incompletos');
+          return;
+        }
+        // Aplicar fecha seleccionada en la plantilla al editor principal
+        var fechaTpl = document.getElementById('tpl-fecha');
+        if (fechaTpl && fechaTpl.value) {
+          if (fechaTpl.value > HOY) {
+            UI.warning('La fecha no puede ser futura.', 'Fecha invalida');
+            fechaTpl.focus();
+            return;
+          }
+          fechaEl.value = fechaTpl.value;
+        }
+        var resultado = tpl.build(r.datos);
+        var asientos = Array.isArray(resultado) ? resultado :
+                        (resultado.asientos ? resultado.asientos : [resultado]);
+
+        if (asientos.length === 1) {
+          cargarAsientoEnTabla(asientos[0]);
+        } else {
+          cargarMultiAsientoEnTabla(asientos);
+        }
+        cerrarModalForm();
+        cerrarModal();
+      }
+
+      document.getElementById('btn-plantillas').addEventListener('click', abrirModal);
+      document.getElementById('modal-close').addEventListener('click', cerrarModal);
+      modal.addEventListener('click', function (e) { if (e.target === modal) cerrarModal(); });
+      document.getElementById('modal-close2').addEventListener('click', cerrarModalForm);
+      document.getElementById('btn-tpl-volver').addEventListener('click', volverAPlantillas);
+      document.getElementById('btn-tpl-volver2').addEventListener('click', volverAPlantillas);
+      modalForm.addEventListener('click', function (e) { if (e.target === modalForm) cerrarModalForm(); });
+      document.getElementById('btn-tpl-aplicar').addEventListener('click', aplicarPlantilla);
+      Array.prototype.forEach.call(modalGrid.querySelectorAll('.plantilla-card'), function (btn) {
+        btn.addEventListener('click', function () { abrirFormularioPlantilla(btn.dataset.tpl); });
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (!modalForm.hidden) cerrarModalForm();
+        else if (!modal.hidden) cerrarModal();
+      });
+
+      monedaEl.value = 'PEN';
+      tcEl.disabled = true;
+      tcEl.value = '1';
+
+      // ========= AUTOGUARDADO DE BORRADORES =========
+      var DRAFT_KEY = EDITAR ? null : 'nuevo-asiento';
+
+      function snapshotForm() {
+        var lineas = [];
+        Array.prototype.forEach.call(tbody.children, function (tr) {
+          if (tr.classList.contains('fila-separador')) return;
+          var inC = tr.querySelector('.in-cuenta');
+          if (!inC) return;
+          var inG = tr.querySelector('.in-glosa');
+          var inD = tr.querySelector('.in-debe');
+          var inH = tr.querySelector('.in-haber');
+          var codigo = inC.value.trim();
+          var glosa = inG ? inG.value : '';
+          var debe = inD ? inD.value : '';
+          var haber = inH ? inH.value : '';
+          if (!codigo && !glosa && !debe && !haber) return;
+          lineas.push({
+            codigo: codigo,
+            glosa: glosa,
+            debe: debe,
+            haber: haber,
+            tipo: tr.dataset.tipo || 'mov',
+            bloque: tr.dataset.bloque || ''
+          });
+        });
+        return {
+          fecha: fechaEl.value,
+          moneda: monedaEl.value,
+          tipo_cambio: tcEl.value,
+          codigo_libro: codigoLibroEl.value,
+          correlativo: correlativoEl.value,
+          documento: documentoEl.value,
+          glosa: glosaEl.value,
+          lineas: lineas,
+          multi: window._plantillaMulti || null
+        };
+      }
+
+      var _draftTimer = null;
+      function marcarBorrador() {
+        if (!DRAFT_KEY) return;
+        clearTimeout(_draftTimer);
+        _draftTimer = setTimeout(function () {
+          var snap = snapshotForm();
+          if (!snap.lineas.length && !snap.documento && !snap.correlativo && !snap.glosa) {
+            UI.draft.clear(DRAFT_KEY);
+            return;
+          }
+          UI.draft.save(DRAFT_KEY, snap);
+          if (window.UI && UI.showSavedIndicator) UI.showSavedIndicator('Borrador guardado');
+        }, 900);
+      }
+
+      function restaurarBorrador(snap) {
+        if (!snap) return;
+        fechaEl.value = snap.fecha || HOY;
+        monedaEl.value = snap.moneda || 'PEN';
+        tcEl.value = snap.tipo_cambio || '1';
+        tcEl.disabled = (snap.moneda === 'PEN');
+        codigoLibroEl.value = snap.codigo_libro || '';
+        correlativoEl.value = snap.correlativo || '';
+        documentoEl.value = snap.documento || '';
+        glosaEl.value = snap.glosa || '';
+        window._plantillaMulti = snap.multi || null;
+        tbody.innerHTML = '';
+        var pend = (snap.lineas || []).length;
+        if (pend === 0) {
+          crearFila('mov', { focus: false });
+          crearFila('mov', { focus: false });
+        } else {
+          (snap.lineas || []).forEach(function (l) {
+            var tr = crearFila(l.tipo || 'mov', { focus: false });
+            if (l.bloque) tr.dataset.bloque = l.bloque;
+            var inC = tr.querySelector('.in-cuenta');
+            if (inC && l.codigo) inC.value = l.codigo;
+            var inG = tr.querySelector('.in-glosa');
+            if (inG) inG.value = l.glosa || '';
+            var inD = tr.querySelector('.in-debe');
+            if (inD) inD.value = l.debe || '';
+            var inH = tr.querySelector('.in-haber');
+            if (inH) inH.value = l.haber || '';
+            tr.dataset.codigo = l.codigo || '';
+            tr.dataset.validado = l.codigo ? '1' : '0';
+            tr.dataset.nivel = '4';
+            if (l.codigo) {
+              fetch('/buscar?q=' + encodeURIComponent(l.codigo) + '&niveles=4,5')
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                  var ex = (d.resultados || []).find(function (r) { return r.codigo === l.codigo; });
+                  if (ex) {
+                    tr.dataset.nivel = String(ex.nivel);
+                    var descEl = tr.querySelector('.desc-cuenta');
+                    if (descEl) { descEl.textContent = ex.descripcion; descEl.title = ex.descripcion; }
+                  }
+                  pend -= 1;
+                  if (pend === 0) recalc();
+                })
+                .catch(function () { pend -= 1; if (pend === 0) recalc(); });
+            } else {
+              pend -= 1;
+              if (pend === 0) recalc();
+            }
+          });
+        }
+        renumerar();
+        recalc();
+      }
+
+      function mostrarBannerBorrador(snap) {
+        var slot = document.getElementById('draft-banner-slot');
+        if (!slot) return;
+        var cuando = new Date(snap.savedAt).toLocaleString();
+        var nLineas = (snap.data.lineas || []).length;
+        slot.innerHTML =
+          '<div class="draft-banner">' +
+            '<span class="draft-ic">history</span>' +
+            '<div class="draft-body">' +
+              '<strong>Tienes un borrador sin guardar</strong><br>' +
+              '<span style="font-size:.78rem;">' + nLineas + ' linea(s) &middot; ' + cuando + '</span>' +
+            '</div>' +
+            '<div class="draft-banner-actions">' +
+              '<button type="button" class="primary" id="draft-restore">Restaurar</button>' +
+              '<button type="button" id="draft-discard">Descartar</button>' +
+            '</div>' +
+          '</div>';
+        document.getElementById('draft-restore').addEventListener('click', function () {
+          restaurarBorrador(snap.data);
+          slot.innerHTML = '';
+          UI.success('Borrador restaurado.', 'Listo');
+        });
+        document.getElementById('draft-discard').addEventListener('click', function () {
+          UI.confirm({
+            type: 'warning',
+            icon: 'delete_outline',
+            title: 'Descartar borrador',
+            msg: 'Se eliminara el borrador guardado. No podras recuperarlo.',
+            confirmText: 'Si, descartar',
+            cancelText: 'Cancelar'
+          }).then(function (ok) {
+            if (!ok) return;
+            UI.draft.clear(DRAFT_KEY);
+            slot.innerHTML = '';
+            UI.info('Borrador descartado.');
+          });
+        });
+      }
+
+      if (EDITAR) {
+        // Modo edicion: cargar datos existentes
+        fechaEl.value = EDITAR.fecha;
+        glosaEl.value = EDITAR.glosa;
+        monedaEl.value = EDITAR.moneda;
+        tcEl.value = EDITAR.tipo_cambio;
+        tcEl.disabled = (EDITAR.moneda === 'PEN');
+        codigoLibroEl.value = EDITAR.codigo_libro;
+        correlativoEl.value = EDITAR.numero_correlativo;
+        documentoEl.value = EDITAR.numero_documento;
+        var pend = (EDITAR.lineas || []).length;
+        if (pend === 0) {
+          crearFila('mov', { focus: false });
+          crearFila('mov', { focus: false });
+          recalc();
+        } else {
+          EDITAR.lineas.forEach(function (l) {
+            var tipo = l.es_titulo ? 'titulo' : 'mov';
+            var tr = crearFila(tipo, { focus: false });
+            var inC = tr.querySelector('.in-cuenta');
+            inC.value = l.cuenta_codigo;
+            var inG = tr.querySelector('.in-glosa');
+            if (inG) inG.value = l.glosa_linea || '';
+            var inD = tr.querySelector('.in-debe');
+            var inH = tr.querySelector('.in-haber');
+            if (inD && l.debe > 0) inD.value = money(l.debe);
+            if (inH && l.haber > 0) inH.value = money(l.haber);
+            tr.dataset.codigo = l.cuenta_codigo;
+            tr.dataset.validado = '1';
+            tr.dataset.nivel = l.es_titulo ? '3' : '4';
+            fetch('/buscar?q=' + encodeURIComponent(l.cuenta_codigo) + '&niveles=' + (l.es_titulo ? '2,3' : '4,5'))
+              .then(function (res) { return res.json(); })
+              .then(function (d) {
+                var exacto = (d.resultados || []).find(function (r) { return r.codigo === l.cuenta_codigo; });
+                if (exacto) {
+                  tr.dataset.codigo = exacto.codigo;
+                  tr.dataset.nivel = String(exacto.nivel);
+                  tr.dataset.validado = '1';
+                  var descEl = tr.querySelector('.desc-cuenta');
+                  if (descEl) { descEl.textContent = exacto.descripcion; descEl.title = exacto.descripcion; }
+                }
+                pend -= 1;
+                if (pend === 0) recalc();
+              })
+              .catch(function () { pend -= 1; if (pend === 0) recalc(); });
+          });
+        }
+        // Cambiar titulo
+        var h1 = document.querySelector('.topbar h1');
+        if (h1) h1.textContent = 'Formato 5.1 - Editando asiento ' + EDITAR.numero;
+        document.title = 'Editar asiento ' + EDITAR.numero;
+        // Ocultar panel de ayuda y plantillas (no aplican en edicion)
+        var pa = document.querySelector('.panel-ayuda');
+        if (pa) pa.style.display = 'none';
+        var pb = document.querySelector('.plantilla-bar');
+        if (pb) pb.style.display = 'none';
+      } else {
+        crearFila('mov', { focus: false });
+        crearFila('mov', { focus: false });
+      }
+      renumerar();
+      var primerInput = tbody.querySelector('.in-cuenta');
+      if (primerInput && !EDITAR) primerInput.focus();
+      recalc();
+
+      // ========= HOOK DE AUTOGUARDADO =========
+      if (DRAFT_KEY) {
+        // Mostrar banner si existe borrador previo
+        var existente = UI.draft.load(DRAFT_KEY);
+        if (existente && existente.data && (existente.data.lineas || []).length > 0) {
+          mostrarBannerBorrador(existente);
+        }
+        // Hooks: cualquier input dentro del main dispara marcarBorrador
+        document.querySelectorAll('#fecha, #moneda, #tipo_cambio, #codigo_libro, #numero_correlativo, #numero_documento, #glosa').forEach(function (el) {
+          el.addEventListener('input', marcarBorrador);
+          el.addEventListener('change', marcarBorrador);
+        });
+        // Observer para capturar cambios en filas (debounced via marcarBorrador)
+        var mo = new MutationObserver(marcarBorrador);
+        mo.observe(tbody, { childList: true, subtree: true, attributes: true, characterData: true });
+        tbody.addEventListener('input', marcarBorrador);
+        tbody.addEventListener('change', marcarBorrador);
+      }
+
+      // Limpiar borrador al guardar exitosamente (hook en localStorage del redirect)
+      window.limpiarBorradorActual = function () { if (DRAFT_KEY) UI.draft.clear(DRAFT_KEY); };
+    })();
   </script>
 </body>
 </html>

@@ -2,70 +2,484 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Plan Contable General Empresarial (PCGE 2026)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; margin: 2rem; background: #f5f6f8; color: #222; }
-    h1 { font-size: 1.4rem; }
-    form { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-    input[type=text] { flex: 1; min-width: 220px; padding: .5rem; font-size: 1rem; }
-    select, button { padding: .5rem; font-size: 1rem; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { border: 1px solid #ddd; padding: .4rem .6rem; text-align: left; font-size: .9rem; }
-    th { background: #2c3e50; color: #fff; position: sticky; top: 0; }
-    tr.nivel-2 { background: #e8edf3; font-weight: bold; }
-    tr.nivel-3 { background: #f4f7fa; }
-    .meta { color: #555; font-size: .85rem; margin-bottom: .5rem; }
-    .wrap { max-height: 75vh; overflow: auto; border: 1px solid #ddd; }
+    :root {
+      --bg: #f2f5f9;
+      --card: #ffffff;
+      --border: #d8dee7;
+      --muted: #6b7785;
+      --text: #1f2937;
+      --primary: #1e3a5f;
+      --primary-2: #2c5282;
+      --accent: #e67e22;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 14px;
+    }
+    .topbar {
+      background: var(--primary);
+      color: #fff;
+      padding: .8rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .topbar h1 { font-size: 1rem; margin: 0; font-weight: 600; letter-spacing: .01em; }
+    .topbar nav { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+    .topbar a {
+      color: #fff;
+      text-decoration: none;
+      font-size: .82rem;
+      padding: .35rem .6rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, .12);
+    }
+    .topbar a:hover { background: rgba(255, 255, 255, .24); }
+    .topbar a.cta { background: var(--accent); font-weight: 600; }
+    .topbar a.cta:hover { background: #d35400; }
+    .wrap { max-width: 1260px; margin: 0 auto; padding: 1.1rem; }
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 1.5rem 1.5rem;
+      margin-bottom: 1.1rem;
+      box-shadow: 0 4px 14px rgba(30, 58, 95, .18);
+    }
+    .hero h2 { margin: 0 0 .3rem; font-size: 1.4rem; font-weight: 700; }
+    .hero p { margin: 0 0 1rem; opacity: .9; font-size: .9rem; }
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .7rem;
+    }
+    .quick-card {
+      background: rgba(255, 255, 255, .12);
+      border: 1px solid rgba(255, 255, 255, .18);
+      padding: .9rem 1rem;
+      border-radius: 10px;
+      color: #fff;
+      text-decoration: none;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+    }
+    .quick-card:hover { background: rgba(255, 255, 255, .22); transform: translateY(-2px); }
+    .quick-card .ic { font-size: 1.6rem; }
+    .quick-card .tt { font-weight: 700; font-size: .9rem; display: block; }
+    .quick-card .ds { font-size: .72rem; opacity: .85; }
+    @media (max-width: 760px) {
+      .quick-actions { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .card-head {
+      padding: .8rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: #fbfcfe;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .card-head h2 { font-size: .9rem; margin: 0; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .card-body { padding: 1rem; }
+    .search-form {
+      display: grid;
+      grid-template-columns: 1fr 260px auto;
+      gap: .6rem;
+      align-items: center;
+    }
+    @media (max-width: 760px) {
+      .search-form { grid-template-columns: 1fr; }
+    }
+    .search-form input, .search-form select {
+      width: 100%;
+      padding: .6rem .75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .9rem;
+      background: #fff;
+      color: var(--text);
+      font-family: inherit;
+    }
+    .search-form input:focus, .search-form select:focus {
+      outline: none;
+      border-color: var(--primary-2);
+      box-shadow: 0 0 0 3px rgba(44, 82, 130, .12);
+    }
+    .search-form .btn-clear {
+      padding: .6rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font-size: .85rem;
+      text-decoration: none;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      transition: all .1s;
+    }
+    .search-form .btn-clear:hover { background: #eef3f8; border-color: var(--primary-2); }
+    .meta {
+      font-size: .78rem;
+      color: var(--muted);
+      padding: 0 1rem .5rem;
+    }
+    .table-wrap {
+      max-height: 68vh;
+      overflow: auto;
+      border-top: 1px solid var(--border);
+    }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--primary);
+      color: #fff;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: .55rem .6rem;
+      text-align: left;
+      white-space: nowrap;
+    }
+    thead th:first-child { padding-left: 1rem; }
+    tbody td {
+      padding: .4rem .6rem;
+      border-bottom: 1px solid #edf0f4;
+      font-size: .85rem;
+      background: #fff;
+    }
+    tbody td:first-child { padding-left: 1rem; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: 600; color: var(--primary); }
+    tbody tr:hover td { background: #f4f8fd; }
+    tbody tr.nivel-2 td { background: #eaf0f7; font-weight: 700; color: var(--primary); }
+    tbody tr.nivel-2 td:first-child { color: var(--primary); }
+    tbody tr.nivel-3 td { background: #f7f9fc; font-weight: 600; }
+    .nivel-badge {
+      display: inline-block;
+      padding: .12rem .5rem;
+      border-radius: 999px;
+      font-size: .7rem;
+      font-weight: 700;
+      background: #eef1f5;
+      color: var(--muted);
+    }
+    .nivel-badge.n2 { background: #c3dafe; color: #1a365d; }
+    .nivel-badge.n3 { background: #d6e4f5; color: #244a7a; }
+    .nivel-badge.n4 { background: #e6f0fb; color: var(--primary-2); }
+    .nivel-badge.n5 { background: #f0e6d6; color: #7c4a0f; }
+    .empty {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+    }
+    .fav-btn {
+      background: transparent; border: none; cursor: pointer; padding: 2px 4px;
+      font-family: 'Material Symbols Rounded'; font-size: 1rem; color: #c5cfd9;
+      transition: all .15s ease; border-radius: 4px;
+    }
+    .fav-btn:hover { color: #e67e22; transform: scale(1.15); }
+    .fav-btn.active { color: #e67e22; font-variation-settings: 'FILL' 1; }
+    .elem-group {
+      border-bottom: 1px solid var(--border);
+    }
+    .elem-group:last-child { border-bottom: none; }
+    .elem-head {
+      display: grid;
+      grid-template-columns: 48px 48px 1fr auto 36px;
+      gap: 1rem;
+      align-items: center;
+      padding: .9rem 1rem;
+      cursor: pointer;
+      background: #fbfcfe;
+      transition: all .18s ease;
+      user-select: none;
+    }
+    .elem-head:hover { background: #eef3f8; }
+    .elem-group.open .elem-head { background: linear-gradient(90deg, #eaf1fb 0%, #f4f8fd 100%); border-bottom: 2px solid var(--primary-2); }
+    .elem-num {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.2rem;
+      box-shadow: 0 3px 10px rgba(30, 58, 95, .25);
+    }
+    .elem-group.open .elem-num { background: var(--accent); box-shadow: 0 4px 14px rgba(230, 126, 34, .35); }
+    .elem-ic { font-size: 1.5rem; color: var(--primary-2); display: flex; align-items: center; justify-content: center; }
+    .elem-title { font-weight: 700; color: var(--primary); font-size: 1rem; }
+    .elem-desc { font-size: .78rem; color: var(--muted); margin-top: .1rem; }
+    .elem-count {
+      background: #e6f0fb;
+      color: var(--primary-2);
+      padding: .25rem .7rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .elem-group.open .elem-count { background: var(--primary-2); color: #fff; }
+    .elem-chevron {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: #eaf1fb;
+      color: var(--primary-2);
+      display: flex; align-items: center; justify-content: center;
+      transition: all .22s cubic-bezier(.2,.9,.3,1);
+    }
+    .elem-group.open .elem-chevron { background: var(--primary-2); color: #fff; transform: rotate(90deg); }
+    .elem-body {
+      display: none;
+      padding: 0;
+      background: #fafbfd;
+    }
+    .elem-group.open .elem-body {
+      display: block;
+      animation: expandDown .3s ease;
+    }
+    .elem-body table { background: transparent; }
+    .elem-body thead th {
+      background: #4a5568;
+      font-size: .68rem;
+    }
+    .elem-body tbody td { background: #fff; }
+    .elem-body tbody tr:nth-child(even) td { background: #fafbfd; }
+    .elem-body tbody tr:hover td { background: #eef3f8; }
+    .search-active-notice {
+      padding: .6rem 1rem;
+      background: #fff8e8;
+      border-top: 1px solid #f0d78a;
+      font-size: .78rem;
+      color: #7a5c0d;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    @keyframes expandDown {
+      from { opacity: 0; max-height: 0; }
+      to { opacity: 1; max-height: 3000px; }
+    }
   </style>
 </head>
 <body>
-  <h1>Plan Contable General Empresarial &mdash; PCGE 2026 (Peru)</h1>
-  <nav style="margin-bottom:1rem;">
-    <a href="/">Buscador</a> |
-    <a href="/asientos">Asientos</a> |
-    <a href="/asientos/nuevo">Nuevo asiento</a>
-  </nav>
-  <form id="form" method="get" onsubmit="return false;">
-    <input type="text" id="q" name="q" placeholder="Buscar por descripcion o codigo (ej: ventas, caja, 70)" value="{{ q }}" autofocus autocomplete="off">
-    <select id="elemento" name="elemento">
-      <option value="">Todos los elementos</option>
-      {% for num, nombre in elementos %}
-        <option value="{{ num }}" {% if elemento_sel == num|string %}selected{% endif %}>
-          {{ num }} - {{ nombre }}
-        </option>
-      {% endfor %}
-    </select>
-    <a href="/" style="align-self:center;">Limpiar</a>
-  </form>
-  <div class="meta" id="meta">{{ total }} resultado(s)</div>
-  <div class="wrap">
-    <table>
-      <thead>
-        <tr><th>Codigo</th><th>Descripcion</th><th>Nivel</th><th>Elemento</th></tr>
-      </thead>
-      <tbody id="tbody">
-        {% for r in resultados %}
-        <tr class="nivel-{{ r['nivel'] }}">
-          <td>{{ r['codigo'] }}</td>
-          <td>{{ r['descripcion'] }}</td>
-          <td>{{ r['nivel'] }}</td>
-          <td>{{ r['elemento'] }} - {{ r['elemento_nombre'] }}</td>
-        </tr>
+  <header class="topbar">
+    <h1 style="display:flex;align-items:center;gap:.5rem;"><span class="ic">menu_book</span> Plan Contable General Empresarial &mdash; PCGE 2026</h1>
+    <nav>
+      <a href="/dashboard" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">search</span> Buscador</a>
+      <a href="/asientos" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <a href="/asientos/nuevo" class="cta" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">add</span> Nuevo asiento</a>
+      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h2>Bienvenido al PCGE Peru</h2>
+      <p>Consulta las cuentas contables oficiales y registra tus operaciones del libro diario.</p>
+      <div class="quick-actions">
+        <a href="/asientos/nuevo" class="quick-card">
+          <span class="ic xl">edit_note</span>
+          <span>
+            <span class="tt">Crear asiento</span>
+            <span class="ds">Registrar nueva operacion contable</span>
+          </span>
+        </a>
+        <a href="/asientos" class="quick-card">
+          <span class="ic xl">receipt_long</span>
+          <span>
+            <span class="tt">Ver operaciones</span>
+            <span class="ds">Historial de todos los asientos</span>
+          </span>
+        </a>
+        <a href="#buscador" class="quick-card">
+          <span class="ic xl">manage_search</span>
+          <span>
+            <span class="tt">Buscar cuentas</span>
+            <span class="ds">Explorar el catalogo PCGE</span>
+          </span>
+        </a>
+      </div>
+    </section>
+
+    <section class="card" id="buscador">
+      <div class="card-head">
+        <h2>Catalogo de cuentas PCGE</h2>
+        <span style="font-size:.78rem;color:var(--muted);">1,666 cuentas disponibles</span>
+      </div>
+      <div class="card-body">
+        <form id="form" class="search-form" method="get" onsubmit="return false;">
+          <div style="position:relative;">
+            <span class="ic" style="position:absolute;left:.9rem;top:50%;transform:translateY(-50%);color:#6b7785;pointer-events:none;">search</span>
+            <input type="text" id="q" name="q" placeholder="Buscar por descripcion o codigo (ej: ventas, caja, 70)" value="{{ q }}" autofocus autocomplete="off" style="padding-left:2.5rem;">
+          </div>
+          <select id="elemento" name="elemento" data-custom>
+            <option value="">Todos los elementos</option>
+            {% for num, nombre in elementos %}
+              <option value="{{ num }}" {% if elemento_sel == num|string %}selected{% endif %}>
+                {{ num }} - {{ nombre }}
+              </option>
+            {% endfor %}
+          </select>
+          <a href="/" class="btn-clear">Limpiar</a>
+        </form>
+      </div>
+      <div class="meta" id="meta">{{ total }} resultado(s)</div>
+      {% if buscando %}
+      <div class="search-active-notice" id="search-notice">
+        <span class="ic sm">info</span>
+        Mostrando resultados de busqueda. <a href="/" style="color:var(--primary-2);font-weight:600;">Limpiar y ver por elementos</a>
+      </div>
+      {% endif %}
+      <div id="grupos-container">
+        {% if buscando %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:110px;">Codigo</th>
+                <th>Descripcion</th>
+                <th style="width:70px;">Nivel</th>
+                <th style="width:260px;">Elemento</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-search">
+              {% for r in resultados %}
+              <tr class="nivel-{{ r['nivel'] }}">
+                <td>{{ r['codigo'] }}</td>
+                <td>{{ r['descripcion'] }}</td>
+                <td><span class="nivel-badge n{{ r['nivel'] }}">N{{ r['nivel'] }}</span></td>
+                <td>{{ r['elemento'] }} - {{ r['elemento_nombre'] }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="empty">Sin resultados.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
         {% else %}
-        <tr><td colspan="4">Sin resultados.</td></tr>
+        {% set elem_icons = {
+          1: ("savings", "Dinero disponible y cuentas por cobrar"),
+          2: ("inventory_2", "Mercaderia, materias primas y productos"),
+          3: ("business", "Edificios, maquinaria, muebles, vehiculos"),
+          4: ("credit_card", "Deudas con proveedores, bancos y SUNAT"),
+          5: ("corporate_fare", "Capital social, reservas, utilidades"),
+          6: ("payments", "Compras, sueldos, servicios, depreciacion"),
+          7: ("point_of_sale", "Ventas, ingresos por servicios"),
+          8: ("insights", "Margen comercial, resultado del ejercicio"),
+          9: ("dashboard", "Gastos administrativos, de ventas, financieros")
+        } %}
+        {% for g in grupos %}
+        <div class="elem-group" data-elem="{{ g.numero }}">
+          <div class="elem-head" onclick="toggleElem(this)">
+            <div class="elem-num">{{ g.numero }}</div>
+            <div class="elem-ic"><span class="ic lg">{{ elem_icons.get(g.numero, ('folder', ''))[0] }}</span></div>
+            <div>
+              <div class="elem-title">{{ g.nombre }}</div>
+              <div class="elem-desc">{{ elem_icons.get(g.numero, ('', ''))[1] }}</div>
+            </div>
+            <div class="elem-count">{{ g.cuentas|length }} cuentas</div>
+            <div class="elem-chevron"><span class="ic">chevron_right</span></div>
+          </div>
+          <div class="elem-body">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:110px;padding-left:1rem;">Codigo</th>
+                  <th>Descripcion</th>
+                  <th style="width:80px;">Nivel</th>
+                  <th style="width:40px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in g.cuentas %}
+                <tr class="nivel-{{ r['nivel'] }}" data-codigo="{{ r['codigo'] }}">
+                  <td>{{ r['codigo'] }}</td>
+                  <td>{{ r['descripcion'] }}</td>
+                  <td><span class="nivel-badge n{{ r['nivel'] }}">N{{ r['nivel'] }}</span></td>
+                  <td style="width:40px;text-align:center;padding:0;">
+                    {% if r['nivel'] in [4, 5] %}
+                    <button type="button" class="fav-btn" data-cod="{{ r['codigo'] }}" title="Marcar como favorita">star</button>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+
   <script>
     const qInput = document.getElementById('q');
     const elementoSelect = document.getElementById('elemento');
-    const tbody = document.getElementById('tbody');
     const meta = document.getElementById('meta');
+    const grupos = document.getElementById('grupos-container');
     let timer = null;
 
     function escapeHtml(s) {
-      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function toggleElem(el) {
+      el.parentElement.classList.toggle('open');
+    }
+    window.toggleElem = toggleElem;
+
+    function renderBusqueda(items) {
+      if (!items.length) {
+        grupos.innerHTML = '<div class="empty">Sin resultados.</div>';
+        return;
+      }
+      const notice = '<div class="search-active-notice"><span class="ic sm">info</span> Mostrando resultados de busqueda. <a href="/" style="color:var(--primary-2);font-weight:600;">Limpiar y ver por elementos</a></div>';
+      const tabla = '<div class="table-wrap"><table>' +
+        '<thead><tr><th style="width:110px;">Codigo</th><th>Descripcion</th><th style="width:70px;">Nivel</th><th style="width:260px;">Elemento</th></tr></thead>' +
+        '<tbody>' +
+        items.map(r => (
+          '<tr class="nivel-' + r.nivel + '">' +
+          '<td>' + escapeHtml(r.codigo) + '</td>' +
+          '<td>' + escapeHtml(r.descripcion) + '</td>' +
+          '<td><span class="nivel-badge n' + r.nivel + '">N' + r.nivel + '</span></td>' +
+          '<td>' + r.elemento + ' - ' + escapeHtml(r.elemento_nombre) + '</td>' +
+          '</tr>'
+        )).join('') +
+        '</tbody></table></div>';
+      grupos.innerHTML = notice + tabla;
     }
 
     function buscar() {
@@ -75,22 +489,17 @@
       if (q) params.set('q', q);
       if (elemento) params.set('elemento', elemento);
 
+      // Si no hay query ni filtro, recargar la pagina para mostrar los acordeones
+      if (!q && !elemento) {
+        if (window.location.search) window.location.href = '/';
+        return;
+      }
+
       fetch('/buscar?' + params.toString())
         .then(r => r.json())
         .then(data => {
           meta.textContent = data.total + ' resultado(s)';
-          if (data.resultados.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4">Sin resultados.</td></tr>';
-            return;
-          }
-          tbody.innerHTML = data.resultados.map(r => (
-            '<tr class="nivel-' + r.nivel + '">' +
-            '<td>' + escapeHtml(r.codigo) + '</td>' +
-            '<td>' + escapeHtml(r.descripcion) + '</td>' +
-            '<td>' + r.nivel + '</td>' +
-            '<td>' + r.elemento + ' - ' + escapeHtml(r.elemento_nombre) + '</td>' +
-            '</tr>'
-          )).join('');
+          renderBusqueda(data.resultados);
         });
 
       const url = new URL(window.location);
@@ -104,6 +513,41 @@
       timer = setTimeout(buscar, 200);
     });
     elementoSelect.addEventListener('change', buscar);
+
+    // ===== Favoritas =====
+    var favoritas = [];
+    function updateFavBtns() {
+      document.querySelectorAll('.fav-btn').forEach(function (btn) {
+        if (favoritas.indexOf(btn.dataset.cod) >= 0) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+    }
+    fetch('/favoritas')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { favoritas = d.favoritas || []; updateFavBtns(); });
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('.fav-btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var cod = btn.dataset.cod;
+      fetch('/favoritas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo: cod })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          favoritas = d.favoritas || [];
+          updateFavBtns();
+          if (window.UI) {
+            if (d.accion === 'added') UI.success('Cuenta ' + cod + ' marcada como favorita.', 'Favorita');
+            else UI.info('Cuenta ' + cod + ' quitada de favoritas.');
+          }
+        })
+        .catch(function () { if (window.UI) UI.error('Error al actualizar favoritas.'); });
+    });
   </script>
 </body>
 </html>

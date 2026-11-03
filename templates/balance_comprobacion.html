@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Balance de comprobacion</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; }
+    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+    .topbar nav { display:flex; gap:.4rem; align-items:center; }
+    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
+    .wrap { max-width:1200px; margin:0 auto; padding:1.4rem; }
+    .filters-card {
+      background:#fff; border-radius:14px; padding:1rem; margin-bottom:1rem;
+      box-shadow:0 2px 10px rgba(15,23,42,.05);
+      display:grid; grid-template-columns: 160px 160px auto; gap:.7rem; align-items:end;
+    }
+    @media (max-width: 760px) { .filters-card { grid-template-columns: 1fr; } }
+    .filters-card label { font-size:.72rem; color:#6b7785; text-transform:uppercase; letter-spacing:.04em; font-weight:600; display:block; margin-bottom:.2rem; }
+
+    .balance-card { background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 2px 10px rgba(15,23,42,.05); }
+    .balance-table { width:100%; border-collapse:collapse; }
+    .balance-table thead th {
+      background:#1e3a5f; color:#fff; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;
+      padding:.65rem .7rem; font-weight:700; text-align:left; position:sticky; top:0;
+    }
+    .balance-table thead th.num, .balance-table thead th.c { text-align:center; }
+    .balance-table tbody td { padding:.5rem .7rem; border-bottom:1px solid #edf0f4; font-size:.85rem; }
+    .balance-table tbody tr:hover td { background:#fafbfd; }
+    .balance-table .cod { font-family:ui-monospace,Consolas,monospace; font-weight:700; color:#1e3a5f; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; }
+    .elem-pill {
+      display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.68rem; font-weight:700; background:#eef1f5; color:#4a5568;
+    }
+    tfoot td { background:#eaf0f7; font-weight:800; padding:.75rem .7rem; font-size:.95rem; }
+    tfoot td.num { font-variant-numeric:tabular-nums; }
+    .cuadra-ok { color:#1e8449; }
+    .cuadra-bad { color:#c0392b; }
+    .status-chip {
+      display:inline-flex; align-items:center; gap:.3rem;
+      padding:.4rem .8rem; border-radius:999px; font-weight:700; font-size:.85rem;
+      margin-bottom:.8rem;
+    }
+    .status-chip.ok { background:#e8f6ee; color:#1e8449; }
+    .status-chip.bad { background:#fdecea; color:#c0392b; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1><span class="ic">balance</span> Balance de comprobacion</h1>
+    </div>
+    <nav>
+      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/reportes/libro-mayor"><span class="ic sm">menu_book</span> Libro Mayor</a>
+      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <button type="button" class="theme-toggle">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <form method="get" class="filters-card">
+      <div>
+        <label>Fecha desde</label>
+        <input type="date" name="desde" value="{{ fecha_desde }}" max="{{ hoy }}">
+      </div>
+      <div>
+        <label>Fecha hasta</label>
+        <input type="date" name="hasta" value="{{ fecha_hasta }}" max="{{ hoy }}">
+      </div>
+      <button type="submit" class="btn primary" style="padding:.6rem 1.1rem;display:inline-flex;align-items:center;gap:.3rem;">
+        <span class="ic sm">search</span> Aplicar
+      </button>
+    </form>
+
+    {% set diff = total_debe - total_haber %}
+    {% if diff|abs < 0.01 and total_debe > 0 %}
+      <div class="status-chip ok"><span class="ic sm">check_circle</span> Totales cuadran correctamente</div>
+    {% elif total_debe == 0 and total_haber == 0 %}
+      <div class="status-chip" style="background:#eef1f5;color:#6b7785;"><span class="ic sm">info</span> Sin movimientos</div>
+    {% else %}
+      <div class="status-chip bad"><span class="ic sm">error</span> Totales NO cuadran. Diferencia: {{ '%.2f'|format(diff) }}</div>
+    {% endif %}
+
+    <div class="balance-card">
+      <table class="balance-table">
+        <thead>
+          <tr>
+            <th style="width:90px;">Codigo</th>
+            <th>Descripcion</th>
+            <th class="c" style="width:90px;">Elem</th>
+            <th class="num" style="width:120px;">Debe</th>
+            <th class="num" style="width:120px;">Haber</th>
+            <th class="num" style="width:120px;">Saldo Deudor</th>
+            <th class="num" style="width:120px;">Saldo Acreedor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in cuentas %}
+          <tr>
+            <td class="cod">{{ c.codigo }}</td>
+            <td>{{ c.descripcion }}</td>
+            <td class="c"><span class="elem-pill">{{ c.elemento }}</span></td>
+            <td class="num">{{ '%.2f'|format(c.total_debe) }}</td>
+            <td class="num">{{ '%.2f'|format(c.total_haber) }}</td>
+            <td class="num">{% if c.saldo_deudor > 0 %}{{ '%.2f'|format(c.saldo_deudor) }}{% endif %}</td>
+            <td class="num">{% if c.saldo_acreedor > 0 %}{{ '%.2f'|format(c.saldo_acreedor) }}{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" style="text-align:center;padding:2rem;color:#6b7785;">Sin movimientos en el rango seleccionado.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if cuentas %}
+        <tfoot>
+          <tr>
+            <td colspan="3" style="text-align:right;">TOTALES:</td>
+            <td class="num">{{ '%.2f'|format(total_debe) }}</td>
+            <td class="num">{{ '%.2f'|format(total_haber) }}</td>
+            <td class="num">{{ '%.2f'|format(total_saldo_deudor) }}</td>
+            <td class="num">{{ '%.2f'|format(total_saldo_acreedor) }}</td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </main>
+</body>
+</html>

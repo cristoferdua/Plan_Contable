@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Libro Mayor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; }
+    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+    .topbar nav { display:flex; gap:.4rem; align-items:center; }
+    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
+    .wrap { max-width:1200px; margin:0 auto; padding:1.4rem; }
+    .filters-card {
+      background:#fff; border-radius:14px; padding:1rem; margin-bottom:1rem;
+      box-shadow:0 2px 10px rgba(15,23,42,.05);
+      display:grid; grid-template-columns: 1fr 160px 160px auto; gap:.7rem; align-items:end;
+    }
+    @media (max-width: 760px) { .filters-card { grid-template-columns: 1fr; } }
+    .filters-card label { font-size:.72rem; color:#6b7785; text-transform:uppercase; letter-spacing:.04em; font-weight:600; display:block; margin-bottom:.2rem; }
+
+    .cuenta-card {
+      background:#fff; border-radius:14px; margin-bottom:.9rem;
+      box-shadow:0 2px 10px rgba(15,23,42,.05); overflow:hidden;
+    }
+    .cuenta-head {
+      padding:.9rem 1.2rem;
+      background: linear-gradient(90deg, #eaf1fb 0%, #f4f8fd 100%);
+      border-bottom:1px solid #d8dee7;
+      display: grid;
+      grid-template-columns: 100px 1fr auto auto auto;
+      gap: 1rem;
+      align-items: center;
+    }
+    .cuenta-codigo { font-family:ui-monospace,Consolas,monospace; font-weight:700; font-size:1rem; color:#1e3a5f; }
+    .cuenta-desc { font-size:.95rem; color:#1f2937; font-weight:600; }
+    .cuenta-stat { text-align:right; }
+    .cuenta-stat .lbl { font-size:.68rem; color:#6b7785; text-transform:uppercase; letter-spacing:.04em; }
+    .cuenta-stat .val { font-size:1rem; font-weight:700; font-variant-numeric:tabular-nums; }
+    .cuenta-stat.debe .val { color:#2c5282; }
+    .cuenta-stat.haber .val { color:#1e8449; }
+    .cuenta-stat.saldo .val.pos { color:#2c5282; }
+    .cuenta-stat.saldo .val.neg { color:#c0392b; }
+
+    table.movs { width:100%; border-collapse:collapse; }
+    table.movs thead th { background:#fafbfd; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:#6b7785; font-weight:600; padding:.5rem .8rem; text-align:left; border-bottom:1px solid #e3e8ef; }
+    table.movs tbody td { padding:.55rem .8rem; border-bottom:1px solid #f1f3f6; font-size:.85rem; }
+    table.movs tbody tr:hover td { background:#fafbfd; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; }
+    .mov-link { color:#2c5282; text-decoration:none; font-weight:600; }
+    .mov-link:hover { text-decoration:underline; }
+    .empty-state { background:#fff; border-radius:14px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1><span class="ic">menu_book</span> Libro Mayor</h1>
+    </div>
+    <nav>
+      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/"><span class="ic sm">home</span> Inicio</a>
+      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <button type="button" class="theme-toggle">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <form method="get" class="filters-card">
+      <div>
+        <label>Filtrar por cuenta (codigo o prefijo)</label>
+        <input type="text" name="cuenta" value="{{ cuenta_filtro }}" placeholder="Ej: 1011, 60, 7011">
+      </div>
+      <div>
+        <label>Fecha desde</label>
+        <input type="date" name="desde" value="{{ fecha_desde }}" max="{{ hoy }}">
+      </div>
+      <div>
+        <label>Fecha hasta</label>
+        <input type="date" name="hasta" value="{{ fecha_hasta }}" max="{{ hoy }}">
+      </div>
+      <button type="submit" class="btn primary" style="padding:.6rem 1.1rem;display:inline-flex;align-items:center;gap:.3rem;">
+        <span class="ic sm">search</span> Filtrar
+      </button>
+    </form>
+
+    {% if cuentas %}
+    <div style="color:#6b7785;font-size:.82rem;margin-bottom:.8rem;">
+      Mostrando {{ cuentas|length }} cuenta(s) con movimientos
+    </div>
+    {% for c in cuentas %}
+    <div class="cuenta-card">
+      <div class="cuenta-head">
+        <div class="cuenta-codigo">{{ c.codigo }}</div>
+        <div class="cuenta-desc">{{ c.descripcion }}</div>
+        <div class="cuenta-stat debe">
+          <div class="lbl">Total debe</div>
+          <div class="val">{{ '%.2f'|format(c.total_debe) }}</div>
+        </div>
+        <div class="cuenta-stat haber">
+          <div class="lbl">Total haber</div>
+          <div class="val">{{ '%.2f'|format(c.total_haber) }}</div>
+        </div>
+        <div class="cuenta-stat saldo">
+          <div class="lbl">Saldo</div>
+          <div class="val {% if c.saldo >= 0 %}pos{% else %}neg{% endif %}">
+            {{ '%.2f'|format(c.saldo) }}
+          </div>
+        </div>
+      </div>
+      <table class="movs">
+        <thead>
+          <tr>
+            <th style="width:100px;">Fecha</th>
+            <th style="width:120px;">Asiento</th>
+            <th>Glosa</th>
+            <th class="num" style="width:120px;">Debe</th>
+            <th class="num" style="width:120px;">Haber</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in c.movs %}
+          <tr>
+            <td>{{ m.fecha }}</td>
+            <td><a href="/asientos/{{ m.asiento_id }}" class="mov-link">{{ m.numero }}</a></td>
+            <td>{{ m.glosa }}</td>
+            <td class="num">{% if m.debe > 0 %}{{ '%.2f'|format(m.debe) }}{% endif %}</td>
+            <td class="num">{% if m.haber > 0 %}{{ '%.2f'|format(m.haber) }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state" style="padding:3rem 1rem;">
+      <div class="empty-icon">menu_book</div>
+      <h3>Sin movimientos</h3>
+      <p>No hay cuentas con movimientos en el rango seleccionado.</p>
+      <a href="/reportes/libro-mayor" class="empty-cta"><span class="ic sm">refresh</span> Limpiar filtros</a>
+    </div>
+    {% endif %}
+  </main>
+</body>
+</html>

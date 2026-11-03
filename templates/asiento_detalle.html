@@ -2,83 +2,344 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Asiento {{ asiento.numero }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; background: #f5f6f8; color: #222; }
-    h1 { font-size: 1.4rem; }
-    nav { margin-bottom: 1rem; }
-    .meta { background: #fff; padding: 1rem; border: 1px solid #ddd; margin-bottom: 1rem; }
-    .meta div { margin-bottom: .3rem; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { border: 1px solid #ddd; padding: .4rem .6rem; font-size: .9rem; text-align: left; }
-    th { background: #2c3e50; color: #fff; }
-    td.num { text-align: right; font-variant-numeric: tabular-nums; }
-    tfoot td { font-weight: bold; background: #e8edf3; }
-    .btn { padding: .4rem .8rem; background: #2c3e50; color: #fff; text-decoration: none; border: none; border-radius: 3px; cursor: pointer; font-size: .9rem; }
-    .btn.warn { background: #c0392b; }
-    .badge { padding: .15rem .5rem; border-radius: 3px; font-size: .8rem; }
-    .badge.ok { background: #27ae60; color: #fff; }
-    .badge.anul { background: #c0392b; color: #fff; }
-    .badge.rev { background: #e67e22; color: #fff; }
+    :root {
+      --bg: #f2f5f9;
+      --card: #ffffff;
+      --border: #d8dee7;
+      --muted: #6b7785;
+      --text: #1f2937;
+      --primary: #1e3a5f;
+      --primary-2: #2c5282;
+      --accent: #e67e22;
+      --ok: #1e8449;
+      --danger: #c0392b;
+      --warn: #b7791f;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 14px; }
+    .topbar { background: var(--primary); color: #fff; padding: .8rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    .topbar-left { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+    .topbar h1 { font-size: 1rem; margin: 0; font-weight: 600; display: flex; align-items: center; gap: .5rem; }
+    .topbar nav { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+    .topbar a { color: #fff; text-decoration: none; font-size: .82rem; padding: .35rem .6rem; border-radius: 8px; background: rgba(255,255,255,.12); display: inline-flex; align-items: center; gap: .3rem; }
+    .topbar a:hover { background: rgba(255,255,255,.24); }
+    .topbar a.cta { background: var(--accent); font-weight: 600; }
+    .tb-back { background: rgba(255,255,255,.18) !important; font-weight: 600; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 1.4rem; }
+
+    .status { display: inline-flex; align-items: center; gap: .25rem; padding: .26rem .75rem; border-radius: 999px; font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+    .status.vigente { background: #e8f6ee; color: var(--ok); }
+    .status.anulado { background: #fdecea; color: var(--danger); }
+    .status.reversa { background: #fff5e6; color: var(--warn); }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,.05); margin-bottom: 1rem; overflow: hidden; }
+
+    .detail-hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+      color: #fff;
+      padding: 1.35rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1.4rem;
+      flex-wrap: wrap;
+    }
+    .d-kicker { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; opacity: .82; font-weight: 600; }
+    .d-numero { font-size: 1.5rem; font-weight: 800; line-height: 1.2; margin: .15rem 0 .35rem; font-family: ui-monospace, Consolas, monospace; }
+    .d-glosa { font-size: .9rem; opacity: .92; max-width: 620px; line-height: 1.4; }
+    .hero-stats { display: flex; gap: .7rem; flex-wrap: wrap; }
+    .hero-stat {
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 12px;
+      padding: .65rem .95rem;
+      min-width: 130px;
+    }
+    .hero-stat .lbl { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; opacity: .78; font-weight: 700; }
+    .hero-stat .val { font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: .1rem; }
+
+    .detail-body { padding: 1.1rem 1.5rem 1.25rem; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .9rem 1.4rem; margin-bottom: 1.1rem; }
+    .meta-item .lbl { font-size: .67rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin-bottom: .18rem; }
+    .meta-item .val { font-size: .9rem; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+    .meta-item .val.mono { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; }
+    .meta-item .val a { color: var(--primary-2); text-decoration: none; }
+    .meta-item .val a:hover { text-decoration: underline; }
+
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; padding-top: 1rem; border-top: 1px solid var(--border); }
+    .act {
+      display: inline-flex; align-items: center; gap: .35rem;
+      padding: .5rem .9rem; border-radius: 10px;
+      font-size: .82rem; font-weight: 600; font-family: inherit;
+      text-decoration: none; cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--card); color: var(--text);
+      box-shadow: 0 1px 2px rgba(15,23,42,.05);
+      transition: all .18s cubic-bezier(.2,.9,.3,1);
+    }
+    .act:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(15,23,42,.12); }
+    .act.excel { background: var(--ok); color: #fff; border-color: var(--ok); }
+    .act.excel:hover { background: #15733b; }
+    .act.edit { background: var(--primary-2); color: #fff; border-color: var(--primary-2); }
+    .act.edit:hover { background: var(--primary); }
+    .act.delete { background: transparent; color: var(--danger); border-color: #e8b7b1; }
+    .act.delete:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .act.reverse { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .act.reverse:hover { background: #8c2418; }
+
+    .lines-head { display: flex; justify-content: space-between; align-items: center; gap: .8rem; padding: .85rem 1.2rem; background: #fbfcfe; border-bottom: 1px solid var(--border); }
+    .lines-head h2 { margin: 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; display: flex; align-items: center; gap: .4rem; }
+    .lines-head .count { font-size: .76rem; color: var(--muted); }
+    .balance-chip { display: inline-flex; align-items: center; gap: .25rem; padding: .22rem .6rem; border-radius: 999px; font-size: .7rem; font-weight: 700; }
+    .balance-chip.ok { background: #e8f6ee; color: var(--ok); }
+    .balance-chip.bad { background: #fdecea; color: var(--danger); }
+
+    .table-scroll { overflow-x: auto; }
+    table.lines { width: 100%; border-collapse: collapse; }
+    table.lines thead th {
+      background: var(--primary); color: #fff;
+      font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
+      padding: .6rem .75rem; text-align: left; font-weight: 700;
+      white-space: nowrap;
+    }
+    table.lines thead th.num { text-align: right; }
+    table.lines tbody td { padding: .55rem .75rem; border-bottom: 1px solid var(--border); font-size: .86rem; vertical-align: top; }
+    table.lines tbody tr:hover td { background: #fafbfd; }
+    table.lines tbody tr.row-titulo td { background: #f1f4f8; font-weight: 700; color: var(--primary); }
+    table.lines tbody tr:last-child td { border-bottom: 1px solid var(--border); }
+    table.lines .cod { font-family: ui-monospace, Consolas, monospace; font-weight: 700; color: var(--primary-2); white-space: nowrap; }
+    table.lines .orden { color: var(--muted); font-variant-numeric: tabular-nums; }
+    table.lines .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    table.lines .debe { color: var(--primary-2); font-weight: 600; }
+    table.lines .haber { color: var(--ok); font-weight: 600; }
+    table.lines .muted-dash { color: var(--muted); }
+    table.lines tfoot td { background: #eaf0f7; font-weight: 800; padding: .7rem .75rem; font-size: .9rem; border-top: 2px solid var(--primary-2); }
+    table.lines tfoot td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.lines tfoot td.label { text-align: right; text-transform: uppercase; letter-spacing: .05em; font-size: .72rem; color: var(--primary); }
+
+    html[data-theme="dark"] .detail-hero { background: linear-gradient(135deg, #0a1118 0%, #1a2838 100%); }
+    html[data-theme="dark"] .lines-head { background: #141b23; }
+    html[data-theme="dark"] table.lines thead th { background: #0a1118; }
+    html[data-theme="dark"] table.lines tbody tr.row-titulo td { background: #1f2832 !important; color: #a4c2e5 !important; }
+    html[data-theme="dark"] table.lines tfoot td { background: #141b23 !important; color: var(--text) !important; border-color: var(--border); }
+    html[data-theme="dark"] .act { background: #253040; color: var(--text); border-color: var(--border); }
+    html[data-theme="dark"] .act:hover { background: #2c3b4e; }
+    html[data-theme="dark"] .act.excel { background: #1e8449; color: #fff; }
+    html[data-theme="dark"] .act.excel:hover { background: #15733b; }
+    html[data-theme="dark"] .act.edit { background: var(--primary-2); color: #fff; }
+    html[data-theme="dark"] .act.edit:hover { background: var(--primary); }
+    html[data-theme="dark"] .act.delete { background: #253040; color: #f1a9a0; }
+    html[data-theme="dark"] .act.delete:hover { background: #c0392b; color: #fff; }
+    html[data-theme="dark"] .act.reverse { background: #c0392b; color: #fff; }
+    html[data-theme="dark"] .act.reverse:hover { background: #8c2418; }
+    html[data-theme="dark"] .balance-chip.ok { background: #1a3a26; color: #86d4a3; }
+    html[data-theme="dark"] .balance-chip.bad { background: #3a1e1a; color: #f1a9a0; }
+    html[data-theme="dark"] .status.vigente { background: #1a3a26; color: #86d4a3; }
+    html[data-theme="dark"] .status.anulado { background: #3a1e1a; color: #f1a9a0; }
+    html[data-theme="dark"] .status.reversa { background: #3a2f1e; color: #f3d3a3; }
+
+    @media (max-width: 640px) {
+      .wrap { padding: 1rem; }
+      .detail-hero { padding: 1.1rem; }
+      .d-numero { font-size: 1.25rem; }
+      .hero-stat { flex: 1; min-width: 120px; }
+      .detail-body { padding: 1rem 1.1rem; }
+    }
   </style>
 </head>
 <body>
-  <h1>Asiento {{ asiento.numero }}
-    {% if asiento.reversa_de_id %}<span class="badge rev">REVERSA</span>
-    {% elif asiento.anulado_por_id %}<span class="badge anul">ANULADO</span>
-    {% else %}<span class="badge ok">VIGENTE</span>{% endif %}
-  </h1>
-  <nav>
-    <a href="/asientos">&larr; Volver al listado</a> |
-    <a href="/asientos/nuevo">+ Nuevo</a> |
-    <a href="/asientos/{{ asiento.id }}/excel" class="btn">Exportar Excel</a>
-    {% if not asiento.reversa_de_id and not asiento.anulado_por_id %}
-      <button class="btn warn" onclick="hacerReversa({{ asiento.id }})">Anular (crear reversa)</button>
-    {% endif %}
-  </nav>
-  <div class="meta">
-    <div><strong>Fecha:</strong> {{ asiento.fecha }}</div>
-    <div><strong>Glosa:</strong> {{ asiento.glosa }}</div>
-    <div><strong>Moneda:</strong> {{ asiento.moneda }} (TC {{ asiento.tipo_cambio }})</div>
-    {% if asiento.reversa_de_id %}<div><strong>Reversa de:</strong> <a href="/asientos/{{ asiento.reversa_de_id }}">asiento #{{ asiento.reversa_de_id }}</a></div>{% endif %}
-    {% if asiento.anulado_por_id %}<div><strong>Anulado por:</strong> <a href="/asientos/{{ asiento.anulado_por_id }}">asiento #{{ asiento.anulado_por_id }}</a></div>{% endif %}
-  </div>
-  <table>
-    <thead>
-      <tr><th>#</th><th>Cuenta</th><th>Descripcion</th><th>Glosa linea</th><th>Debe</th><th>Haber</th></tr>
-    </thead>
-    <tbody>
-      {% for l in lineas %}
-      <tr {% if l.es_titulo %}style="background:#f0f0f0;font-weight:bold;"{% endif %}>
-        <td>{{ l.orden }}</td>
-        <td>{{ l.cuenta_codigo }}</td>
-        <td>{{ l.cuenta_desc }}</td>
-        <td>{{ l.glosa_linea }}</td>
-        <td class="num">{% if not l.es_titulo %}{{ '%.2f'|format(l.debe) }}{% endif %}</td>
-        <td class="num">{% if not l.es_titulo %}{{ '%.2f'|format(l.haber) }}{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-    <tfoot>
-      <tr><td colspan="4" style="text-align:right;">TOTAL</td>
-        <td class="num">{{ '%.2f'|format(total_debe) }}</td>
-        <td class="num">{{ '%.2f'|format(total_haber) }}</td>
-      </tr>
-    </tfoot>
-  </table>
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="javascript:history.back()" class="tb-back"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1>
+        <span class="ic">receipt_long</span> Asiento {{ asiento.numero }}
+        {% if asiento.reversa_de_id %}<span class="status reversa">REVERSA</span>
+        {% elif asiento.anulado_por_id %}<span class="status anulado">ANULADO</span>
+        {% else %}<span class="status vigente">VIGENTE</span>{% endif %}
+      </h1>
+    </div>
+    <nav>
+      <a href="/"><span class="ic sm">home</span> Inicio</a>
+      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <a href="/asientos/nuevo" class="cta"><span class="ic sm">add</span> Nueva operacion</a>
+      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="card">
+      <div class="detail-hero">
+        <div>
+          <div class="d-kicker">Asiento contable &middot; {{ asiento.fecha }}</div>
+          <div class="d-numero">{{ asiento.numero }}</div>
+          <div class="d-glosa">{{ asiento.glosa }}</div>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="lbl">Total debe</div>
+            <div class="val">{{ '%.2f'|format(total_debe) }}</div>
+          </div>
+          <div class="hero-stat">
+            <div class="lbl">Total haber</div>
+            <div class="val">{{ '%.2f'|format(total_haber) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <div class="meta-grid">
+          <div class="meta-item">
+            <div class="lbl">Fecha</div>
+            <div class="val">{{ asiento.fecha }}</div>
+          </div>
+          <div class="meta-item">
+            <div class="lbl">Moneda</div>
+            <div class="val">{{ asiento.moneda }} <span style="color:var(--muted);font-weight:500;">(TC {{ asiento.tipo_cambio }})</span></div>
+          </div>
+          {% if asiento.codigo_libro %}
+          <div class="meta-item">
+            <div class="lbl">Libro</div>
+            <div class="val">{{ asiento.codigo_libro }}</div>
+          </div>
+          {% endif %}
+          {% if asiento.numero_correlativo %}
+          <div class="meta-item">
+            <div class="lbl">Correlativo</div>
+            <div class="val mono">{{ asiento.numero_correlativo }}</div>
+          </div>
+          {% endif %}
+          {% if asiento.numero_documento %}
+          <div class="meta-item">
+            <div class="lbl">Documento</div>
+            <div class="val mono">{{ asiento.numero_documento }}</div>
+          </div>
+          {% endif %}
+          {% if asiento.reversa_de_id %}
+          <div class="meta-item">
+            <div class="lbl">Reversa de</div>
+            <div class="val"><a href="/asientos/{{ asiento.reversa_de_id }}">asiento #{{ asiento.reversa_de_id }}</a></div>
+          </div>
+          {% endif %}
+          {% if asiento.anulado_por_id %}
+          <div class="meta-item">
+            <div class="lbl">Anulado por</div>
+            <div class="val"><a href="/asientos/{{ asiento.anulado_por_id }}">asiento #{{ asiento.anulado_por_id }}</a></div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="actions">
+          <a href="/asientos/{{ asiento.id }}/excel" class="act excel"><span class="ic sm">download</span> Exportar Excel</a>
+          {% if not asiento.reversa_de_id and not asiento.anulado_por_id %}
+            <a href="/asientos/nuevo?editar={{ asiento.id }}" class="act edit"><span class="ic sm">edit</span> Editar</a>
+            <button type="button" class="act delete" onclick="eliminarAsiento({{ asiento.id }})"><span class="ic sm">delete</span> Eliminar</button>
+            <button type="button" class="act reverse" onclick="hacerReversa({{ asiento.id }})"><span class="ic sm">undo</span> Anular (crear reversa)</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% set diff = total_debe - total_haber %}
+    <div class="card">
+      <div class="lines-head">
+        <h2><span class="ic sm">list</span> Detalle del asiento</h2>
+        <div style="display:flex;align-items:center;gap:.7rem;">
+          <span class="count">{{ lineas|length }} linea(s)</span>
+          {% if diff|abs < 0.01 and total_debe > 0 %}
+            <span class="balance-chip ok"><span class="ic sm">check_circle</span> Cuadra</span>
+          {% elif total_debe > 0 or total_haber > 0 %}
+            <span class="balance-chip bad"><span class="ic sm">error</span> Diferencia {{ '%.2f'|format(diff) }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="lines">
+          <thead>
+            <tr>
+              <th style="width:52px;">#</th>
+              <th style="width:110px;">Cuenta</th>
+              <th>Descripcion</th>
+              <th>Glosa linea</th>
+              <th class="num" style="width:130px;">Debe</th>
+              <th class="num" style="width:130px;">Haber</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in lineas %}
+            <tr {% if l.es_titulo %}class="row-titulo"{% endif %}>
+              <td class="orden">{{ l.orden }}</td>
+              <td class="cod">{{ l.cuenta_codigo }}</td>
+              <td>{{ l.cuenta_desc }}</td>
+              <td>{{ l.glosa_linea }}</td>
+              <td class="num debe">{% if not l.es_titulo %}{{ '%.2f'|format(l.debe) }}{% endif %}</td>
+              <td class="num haber">{% if not l.es_titulo %}{{ '%.2f'|format(l.haber) }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" class="label">Total</td>
+              <td class="num">{{ '%.2f'|format(total_debe) }}</td>
+              <td class="num">{{ '%.2f'|format(total_haber) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </main>
+
   <script>
-    function hacerReversa(id) {
-      if (!confirm('Crear asiento de reversa? Esta accion no se puede deshacer.')) return;
+    async function eliminarAsiento(id) {
+      var ok = await UI.confirm({
+        type: 'danger',
+        icon: 'delete',
+        title: 'Eliminar asiento',
+        msg: 'Esta accion no se puede deshacer. Los datos se borraran permanentemente.',
+        confirmText: 'Si, eliminar',
+        cancelText: 'Cancelar'
+      });
+      if (!ok) return;
+      fetch('/asientos/' + id, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            UI.success('Asiento eliminado correctamente.', 'Listo');
+            setTimeout(() => { window.location.href = '/asientos'; }, 700);
+          } else {
+            UI.error(d.error || 'desconocido', 'Error al eliminar');
+          }
+        })
+        .catch(() => UI.error('Error de red al eliminar.', 'Sin conexion'));
+    }
+    async function hacerReversa(id) {
+      var ok = await UI.confirm({
+        type: 'warning',
+        icon: 'undo',
+        title: 'Crear asiento de reversa',
+        msg: 'Se creara un nuevo asiento que anula al actual (debe y haber invertidos). El original quedara marcado como anulado.',
+        confirmText: 'Si, crear reversa',
+        cancelText: 'Cancelar'
+      });
+      if (!ok) return;
       fetch('/asientos/' + id + '/reversa', { method: 'POST' })
         .then(r => r.json())
         .then(d => {
           if (d.ok) {
-            alert('Reversa creada: ' + d.numero);
-            location.reload();
+            UI.success('Reversa creada: ' + d.numero, 'Listo');
+            setTimeout(() => location.reload(), 700);
           } else {
-            alert('Error: ' + (d.error || JSON.stringify(d)));
+            UI.error(d.error || JSON.stringify(d), 'Error al reversar');
           }
-        });
+        })
+        .catch(() => UI.error('Error de red.', 'Sin conexion'));
     }
   </script>
 </body>
