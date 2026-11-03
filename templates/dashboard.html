@@ -109,6 +109,11 @@
     <nav>
       <a href="/"><span class="ic sm">home</span> Inicio</a>
       <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <a href="/reportes/libro-mayor"><span class="ic sm">menu_book</span> Libro Mayor</a>
+      <a href="/reportes/balance"><span class="ic sm">balance</span> Balance</a>
+      <a href="/entidades"><span class="ic sm">business</span> Entidades</a>
+      <a href="/importar"><span class="ic sm">upload_file</span> Importar</a>
+      <a href="/cierres"><span class="ic sm">lock</span> Cierres</a>
       <a href="/asientos/nuevo" class="cta"><span class="ic sm">add</span> Nuevo</a>
       <button type="button" class="theme-toggle">dark_mode</button>
     </nav>
@@ -154,6 +159,40 @@
         </div>
       </div>
     </div>
+
+    {% set vmax = ventas_mes if ventas_mes > compras_mes else compras_mes %}
+    {% if vmax and vmax > 0 %}
+    {% set bw_ventas = (ventas_mes / vmax * 595)|float %}
+    {% set bw_compras = (compras_mes / vmax * 595)|float %}
+    <div class="stat-card" style="display:block;padding:1.4rem 1.6rem;margin-bottom:1.4rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem;">
+        <div>
+          <div class="stat-label">Ventas vs Compras</div>
+          <div style="font-size:.78rem;color:#6b7785;">Comparativa del mes actual</div>
+        </div>
+        <a href="/reportes/libro-mayor" style="font-size:.78rem;color:#2c5282;text-decoration:none;font-weight:600;">Ver detalle →</a>
+      </div>
+      <svg viewBox="0 0 600 110" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+        <!-- Ventas -->
+        <text x="0" y="18" font-size="12" font-weight="600" fill="#1e8449">Ventas</text>
+        <text x="595" y="18" font-size="12" text-anchor="end" fill="#1f2937" font-weight="700">S/ {{ '%.2f'|format(ventas_mes) }}</text>
+        <rect x="0" y="24" width="595" height="18" rx="9" fill="#e8f6ee"/>
+        <rect x="0" y="24" width="{{ '%.2f'|format(bw_ventas) }}" height="18" rx="9" fill="#1e8449"/>
+        <!-- Compras -->
+        <text x="0" y="72" font-size="12" font-weight="600" fill="#e67e22">Compras</text>
+        <text x="595" y="72" font-size="12" text-anchor="end" fill="#1f2937" font-weight="700">S/ {{ '%.2f'|format(compras_mes) }}</text>
+        <rect x="0" y="78" width="595" height="18" rx="9" fill="#fff5e6"/>
+        <rect x="0" y="78" width="{{ '%.2f'|format(bw_compras) }}" height="18" rx="9" fill="#e67e22"/>
+      </svg>
+      {% set margen = ventas_mes - compras_mes %}
+      <div style="margin-top:.7rem;font-size:.82rem;color:#6b7785;text-align:right;">
+        Margen bruto:
+        <strong style="color:{% if margen >= 0 %}#1e8449{% else %}#c0392b{% endif %};">
+          S/ {{ '%.2f'|format(margen) }}
+        </strong>
+      </div>
+    </div>
+    {% endif %}
 
     {% if ultima_op %}
     <div class="stat-card" style="background: linear-gradient(90deg, #fbfcfe 0%, #f4f8fd 100%);">
@@ -206,6 +245,20 @@
         <div>
           <strong>Balance de comprobacion</strong>
           <span class="ds">Verifica que todo cuadre</span>
+        </div>
+      </a>
+      <a href="/reportes/por-ruc" class="quick-link">
+        <span class="ic" style="color:#2c5282;">groups</span>
+        <div>
+          <strong>Compras / Ventas por RUC</strong>
+          <span class="ds">Agrupacion por tercero (base DAOT)</span>
+        </div>
+      </a>
+      <a href="/reportes/anual" class="quick-link">
+        <span class="ic" style="color:#8e44ad;">calendar_month</span>
+        <div>
+          <strong>Reporte anual</strong>
+          <span class="ds">Cuadre global con desglose mensual</span>
         </div>
       </a>
     </div>

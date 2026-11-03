@@ -636,6 +636,20 @@
             <input type="text" id="numero_documento" maxlength="30" placeholder="F001-1234">
             <div class="field-hint">Ej: F001-1234, B001-56, R001-...</div>
           </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="ruc_tercero">RUC del tercero</label>
+              <span class="help-ic" data-tip="RUC del proveedor o cliente. Al consultar, SUNAT devuelve la razon social y la autocompletamos en la glosa.">?</span>
+            </div>
+            <div style="display:flex;gap:.4rem;">
+              <input type="text" id="ruc_tercero" maxlength="11" inputmode="numeric" pattern="[0-9]{11}" placeholder="20131312955" style="flex:1;font-family:ui-monospace,Consolas,monospace;letter-spacing:.05em;">
+              <button type="button" id="btn-sunat" class="btn ghost" style="padding:.45rem .7rem;white-space:nowrap;" title="Consultar en SUNAT">
+                <span class="ic sm">search</span> SUNAT
+              </button>
+            </div>
+            <div class="field-hint">Opcional. Autocompleta la razon social en la glosa.</div>
+            <div id="sunat-result" style="display:none;margin-top:.4rem;padding:.5rem .7rem;border-radius:8px;background:#eef3f8;border:1px solid #c9d6e5;font-size:.78rem;line-height:1.35;"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -674,6 +688,13 @@
           <span>Diferencia</span>
           <strong id="td-diff" class="bad">0.00</strong>
         </div>
+      </div>
+
+      <div id="warnings-box" style="display:none;margin:.6rem 0;padding:.65rem .85rem;background:#fff8e1;border:1px solid #ffe08a;border-left:4px solid #e67e22;border-radius:8px;font-size:.85rem;color:#7a4d00;">
+        <div style="font-weight:700;display:flex;align-items:center;gap:.35rem;margin-bottom:.3rem;">
+          <span class="ic sm">warning_amber</span> Avisos (puedes guardar igual)
+        </div>
+        <ul id="warnings-list" style="margin:.2rem 0 0 1.2rem;padding:0;"></ul>
       </div>
 
       <div class="acciones">
@@ -809,7 +830,91 @@
       var codigoLibroEl = document.getElementById('codigo_libro');
       var correlativoEl = document.getElementById('numero_correlativo');
       var documentoEl = document.getElementById('numero_documento');
+      var rucEl = document.getElementById('ruc_tercero');
+      var btnSunat = document.getElementById('btn-sunat');
+      var sunatResultEl = document.getElementById('sunat-result');
+      var razonSocialTercero = '';
       var guardando = false;
+
+      function pintarSunat(res) {
+        if (!res || !res.ok) {
+          sunatResultEl.style.display = 'block';
+          sunatResultEl.style.background = '#fdecea';
+          sunatResultEl.style.borderColor = '#f1b4ad';
+          sunatResultEl.innerHTML = '<span class="ic sm" style="color:#c0392b;">error</span> <strong>' + ((res && res.error) || 'RUC no encontrado') + '</strong>';
+          return;
+        }
+        var d = res.data;
+        var fuente = res.fuente === 'cache' ? 'cache' : (res.fuente === 'cache_fallback' ? 'cache (sin conexion)' : 'SUNAT');
+        var estadoOk = (d.estado || '').toUpperCase() === 'ACTIVO';
+        var condicionOk = (d.condicion || '').toUpperCase() === 'HABIDO';
+        var alerta = !estadoOk || !condicionOk;
+        sunatResultEl.style.display = 'block';
+        sunatResultEl.style.background = alerta ? '#fff5e6' : '#eef3f8';
+        sunatResultEl.style.borderColor = alerta ? '#e3cf9c' : '#c9d6e5';
+        var pills = '';
+        pills += '<span style="display:inline-block;padding:.08rem .45rem;border-radius:999px;background:' + (estadoOk?'#e8f6ee':'#fdecea') + ';color:' + (estadoOk?'#1e8449':'#c0392b') + ';font-weight:700;font-size:.68rem;letter-spacing:.04em;">' + (d.estado || '—') + '</span> ';
+        pills += '<span style="display:inline-block;padding:.08rem .45rem;border-radius:999px;background:' + (condicionOk?'#e8f6ee':'#fff5e6') + ';color:' + (condicionOk?'#1e8449':'#b7791f') + ';font-weight:700;font-size:.68rem;letter-spacing:.04em;">' + (d.condicion || '—') + '</span>';
+        sunatResultEl.innerHTML =
+          '<div style="font-weight:700;color:#1e3a5f;">' + (d.razon_social || '—') + '</div>'
+          + (d.direccion ? '<div style="color:#4a5568;font-size:.74rem;margin-top:.1rem;">' + d.direccion + (d.distrito?' · '+d.distrito:'') + '</div>' : '')
+          + '<div style="margin-top:.35rem;">' + pills + ' <span style="color:#6b7785;font-size:.7rem;margin-left:.3rem;">(fuente: ' + fuente + ')</span></div>';
+      }
+
+      function limpiarSunat() {
+        sunatResultEl.style.display = 'none';
+        sunatResultEl.innerHTML = '';
+      }
+
+      function consultarRucSunat(auto) {
+        var ruc = (rucEl.value || '').trim();
+        if (ruc.length !== 11 || !/^\d{11}$/.test(ruc)) {
+          if (!auto) UI.warning('El RUC debe tener 11 digitos numericos.', 'RUC invalido');
+          return;
+        }
+        btnSunat.disabled = true;
+        if (window.UI && UI.loading) UI.loading.btn(btnSunat, true);
+        sunatResultEl.style.display = 'block';
+        sunatResultEl.innerHTML = '<span class="ic sm">hourglass_empty</span> Consultando...';
+        fetch('/sunat/ruc/' + ruc)
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (window.UI && UI.loading) UI.loading.btn(btnSunat, false);
+            btnSunat.disabled = false;
+            pintarSunat(d);
+            if (d.ok && d.data && d.data.razon_social) {
+              razonSocialTercero = d.data.razon_social;
+              // Autocompletar glosa si esta vacia o la actual es generica
+              var g = (glosaEl.value || '').trim();
+              if (!g || g.length < 10) {
+                glosaEl.value = d.data.razon_social;
+                glosaEl.dispatchEvent(new Event('input'));
+              }
+              if ((d.data.estado || '').toUpperCase() !== 'ACTIVO') {
+                UI.warning('Proveedor con estado "' + d.data.estado + '". Puede afectar deducibilidad de gasto o credito fiscal.', 'Atencion');
+              } else if ((d.data.condicion || '').toUpperCase() === 'NO HABIDO') {
+                UI.warning('Proveedor NO HABIDO. Limita el credito fiscal del IGV.', 'Atencion');
+              }
+            }
+          })
+          .catch(function () {
+            if (window.UI && UI.loading) UI.loading.btn(btnSunat, false);
+            btnSunat.disabled = false;
+            pintarSunat({ ok: false, error: 'Error de red al consultar SUNAT' });
+          });
+      }
+
+      btnSunat.addEventListener('click', function () { consultarRucSunat(false); });
+      rucEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); consultarRucSunat(false); }
+      });
+      rucEl.addEventListener('blur', function () {
+        if ((rucEl.value || '').length === 11) consultarRucSunat(true);
+      });
+      rucEl.addEventListener('input', function () {
+        rucEl.value = (rucEl.value || '').replace(/\D/g, '').slice(0, 11);
+        if (!rucEl.value) limpiarSunat();
+      });
 
       function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
       function money(n) { return round2(n).toFixed(2); }
@@ -1275,6 +1380,103 @@
         estadoEl.className = 'estado ' + clase;
         fechaEl.classList.toggle('invalid', !fOk);
         tcEl.classList.toggle('invalid', !tOk);
+        actualizarWarnings(r);
+      }
+
+      function actualizarWarnings(r) {
+        var box = document.getElementById('warnings-box');
+        var list = document.getElementById('warnings-list');
+        if (!box || !list) return;
+        var avisos = [];
+
+        // 1) Fecha fin de semana
+        var fv = fechaEl && fechaEl.value;
+        if (fv) {
+          var partes = fv.split('-');
+          if (partes.length === 3) {
+            var dt = new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]));
+            var dia = dt.getDay();
+            if (dia === 0 || dia === 6) {
+              avisos.push('La fecha cae ' + (dia === 0 ? 'domingo' : 'sabado') + ' (fin de semana). Verifica si corresponde.');
+            }
+          }
+        }
+
+        // 2) Monto muy alto por linea (>100,000)
+        var altas = [];
+        r.filas.forEach(function (f) {
+          if (f.vacia || f.msg) return;
+          var tr = f.tr;
+          if (tr.dataset.tipo !== 'mov') return;
+          var d = parseAmount(tr.querySelector('.in-debe').value);
+          var h = parseAmount(tr.querySelector('.in-haber').value);
+          var monto = Math.max(isFinite(d) ? d : 0, isFinite(h) ? h : 0);
+          if (monto > 100000) {
+            var orden = tr.querySelector('.orden').textContent;
+            altas.push('L' + orden + ' (' + money(monto) + ')');
+          }
+        });
+        if (altas.length) {
+          avisos.push('Monto elevado en: ' + altas.join(', ') + '. Verifica el importe.');
+        }
+
+        // 3) IGV atipico (cuentas 4011 / 40111 que no sean ~18% de alguna base de la operacion)
+        var baseVentas = 0;      // haber en 70xx
+        var baseCompras = 0;     // debe en 60xx/63xx
+        var igvVenta = 0;        // haber 4011/40111
+        var igvCompra = 0;       // debe 4011/40111
+        r.filas.forEach(function (f) {
+          if (f.vacia || f.msg) return;
+          var tr = f.tr;
+          if (tr.dataset.tipo !== 'mov') return;
+          var cod = tr.dataset.codigo || tr.querySelector('.in-cuenta').value.trim();
+          var d = parseAmount(tr.querySelector('.in-debe').value);
+          var h = parseAmount(tr.querySelector('.in-haber').value);
+          d = isFinite(d) ? d : 0;
+          h = isFinite(h) ? h : 0;
+          if (cod.indexOf('70') === 0) baseVentas += h;
+          else if (cod.indexOf('60') === 0 || cod.indexOf('63') === 0) baseCompras += d;
+          else if (cod.indexOf('4011') === 0) {
+            igvVenta += h;
+            igvCompra += d;
+          }
+        });
+        function cercano(a, b) {
+          if (b <= 0) return true;
+          return Math.abs(a - b) / b < 0.02; // tolerancia 2%
+        }
+        if (igvVenta > 0 && baseVentas > 0 && !cercano(igvVenta, baseVentas * 0.18)) {
+          avisos.push('IGV de venta (' + money(igvVenta) + ') no coincide con 18% de ' + money(baseVentas) + ' = ' + money(baseVentas * 0.18) + '.');
+        }
+        if (igvCompra > 0 && baseCompras > 0 && !cercano(igvCompra, baseCompras * 0.18)) {
+          avisos.push('IGV de compra (' + money(igvCompra) + ') no coincide con 18% de ' + money(baseCompras) + ' = ' + money(baseCompras * 0.18) + '.');
+        }
+
+        // 4) Cuenta en elemento inusual: 60xx normalmente va al debe; si se pone en haber (sin ser nota credito), avisar
+        r.filas.forEach(function (f) {
+          if (f.vacia || f.msg) return;
+          var tr = f.tr;
+          if (tr.dataset.tipo !== 'mov') return;
+          var cod = tr.dataset.codigo || tr.querySelector('.in-cuenta').value.trim();
+          var d = parseAmount(tr.querySelector('.in-debe').value);
+          var h = parseAmount(tr.querySelector('.in-haber').value);
+          d = isFinite(d) ? d : 0;
+          h = isFinite(h) ? h : 0;
+          var orden = tr.querySelector('.orden').textContent;
+          if ((cod.indexOf('60') === 0 || cod.indexOf('63') === 0) && h > 0 && d === 0) {
+            avisos.push('L' + orden + ': cuenta ' + cod + ' (compra/gasto) suele ir al Debe, no al Haber.');
+          } else if (cod.indexOf('70') === 0 && d > 0 && h === 0) {
+            avisos.push('L' + orden + ': cuenta ' + cod + ' (venta) suele ir al Haber, no al Debe.');
+          }
+        });
+
+        if (avisos.length === 0) {
+          box.style.display = 'none';
+          list.innerHTML = '';
+        } else {
+          list.innerHTML = avisos.map(function (a) { return '<li>' + a + '</li>'; }).join('');
+          box.style.display = 'block';
+        }
       }
 
       function cuadrarUltima() {
@@ -1384,7 +1586,9 @@
           tipo_cambio: monedaEl.value === 'PEN' ? '1' : tcEl.value,
           codigo_libro: codigoLibroEl.value.trim(),
           numero_correlativo: correlativoEl.value.trim(),
-          numero_documento: documentoEl.value.trim()
+          numero_documento: documentoEl.value.trim(),
+          ruc_tercero: (rucEl.value || '').trim(),
+          razon_social_tercero: razonSocialTercero
         };
         var info = window._plantillaMulti || [];
 
@@ -1416,6 +1620,8 @@
               codigo_libro: meta.codigo_libro,
               numero_correlativo: correlativo,
               numero_documento: meta.numero_documento,
+              ruc_tercero: meta.ruc_tercero,
+              razon_social_tercero: meta.razon_social_tercero,
               lineas: grupos[b]
             })
           }).then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
@@ -1477,6 +1683,8 @@
             codigo_libro: codigoLibroEl.value.trim(),
             numero_correlativo: correlativoEl.value.trim(),
             numero_documento: documentoEl.value.trim(),
+            ruc_tercero: (rucEl.value || '').trim(),
+            razon_social_tercero: razonSocialTercero,
             lineas: lineas
           })
         })
@@ -2134,6 +2342,8 @@
             codigo_libro: metaBase.codigo_libro,
             numero_correlativo: metaBase.numero_correlativo ? (metaBase.numero_correlativo + '-' + (i + 1)) : '',
             numero_documento: metaBase.numero_documento,
+            ruc_tercero: metaBase.ruc_tercero,
+            razon_social_tercero: metaBase.razon_social_tercero,
             lineas: a.lineas.map(function (l) {
               return { cuenta_codigo: l.codigo, glosa_linea: l.g || '', debe: l.debe || 0, haber: l.haber || 0 };
             })
@@ -2159,7 +2369,13 @@
         tbody.innerHTML = '';
         window._plantillaMulti = asientos.map(function (a) { return { glosa: a.glosa, nLineas: a.lineas.length }; });
         var glosaFinal = asientos.map(function (a) { return a.glosa; }).join(' | ');
-        glosaEl.value = glosaFinal;
+        // Si ya se consulto un RUC, anteponer la razon social a la glosa final
+        var rsSunat = '';
+        if (sunatResultEl && sunatResultEl.style.display !== 'none') {
+          var rsEl = sunatResultEl.querySelector('div[style*="font-weight:700"]');
+          if (rsEl) rsSunat = rsEl.textContent.trim();
+        }
+        glosaEl.value = rsSunat ? (rsSunat + ' — ' + glosaFinal) : glosaFinal;
 
         var filasPendientes = [];
         asientos.forEach(function (a, idx) {
@@ -2427,6 +2643,11 @@
         codigoLibroEl.value = EDITAR.codigo_libro;
         correlativoEl.value = EDITAR.numero_correlativo;
         documentoEl.value = EDITAR.numero_documento;
+        rucEl.value = EDITAR.ruc_tercero || '';
+        razonSocialTercero = EDITAR.razon_social_tercero || '';
+        if (rucEl.value && razonSocialTercero) {
+          pintarSunat({ ok: true, fuente: 'cache', data: { razon_social: razonSocialTercero, estado: 'ACTIVO', condicion: 'HABIDO' } });
+        }
         var pend = (EDITAR.lineas || []).length;
         if (pend === 0) {
           crearFila('mov', { focus: false });

@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entidades (RUC)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; }
+    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+    .topbar nav { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; }
+    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
+    .wrap { max-width:1200px; margin:0 auto; padding:1.4rem; }
+    .page-hero { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); color:#fff; border-radius:14px; padding:1.6rem 1.8rem; margin-bottom:1.4rem; box-shadow:0 10px 30px rgba(30,58,95,.18); display:flex; align-items:center; gap:1rem; }
+    .page-hero .hero-icon { width:54px; height:54px; border-radius:14px; background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center; font-size:1.9rem; flex-shrink:0; }
+    .page-hero h2 { margin:0 0 .2rem; font-size:1.3rem; }
+    .page-hero p { margin:0; opacity:.92; font-size:.88rem; }
+
+    .card { background:#fff; border-radius:14px; padding:1.3rem 1.5rem; margin-bottom:1rem; box-shadow:0 2px 10px rgba(15,23,42,.05); }
+    .card h2 { margin:0 0 .5rem; font-size:1rem; color:#4a5568; text-transform:uppercase; letter-spacing:.04em; }
+    .consultar { display:grid; grid-template-columns: 1fr auto; gap:.7rem; align-items:end; }
+    @media (max-width:600px){ .consultar { grid-template-columns:1fr; } }
+    .consultar input { width:100%; padding:.7rem .85rem; border:1px solid #d8dee7; border-radius:10px; font-size:1rem; font-family:ui-monospace,Consolas,monospace; letter-spacing:.05em; }
+    .consultar input:focus { outline:0; border-color:#2c5282; box-shadow:0 0 0 3px rgba(44,82,130,.15); }
+    .btn-sunat { background:#1e3a5f; color:#fff; border:0; padding:.7rem 1.3rem; border-radius:10px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem; }
+    .btn-sunat:hover { background:#2c5282; }
+    .btn-sunat:disabled { opacity:.5; cursor:not-allowed; }
+
+    .search-box { display:flex; gap:.6rem; align-items:center; margin-bottom:1rem; }
+    .search-box input { flex:1; padding:.6rem .8rem; border:1px solid #d8dee7; border-radius:10px; font-size:.9rem; }
+
+    table.ents { width:100%; border-collapse:collapse; }
+    table.ents thead th { background:#fafbfd; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:#6b7785; font-weight:600; padding:.6rem .8rem; text-align:left; border-bottom:1px solid #e3e8ef; }
+    table.ents tbody td { padding:.7rem .8rem; border-bottom:1px solid #f1f3f6; font-size:.88rem; vertical-align:top; }
+    table.ents tbody tr:hover td { background:#fafbfd; }
+    .ruc { font-family:ui-monospace,Consolas,monospace; font-weight:700; color:#1e3a5f; }
+    .rs { font-weight:600; color:#1f2937; }
+    .nc { color:#6b7785; font-size:.78rem; }
+    .pill { display:inline-block; padding:.14rem .55rem; border-radius:999px; font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .pill.ok { background:#e8f6ee; color:#1e8449; }
+    .pill.warn { background:#fff5e6; color:#b7791f; }
+    .pill.bad { background:#fdecea; color:#c0392b; }
+    .pill.muted { background:#eef1f5; color:#6b7785; }
+    .btn-act { background:#fff; color:#2c5282; border:1px solid #c9d6e5; padding:.3rem .6rem; border-radius:6px; font-size:.76rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:.25rem; margin-right:.3rem; text-decoration:none; }
+    .btn-act:hover { background:#2c5282; color:#fff; border-color:#2c5282; }
+    .btn-act.danger { color:#c0392b; border-color:#e8b7b1; }
+    .btn-act.danger:hover { background:#c0392b; border-color:#c0392b; }
+
+    .result-preview { background:linear-gradient(135deg,#eef3f8 0%,#f4f8fd 100%); border:1px solid #c9d6e5; border-radius:12px; padding:1rem 1.2rem; margin-top:1rem; }
+    .result-preview .grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:.5rem 1rem; margin-top:.6rem; font-size:.86rem; }
+    @media (max-width:600px){ .result-preview .grid { grid-template-columns:1fr; } }
+    .result-preview .k { color:#6b7785; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; }
+    .result-preview .v { color:#1f2937; font-weight:600; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1><span class="ic">business</span> Entidades (RUC)</h1>
+    </div>
+    <nav>
+      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <button type="button" class="theme-toggle">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="page-hero">
+      <div class="hero-icon"><span class="ic">business_center</span></div>
+      <div>
+        <h2>Catalogo de entidades</h2>
+        <p>Consulta cualquier RUC en SUNAT y guardalo para no volver a consultarlo. Puedes administrar proveedores y clientes como catalogo.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Consultar RUC en SUNAT</h2>
+      <p style="color:#6b7785;font-size:.85rem;margin:0 0 .9rem;">Ingresa un RUC de 11 digitos. Si ya esta en cache lo mostramos al instante; si no, lo consultamos en SUNAT y lo guardamos.</p>
+      <form class="consultar" onsubmit="consultar(event)">
+        <input type="text" id="in-ruc" maxlength="11" placeholder="Ej: 20131312955" inputmode="numeric" pattern="[0-9]{11}" required>
+        <button type="submit" class="btn-sunat" id="btn-consultar"><span class="ic sm">search</span> Consultar</button>
+      </form>
+      <div id="result-wrap"></div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:1rem 1.3rem;border-bottom:1px solid #e3e8ef;background:#fbfcfe;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.8rem;">
+        <h2 style="margin:0;">Entidades guardadas</h2>
+        <span style="font-size:.78rem;color:#6b7785;">{{ entidades|length }} entidad(es)</span>
+      </div>
+      <form method="get" style="padding:.9rem 1.3rem;border-bottom:1px solid #e3e8ef;" class="search-box">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por RUC, razon social o nombre comercial...">
+        <button type="submit" class="btn-act"><span class="ic sm">search</span> Buscar</button>
+        {% if q %}<a href="/entidades" class="btn-act"><span class="ic sm">close</span> Limpiar</a>{% endif %}
+      </form>
+      {% if entidades %}
+      <table class="ents">
+        <thead>
+          <tr>
+            <th style="width:120px;">RUC</th>
+            <th>Razon social</th>
+            <th style="width:110px;">Estado</th>
+            <th style="width:110px;">Condicion</th>
+            <th>Direccion</th>
+            <th style="width:220px;text-align:right;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entidades %}
+          <tr data-id="{{ e.id }}">
+            <td class="ruc">{{ e.ruc }}</td>
+            <td>
+              <div class="rs">{{ e.razon_social }}</div>
+              {% if e.nombre_comercial %}<div class="nc">{{ e.nombre_comercial }}</div>{% endif %}
+              {% if e.nota %}<div style="font-size:.76rem;color:#b7791f;margin-top:.2rem;"><span class="ic sm">sticky_note_2</span> {{ e.nota }}</div>{% endif %}
+            </td>
+            <td>
+              {% if e.estado == 'ACTIVO' %}<span class="pill ok">{{ e.estado }}</span>
+              {% elif e.estado %}<span class="pill bad">{{ e.estado }}</span>
+              {% else %}<span class="pill muted">—</span>{% endif %}
+            </td>
+            <td>
+              {% if e.condicion == 'HABIDO' %}<span class="pill ok">{{ e.condicion }}</span>
+              {% elif e.condicion %}<span class="pill warn">{{ e.condicion }}</span>
+              {% else %}<span class="pill muted">—</span>{% endif %}
+            </td>
+            <td style="font-size:.82rem;color:#4a5568;">
+              {{ e.direccion or '—' }}
+              {% if e.distrito or e.provincia or e.departamento %}
+              <div style="color:#6b7785;font-size:.76rem;">{{ e.distrito }}{% if e.distrito and e.provincia %}, {% endif %}{{ e.provincia }}{% if e.provincia and e.departamento %}, {% endif %}{{ e.departamento }}</div>
+              {% endif %}
+            </td>
+            <td style="text-align:right;white-space:nowrap;">
+              <button type="button" class="btn-act" onclick="refrescar('{{ e.ruc }}')" title="Volver a consultar SUNAT"><span class="ic sm">refresh</span></button>
+              <button type="button" class="btn-act" onclick="editarNota({{ e.id }}, '{{ e.nota|replace("'", "\\'") }}')"><span class="ic sm">edit_note</span> Nota</button>
+              <button type="button" class="btn-act danger" onclick="eliminar({{ e.id }}, '{{ e.ruc }}')"><span class="ic sm">delete</span></button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state" style="padding:2.5rem 1rem;">
+        <div class="empty-icon">business</div>
+        <h3>{% if q %}Sin resultados para "{{ q }}"{% else %}Aun no hay entidades{% endif %}</h3>
+        <p>{% if q %}Prueba otra busqueda o consulta un RUC nuevo arriba.{% else %}Consulta un RUC arriba y se guardara aqui para reutilizarlo.{% endif %}</p>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+
+  <script>
+    async function consultar(ev) {
+      ev.preventDefault();
+      var ruc = document.getElementById('in-ruc').value.trim();
+      var btn = document.getElementById('btn-consultar');
+      btn.disabled = true;
+      UI.loading.btn(btn, true);
+      fetch('/sunat/ruc/' + ruc)
+        .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+        .then(function (res) {
+          UI.loading.btn(btn, false);
+          btn.disabled = false;
+          if (!res.d.ok) {
+            UI.error(res.d.error || 'Error', 'No se pudo consultar');
+            document.getElementById('result-wrap').innerHTML = '';
+            return;
+          }
+          renderResult(res.d);
+          if (res.d.fuente === 'sunat') setTimeout(function () { location.href = '/entidades?q=' + ruc; }, 1200);
+        })
+        .catch(function () {
+          UI.loading.btn(btn, false);
+          btn.disabled = false;
+          UI.error('Error de red.', 'Sin conexion');
+        });
+    }
+    function renderResult(res) {
+      var d = res.data;
+      var fuenteTag = res.fuente === 'cache' ? '<span class="pill muted">Desde cache</span>' :
+                      res.fuente === 'cache_fallback' ? '<span class="pill warn">Cache (sin conexion SUNAT)</span>' :
+                      '<span class="pill ok">Consultado en SUNAT</span>';
+      var html = '<div class="result-preview">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">'
+        + '<div class="ruc" style="font-size:1.05rem;">' + d.ruc + '</div>'
+        + fuenteTag
+        + '</div>'
+        + '<div style="font-weight:700;margin-top:.3rem;font-size:1rem;color:#1e3a5f;">' + (d.razon_social || '—') + '</div>'
+        + (d.nombre_comercial ? '<div class="nc">' + d.nombre_comercial + '</div>' : '')
+        + '<div class="grid">'
+        + '<div><div class="k">Estado</div><div class="v">' + (d.estado || '—') + '</div></div>'
+        + '<div><div class="k">Condicion</div><div class="v">' + (d.condicion || '—') + '</div></div>'
+        + '<div style="grid-column:1/-1;"><div class="k">Direccion</div><div class="v">' + (d.direccion || '—') + '</div></div>'
+        + '<div><div class="k">Distrito</div><div class="v">' + (d.distrito || '—') + '</div></div>'
+        + '<div><div class="k">Provincia / Depto</div><div class="v">' + ((d.provincia || '—') + ' / ' + (d.departamento || '—')) + '</div></div>'
+        + '</div>'
+        + '</div>';
+      document.getElementById('result-wrap').innerHTML = html;
+    }
+    function refrescar(ruc) {
+      fetch('/sunat/ruc/' + ruc + '?refresh=1')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) { UI.success('Datos actualizados desde SUNAT.'); setTimeout(function(){ location.reload(); }, 700); }
+          else UI.error(d.error || 'Error');
+        });
+    }
+    async function editarNota(id, actual) {
+      var nueva = prompt('Nota para esta entidad:', actual || '');
+      if (nueva === null) return;
+      fetch('/entidades/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nota: nueva }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) { UI.success('Nota guardada.'); setTimeout(function(){ location.reload(); }, 500); } else UI.error(d.error); });
+    }
+    async function eliminar(id, ruc) {
+      var ok = await UI.confirm({ type:'danger', icon:'delete', title:'Eliminar entidad', msg:'Se quitara del catalogo el RUC ' + ruc + '. Puedes volver a consultarlo despues.', confirmText:'Si, eliminar', cancelText:'Cancelar' });
+      if (!ok) return;
+      fetch('/entidades/' + id, { method: 'DELETE' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) { UI.success('Eliminada.'); setTimeout(function(){ location.reload(); }, 500); } else UI.error(d.error); });
+    }
+  </script>
+</body>
+</html>

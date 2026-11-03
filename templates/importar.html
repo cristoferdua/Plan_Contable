@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Importar desde Excel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; }
+    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+    .topbar nav { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; }
+    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
+    .wrap { max-width:1100px; margin:0 auto; padding:1.4rem; }
+    .card { background:#fff; border-radius:14px; padding:1.3rem; margin-bottom:1rem; box-shadow:0 2px 10px rgba(15,23,42,.05); }
+    .card h2 { margin:0 0 .6rem; font-size:1rem; color:#4a5568; text-transform:uppercase; letter-spacing:.04em; }
+    .btn { padding:.6rem 1rem; border-radius:8px; font-weight:600; text-decoration:none; border:1px solid transparent; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer; font-size:.88rem; }
+    .btn.primary { background:#1e3a5f; color:#fff; border-color:#1e3a5f; }
+    .btn.primary:hover { background:#2c5282; }
+    .btn.excel { background:#1e8449; color:#fff; border-color:#1e8449; }
+    .btn.excel:hover { background:#15733b; }
+    .btn.ghost { background:#fff; color:#2c5282; border-color:#d8dee7; }
+    .btn.ghost:hover { background:#eef3f8; }
+    .btn.success { background:#1e8449; color:#fff; border-color:#1e8449; }
+    .btn.success:hover { background:#15733b; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+
+    .dropzone {
+      border: 2px dashed #c3cdd9; border-radius: 12px; padding: 2rem;
+      text-align:center; background:#fafbfd; transition: all .2s;
+      cursor:pointer;
+    }
+    .dropzone.drag { border-color:#2c5282; background:#eef3f8; }
+    .dropzone .ic { font-size:2.4rem; color:#6b7785; }
+    .dropzone p { margin:.5rem 0 0; color:#6b7785; font-size:.9rem; }
+
+    .asiento-prev { border:1px solid #e3e8ef; border-radius:10px; margin-bottom:.8rem; overflow:hidden; }
+    .asiento-prev .ap-head { padding:.7rem 1rem; background:#fafbfd; display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; border-bottom:1px solid #e3e8ef; }
+    .asiento-prev .ap-title { font-weight:600; color:#1e3a5f; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .asiento-prev table { width:100%; border-collapse:collapse; }
+    .asiento-prev th, .asiento-prev td { padding:.45rem .7rem; font-size:.82rem; border-bottom:1px solid #f1f3f6; text-align:left; }
+    .asiento-prev th { background:#f4f7fb; color:#6b7785; text-transform:uppercase; font-size:.68rem; letter-spacing:.04em; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; }
+    .pill-ok { background:#e8f6ee; color:#1e8449; padding:.14rem .55rem; border-radius:999px; font-size:.68rem; font-weight:700; text-transform:uppercase; }
+    .pill-bad { background:#fdecea; color:#c0392b; padding:.14rem .55rem; border-radius:999px; font-size:.68rem; font-weight:700; text-transform:uppercase; }
+    .err-list { background:#fdecea; border:1px solid #f1b4ad; border-left:4px solid #c0392b; padding:.8rem 1rem; border-radius:8px; color:#8b2a1f; font-size:.85rem; }
+    .err-list ul { margin:.3rem 0 0 1.2rem; padding:0; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1><span class="ic">upload_file</span> Importar desde Excel</h1>
+    </div>
+    <nav>
+      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <button type="button" class="theme-toggle">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="card">
+      <h2>1. Descarga la plantilla</h2>
+      <p style="color:#6b7785;font-size:.88rem;margin:-.3rem 0 .7rem;">
+        Columnas: <strong>Fecha</strong> (YYYY-MM-DD), <strong>Documento</strong>, <strong>Glosa</strong>, <strong>Cuenta</strong> (codigo PCGE nivel 4/5), <strong>Debe</strong>, <strong>Haber</strong>.
+        Agrupa las lineas de un mismo asiento repitiendo <em>Fecha + Documento</em> en cada fila.
+      </p>
+      <a href="/importar/plantilla" class="btn excel"><span class="ic sm">download</span> Descargar plantilla Excel</a>
+    </div>
+
+    <div class="card">
+      <h2>2. Sube tu archivo</h2>
+      <div id="dropzone" class="dropzone">
+        <span class="ic">cloud_upload</span>
+        <p><strong>Arrastra el archivo aqui</strong> o haz click para seleccionar</p>
+        <p style="font-size:.78rem;">Solo .xlsx</p>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx" style="display:none;">
+      <div id="file-info" style="margin-top:.8rem;display:none;font-size:.88rem;color:#1f2937;"></div>
+    </div>
+
+    <div id="preview-wrap" style="display:none;">
+      <div class="card">
+        <h2>3. Previsualizacion</h2>
+        <div id="errors-wrap" style="margin-bottom:.9rem;"></div>
+        <div id="asientos-prev"></div>
+        <div style="margin-top:1rem;display:flex;gap:.6rem;justify-content:flex-end;flex-wrap:wrap;">
+          <button type="button" class="btn ghost" onclick="resetAll()">Cancelar</button>
+          <button type="button" class="btn success" id="btn-importar" disabled onclick="ejecutarImport()">
+            <span class="ic sm">check_circle</span> Importar <span id="btn-importar-n"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    var currentFile = null;
+    var dz = document.getElementById('dropzone');
+    var fi = document.getElementById('file-input');
+    var fileInfo = document.getElementById('file-info');
+
+    dz.addEventListener('click', function () { fi.click(); });
+    dz.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', function () { dz.classList.remove('drag'); });
+    dz.addEventListener('drop', function (e) {
+      e.preventDefault();
+      dz.classList.remove('drag');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        procesarArchivo(e.dataTransfer.files[0]);
+      }
+    });
+    fi.addEventListener('change', function () {
+      if (fi.files && fi.files[0]) procesarArchivo(fi.files[0]);
+    });
+
+    function money(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+
+    function procesarArchivo(f) {
+      if (!f.name.toLowerCase().endsWith('.xlsx')) {
+        UI.error('Solo archivos .xlsx', 'Formato no admitido');
+        return;
+      }
+      currentFile = f;
+      fileInfo.style.display = 'block';
+      fileInfo.innerHTML = '<span class="ic sm">description</span> ' + f.name + ' <span style="color:#6b7785;">(' + Math.round(f.size / 1024) + ' KB)</span>';
+
+      var fd = new FormData();
+      fd.append('archivo', f);
+      UI.loading.show();
+      fetch('/importar/preview', { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          UI.loading.hide();
+          if (!d.ok) {
+            UI.error(d.error || 'Error', 'No se pudo procesar');
+            return;
+          }
+          renderPreview(d);
+        })
+        .catch(function () { UI.loading.hide(); UI.error('Error de red.', 'Sin conexion'); });
+    }
+
+    function renderPreview(d) {
+      document.getElementById('preview-wrap').style.display = 'block';
+      var errWrap = document.getElementById('errors-wrap');
+      if (d.errores && d.errores.length) {
+        errWrap.innerHTML = '<div class="err-list"><strong>Errores encontrados (' + d.errores.length + '):</strong><ul>'
+          + d.errores.map(function (e) { return '<li>' + e + '</li>'; }).join('') + '</ul></div>';
+      } else {
+        errWrap.innerHTML = '';
+      }
+
+      var cont = document.getElementById('asientos-prev');
+      if (!d.asientos.length) {
+        cont.innerHTML = '<div style="padding:1rem;color:#6b7785;text-align:center;">No se detectaron asientos en el archivo.</div>';
+      } else {
+        cont.innerHTML = d.asientos.map(function (a, idx) {
+          var filas = a.lineas.map(function (l) {
+            return '<tr><td style="font-family:ui-monospace,Consolas,monospace;">' + l.cuenta + '</td>'
+              + '<td>' + (l.cuenta_desc || '') + '</td>'
+              + '<td>' + (l.glosa || '') + '</td>'
+              + '<td class="num">' + (l.debe > 0 ? money(l.debe) : '') + '</td>'
+              + '<td class="num">' + (l.haber > 0 ? money(l.haber) : '') + '</td></tr>';
+          }).join('');
+          return '<div class="asiento-prev">'
+            + '<div class="ap-head">'
+            + '<div class="ap-title">#' + (idx + 1) + ' · ' + a.fecha + (a.documento ? ' · <span style="font-family:ui-monospace,Consolas,monospace;">' + a.documento + '</span>' : '') + ' — ' + a.glosa + '</div>'
+            + '<div>'
+            + (a.cuadra ? '<span class="pill-ok">Cuadra</span>' : '<span class="pill-bad">No cuadra</span>')
+            + ' <span style="font-size:.78rem;color:#6b7785;margin-left:.4rem;">Debe ' + money(a.total_debe) + ' / Haber ' + money(a.total_haber) + '</span>'
+            + '</div>'
+            + '</div>'
+            + '<table><thead><tr><th>Cuenta</th><th>Descripcion</th><th>Glosa</th><th class="num">Debe</th><th class="num">Haber</th></tr></thead>'
+            + '<tbody>' + filas + '</tbody></table>'
+            + '</div>';
+        }).join('');
+      }
+
+      var btn = document.getElementById('btn-importar');
+      var okImportar = d.asientos.length > 0 && (!d.errores || d.errores.length === 0);
+      btn.disabled = !okImportar;
+      document.getElementById('btn-importar-n').textContent = d.asientos.length ? ('(' + d.asientos.length + ')') : '';
+    }
+
+    async function ejecutarImport() {
+      if (!currentFile) return;
+      var ok = await UI.confirm({
+        type: 'warning',
+        icon: 'upload_file',
+        title: 'Confirmar importacion',
+        msg: 'Se crearan los asientos listados. Esta accion no se puede deshacer facilmente.',
+        confirmText: 'Si, importar',
+        cancelText: 'Cancelar'
+      });
+      if (!ok) return;
+      var fd = new FormData();
+      fd.append('archivo', currentFile);
+      UI.loading.show();
+      fetch('/importar/ejecutar', { method: 'POST', body: fd })
+        .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+        .then(function (res) {
+          UI.loading.hide();
+          var d = res.data;
+          if (d.ok) {
+            UI.success(d.creados + ' asiento(s) importados correctamente.', 'Listo');
+            setTimeout(function () { location.href = '/asientos'; }, 900);
+          } else if (d.errores) {
+            UI.error(d.errores[0], 'Importacion rechazada');
+          } else {
+            UI.error(d.error || 'Error', 'No se pudo importar');
+          }
+        })
+        .catch(function () { UI.loading.hide(); UI.error('Error de red.', 'Sin conexion'); });
+    }
+
+    function resetAll() {
+      currentFile = null;
+      fi.value = '';
+      fileInfo.style.display = 'none';
+      document.getElementById('preview-wrap').style.display = 'none';
+      document.getElementById('asientos-prev').innerHTML = '';
+      document.getElementById('errors-wrap').innerHTML = '';
+    }
+  </script>
+</body>
+</html>

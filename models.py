@@ -33,6 +33,8 @@ class Asiento(Base):
     codigo_libro = Column(String(10), nullable=True)
     numero_correlativo = Column(String(20), nullable=True)
     numero_documento = Column(String(30), nullable=True)
+    ruc_tercero = Column(String(11), nullable=True)
+    razon_social_tercero = Column(String(300), nullable=True)
     reversa_de_id = Column(Integer, ForeignKey("asiento.id"), nullable=True)
     anulado_por_id = Column(Integer, ForeignKey("asiento.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -46,6 +48,46 @@ class Asiento(Base):
 
     __table_args__ = (
         Index("ix_asiento_fecha", "fecha"),
+    )
+
+
+class Entidad(Base):
+    __tablename__ = "entidad"
+
+    id = Column(Integer, primary_key=True)
+    ruc = Column(String(11), nullable=False, unique=True)
+    razon_social = Column(String(300), nullable=False, default="")
+    nombre_comercial = Column(String(300), nullable=True)
+    estado = Column(String(40), nullable=True)
+    condicion = Column(String(40), nullable=True)
+    direccion = Column(String(300), nullable=True)
+    distrito = Column(String(100), nullable=True)
+    provincia = Column(String(100), nullable=True)
+    departamento = Column(String(100), nullable=True)
+    ubigeo = Column(String(10), nullable=True)
+    tipo = Column(String(30), nullable=True)
+    nota = Column(String(300), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_entidad_razon_social", "razon_social"),
+    )
+
+
+class CierreMes(Base):
+    __tablename__ = "cierre_mes"
+
+    id = Column(Integer, primary_key=True)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)
+    cerrado_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    cerrado_por = Column(String(80), nullable=True)
+    nota = Column(String(300), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("year", "month", name="uq_cierre_year_month"),
+        CheckConstraint("month >= 1 AND month <= 12", name="ck_cierre_month"),
     )
 
 

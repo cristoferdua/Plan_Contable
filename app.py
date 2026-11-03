@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db import SessionLocal
-from models import Asiento, AsientoLinea
+from models import Asiento, AsientoLinea, CierreMes, Entidad
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "pcge_data.json")
@@ -521,10 +521,31 @@ def buscar():
     }
 
 
+def _mes_cerrado(session: Session, fecha: date) -> bool:
+    row = session.execute(
+        select(CierreMes).where(CierreMes.year == fecha.year, CierreMes.month == fecha.month)
+    ).scalar_one_or_none()
+    return row is not None
+
+
+def _meses_cerrados_set(session: Session):
+    rows = session.execute(select(CierreMes.year, CierreMes.month)).all()
+    return {(y, m) for (y, m) in rows}
+
+
 def _generar_numero(session: Session, fecha: date) -> str:
     prefijo = f"{fecha.year:04d}-{fecha.month:02d}-"
-    stmt = select(func.count()).select_from(Asiento).where(Asiento.numero.like(prefijo + "%"))
-    siguiente = session.execute(stmt).scalar_one() + 1
+    stmt = select(Asiento.numero).where(Asiento.numero.like(prefijo + "%"))
+    numeros = session.execute(stmt).scalars().all()
+    max_sufijo = 0
+    for n in numeros:
+        try:
+            v = int(n.split("-")[-1])
+            if v > max_sufijo:
+                max_sufijo = v
+        except (ValueError, IndexError):
+            continue
+    siguiente = max_sufijo + 1
     return f"{prefijo}{siguiente:04d}"
 
 
@@ -611,10 +632,39 @@ def _validar_y_construir_lineas(data_lineas):
 
 @app.route("/asientos")
 def asientos_listado():
+    year_f = request.args.get("year", type=int)
+    month_f = request.args.get("month", type=int)
+    desde_f = request.args.get("desde", "").strip()
+    hasta_f = request.args.get("hasta", "").strip()
+    ruc_f = request.args.get("ruc", "").strip()
+    filtro_info = None
     with SessionLocal() as session:
-        rows = session.execute(
-            select(Asiento).order_by(Asiento.fecha.desc(), Asiento.id.desc()).limit(500)
-        ).scalars().all()
+        stmt = select(Asiento).order_by(Asiento.fecha.desc(), Asiento.id.desc())
+        if ruc_f:
+            stmt = stmt.where(Asiento.ruc_tercero == ruc_f)
+            filtro_info = {"tipo": "ruc", "label": f"RUC {ruc_f}", "ruc": ruc_f}
+        if year_f and month_f:
+            from calendar import monthrange
+            desde_d = date(year_f, month_f, 1)
+            hasta_d = date(year_f, month_f, monthrange(year_f, month_f)[1])
+            stmt = stmt.where(Asiento.fecha >= desde_d, Asiento.fecha <= hasta_d)
+            filtro_info = {"tipo": "mes", "label": f"{year_f}-{month_f:02d}", "year": year_f, "month": month_f}
+        else:
+            if desde_f:
+                try:
+                    stmt = stmt.where(Asiento.fecha >= datetime.strptime(desde_f, "%Y-%m-%d").date())
+                except ValueError:
+                    pass
+            if hasta_f:
+                try:
+                    stmt = stmt.where(Asiento.fecha <= datetime.strptime(hasta_f, "%Y-%m-%d").date())
+                except ValueError:
+                    pass
+            if desde_f or hasta_f:
+                filtro_info = {"tipo": "rango", "label": f"{desde_f or '…'} a {hasta_f or '…'}"}
+        if not filtro_info:
+            stmt = stmt.limit(500)
+        rows = session.execute(stmt).scalars().all()
 
         # Agrupar asientos relacionados: misma fecha + mismo documento (o misma glosa base si no hay doc).
         def grupo_key(a):
@@ -637,6 +687,7 @@ def asientos_listado():
                 orden_grupos.append(k)
             grupos[k].append(a)
 
+        cerrados = _meses_cerrados_set(session)
         operaciones = []
         for k in orden_grupos:
             asientos = sorted(grupos[k], key=lambda a: a.id)
@@ -647,18 +698,35 @@ def asientos_listado():
             import re
             glosa_primera = (asientos[0].glosa or "").strip()
             titulo = re.sub(r"^\d+\)\s*[A-Za-z]+\s*-\s*", "", glosa_primera) or glosa_primera or "Operacion"
+            f = asientos[0].fecha
             operaciones.append({
                 "key": "|".join(k),
                 "titulo": titulo,
-                "fecha": asientos[0].fecha,
+                "fecha": f,
                 "n_asientos": len(asientos),
                 "numero_documento": asientos[0].numero_documento,
+                "ruc_tercero": asientos[0].ruc_tercero,
+                "razon_social_tercero": asientos[0].razon_social_tercero,
                 "numero_correlativo_base": (asientos[0].numero_correlativo or "").split("-")[0] if asientos[0].numero_correlativo else "",
                 "total_debe": total_debe,
                 "asientos": asientos,
                 "ids": [a.id for a in asientos],
+                "cerrado": (f.year, f.month) in cerrados,
             })
-    return render_template("asientos_listado.html", operaciones=operaciones)
+    total_debe_filtro = Decimal("0")
+    total_haber_filtro = Decimal("0")
+    for op in operaciones:
+        for a in op["asientos"]:
+            for l in a.lineas:
+                total_debe_filtro += l.debe
+                total_haber_filtro += l.haber
+    return render_template(
+        "asientos_listado.html",
+        operaciones=operaciones,
+        filtro_info=filtro_info,
+        total_debe_filtro=total_debe_filtro,
+        total_haber_filtro=total_haber_filtro,
+    )
 
 
 @app.route("/asientos/nuevo")
@@ -679,6 +747,8 @@ def asientos_nuevo():
                     "codigo_libro": a.codigo_libro or "",
                     "numero_correlativo": a.numero_correlativo or "",
                     "numero_documento": a.numero_documento or "",
+                    "ruc_tercero": a.ruc_tercero or "",
+                    "razon_social_tercero": a.razon_social_tercero or "",
                     "lineas": [
                         {
                             "cuenta_codigo": l.cuenta_codigo,
@@ -707,6 +777,10 @@ def asientos_crear():
     codigo_libro = (payload.get("codigo_libro") or "").strip() or None
     numero_correlativo = (payload.get("numero_correlativo") or "").strip() or None
     numero_documento = (payload.get("numero_documento") or "").strip() or None
+    ruc_tercero = (payload.get("ruc_tercero") or "").strip() or None
+    razon_social_tercero = (payload.get("razon_social_tercero") or "").strip() or None
+    if ruc_tercero and not _validar_ruc(ruc_tercero):
+        return {"ok": False, "errores": ["RUC del tercero invalido (11 digitos + check digit)."]}, 400
     data_lineas = payload.get("lineas") or []
 
     errores = []
@@ -732,6 +806,8 @@ def asientos_crear():
 
     with SessionLocal() as session:
         with session.begin():
+            if _mes_cerrado(session, fecha_obj):
+                return {"ok": False, "errores": [f"El mes {fecha_obj.year}-{fecha_obj.month:02d} esta cerrado. No se puede crear asientos en ese periodo."]}, 400
             numero = _generar_numero(session, fecha_obj)
             asiento = Asiento(
                 numero=numero,
@@ -742,6 +818,8 @@ def asientos_crear():
                 codigo_libro=codigo_libro,
                 numero_correlativo=numero_correlativo,
                 numero_documento=numero_documento,
+                ruc_tercero=ruc_tercero,
+                razon_social_tercero=razon_social_tercero,
             )
             for l in lineas:
                 asiento.lineas.append(AsientoLinea(**l))
@@ -788,6 +866,8 @@ def asientos_eliminar(asiento_id):
                 return {"ok": False, "error": "Asiento no encontrado."}, 404
             if a.anulado_por_id:
                 return {"ok": False, "error": "El asiento ya tiene una reversa; no se puede eliminar."}, 400
+            if _mes_cerrado(session, a.fecha):
+                return {"ok": False, "error": f"El mes {a.fecha.year}-{a.fecha.month:02d} esta cerrado. No se puede eliminar asientos de ese periodo."}, 400
             for l in list(a.lineas):
                 session.delete(l)
             session.delete(a)
@@ -809,15 +889,21 @@ def operaciones_eliminar():
     with SessionLocal() as session:
         with session.begin():
             eliminados = 0
+            bloqueados = 0
             for aid in ids:
                 a = session.get(Asiento, aid)
                 if not a or a.anulado_por_id:
+                    continue
+                if _mes_cerrado(session, a.fecha):
+                    bloqueados += 1
                     continue
                 for l in list(a.lineas):
                     session.delete(l)
                 session.delete(a)
                 eliminados += 1
-        return {"ok": True, "eliminados": eliminados}
+        if bloqueados and not eliminados:
+            return {"ok": False, "error": f"{bloqueados} asiento(s) estan en un mes cerrado y no se pueden eliminar."}, 400
+        return {"ok": True, "eliminados": eliminados, "bloqueados": bloqueados}
 
 
 @app.route("/asientos/<int:asiento_id>", methods=["PUT"])
@@ -849,6 +935,12 @@ def asientos_editar(asiento_id):
         if errs:
             return {"ok": False, "errores": errs}, 400
 
+        if _mes_cerrado(session, a.fecha):
+            return {"ok": False, "errores": [f"El mes {a.fecha.year}-{a.fecha.month:02d} esta cerrado. No se puede editar asientos de ese periodo."]}, 400
+        if _mes_cerrado(session, fecha_obj):
+            return {"ok": False, "errores": [f"El mes destino {fecha_obj.year}-{fecha_obj.month:02d} esta cerrado."]}, 400
+
+        session.rollback()
         with session.begin():
             a.fecha = fecha_obj
             a.glosa = (payload.get("glosa") or "").strip()
@@ -857,6 +949,11 @@ def asientos_editar(asiento_id):
             a.codigo_libro = (payload.get("codigo_libro") or "").strip() or None
             a.numero_correlativo = (payload.get("numero_correlativo") or "").strip() or None
             a.numero_documento = (payload.get("numero_documento") or "").strip() or None
+            nuevo_ruc = (payload.get("ruc_tercero") or "").strip() or None
+            if nuevo_ruc and not _validar_ruc(nuevo_ruc):
+                raise ValueError("RUC del tercero invalido.")
+            a.ruc_tercero = nuevo_ruc
+            a.razon_social_tercero = (payload.get("razon_social_tercero") or "").strip() or None
             for l in list(a.lineas):
                 session.delete(l)
             session.flush()
@@ -877,6 +974,8 @@ def asientos_reversa(asiento_id):
                 return {"ok": False, "error": "El asiento ya tiene una reversa."}, 400
             if original.reversa_de_id:
                 return {"ok": False, "error": "Un asiento de reversa no se puede reversar."}, 400
+            if _mes_cerrado(session, date.today()):
+                return {"ok": False, "error": f"El mes actual {date.today().year}-{date.today().month:02d} esta cerrado. No se puede generar reversas."}, 400
 
             numero = _generar_numero(session, date.today())
             reversa = Asiento(
@@ -1015,6 +1114,52 @@ def libro_mayor():
     )
 
 
+@app.route("/reportes/por-ruc")
+def reporte_por_ruc():
+    """Compras y ventas agrupadas por RUC del tercero (base DAOT)."""
+    fecha_desde = request.args.get("desde", "").strip()
+    fecha_hasta = request.args.get("hasta", "").strip()
+    with SessionLocal() as session:
+        asientos = _filtrar_asientos_rango(session, fecha_desde, fecha_hasta)
+        por_ruc = {}
+        for a in asientos:
+            if not a.ruc_tercero:
+                continue
+            k = a.ruc_tercero
+            if k not in por_ruc:
+                por_ruc[k] = {
+                    "ruc": k,
+                    "razon_social": a.razon_social_tercero or "",
+                    "n_ops": 0,
+                    "compras": Decimal("0"),
+                    "ventas": Decimal("0"),
+                    "ultima_fecha": a.fecha,
+                }
+            por_ruc[k]["n_ops"] += 1
+            if a.fecha > por_ruc[k]["ultima_fecha"]:
+                por_ruc[k]["ultima_fecha"] = a.fecha
+            if not por_ruc[k]["razon_social"] and a.razon_social_tercero:
+                por_ruc[k]["razon_social"] = a.razon_social_tercero
+            # Heuristica: 60xx/63xx en debe = compra, 70xx en haber = venta
+            for l in a.lineas:
+                if l.cuenta_codigo.startswith("60") or l.cuenta_codigo.startswith("63"):
+                    por_ruc[k]["compras"] += l.debe
+                elif l.cuenta_codigo.startswith("70"):
+                    por_ruc[k]["ventas"] += l.haber
+        filas = sorted(por_ruc.values(), key=lambda x: -(x["compras"] + x["ventas"]))
+        total_compras = sum((f["compras"] for f in filas), Decimal("0"))
+        total_ventas = sum((f["ventas"] for f in filas), Decimal("0"))
+    return render_template(
+        "reporte_por_ruc.html",
+        filas=filas,
+        total_compras=total_compras,
+        total_ventas=total_ventas,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        hoy=date.today().isoformat(),
+    )
+
+
 @app.route("/reportes/balance")
 def balance_comprobacion():
     """Balance de comprobacion: todas las cuentas con sus totales y saldos."""
@@ -1077,6 +1222,1057 @@ def balance_comprobacion():
         fecha_hasta=fecha_hasta,
         hoy=date.today().isoformat(),
     )
+
+
+def _filtrar_asientos_rango(session, fecha_desde, fecha_hasta):
+    asientos = session.execute(
+        select(Asiento).order_by(Asiento.fecha, Asiento.id)
+    ).scalars().all()
+    desde_d = None
+    hasta_d = None
+    if fecha_desde:
+        try:
+            desde_d = datetime.strptime(fecha_desde, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    if fecha_hasta:
+        try:
+            hasta_d = datetime.strptime(fecha_hasta, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    out = []
+    for a in asientos:
+        if desde_d and a.fecha < desde_d:
+            continue
+        if hasta_d and a.fecha > hasta_d:
+            continue
+        out.append(a)
+    return out
+
+
+@app.route("/reportes/libro-mayor/excel")
+def libro_mayor_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    cuenta_filtro = request.args.get("cuenta", "").strip()
+    fecha_desde = request.args.get("desde", "").strip()
+    fecha_hasta = request.args.get("hasta", "").strip()
+
+    with SessionLocal() as session:
+        asientos = _filtrar_asientos_rango(session, fecha_desde, fecha_hasta)
+        por_cuenta = {}
+        for a in asientos:
+            for l in a.lineas:
+                if l.es_titulo:
+                    continue
+                if cuenta_filtro and not l.cuenta_codigo.startswith(cuenta_filtro):
+                    continue
+                k = l.cuenta_codigo
+                if k not in por_cuenta:
+                    por_cuenta[k] = {
+                        "codigo": k,
+                        "descripcion": CUENTAS_POR_CODIGO.get(k, {}).get("descripcion", ""),
+                        "movs": [],
+                        "total_debe": Decimal("0"),
+                        "total_haber": Decimal("0"),
+                    }
+                por_cuenta[k]["movs"].append((a.fecha, a.numero, l.glosa_linea or a.glosa, l.debe, l.haber))
+                por_cuenta[k]["total_debe"] += l.debe
+                por_cuenta[k]["total_haber"] += l.haber
+        cuentas_ord = sorted(por_cuenta.values(), key=lambda x: x["codigo"])
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Libro Mayor"
+    thin = Side(border_style="thin", color="999999")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    sep_fill = PatternFill("solid", fgColor="EAF0F7")
+    sep_font = Font(bold=True, color="1E3A5F", size=11)
+
+    ws["A1"] = "LIBRO MAYOR"
+    ws["A1"].font = Font(bold=True, size=14, color="1E3A5F")
+    ws.merge_cells("A1:F1")
+    ws["A1"].alignment = Alignment(horizontal="center")
+    rango = f"Desde {fecha_desde or '-'} hasta {fecha_hasta or '-'}"
+    if cuenta_filtro:
+        rango += f" | Cuenta: {cuenta_filtro}"
+    ws["A2"] = rango
+    ws.merge_cells("A2:F2")
+    ws["A2"].font = Font(italic=True, color="666666")
+
+    row = 4
+    for c in cuentas_ord:
+        ws.cell(row=row, column=1, value=f"{c['codigo']} — {c['descripcion']}")
+        ws.cell(row=row, column=1).font = sep_font
+        for col in range(1, 7):
+            ws.cell(row=row, column=col).fill = sep_fill
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+        row += 1
+        headers = ["Fecha", "Asiento", "Glosa", "Debe", "Haber", "Saldo"]
+        for col, h in enumerate(headers, start=1):
+            cell = ws.cell(row=row, column=col, value=h)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+            cell.border = border
+        row += 1
+        saldo = Decimal("0")
+        for (f, numero, glosa, debe, haber) in c["movs"]:
+            saldo += debe - haber
+            ws.cell(row=row, column=1, value=f.isoformat()).border = border
+            ws.cell(row=row, column=2, value=numero).border = border
+            ws.cell(row=row, column=3, value=glosa).border = border
+            ws.cell(row=row, column=4, value=float(debe)).border = border
+            ws.cell(row=row, column=4).number_format = "#,##0.00"
+            ws.cell(row=row, column=5, value=float(haber)).border = border
+            ws.cell(row=row, column=5).number_format = "#,##0.00"
+            ws.cell(row=row, column=6, value=float(saldo)).border = border
+            ws.cell(row=row, column=6).number_format = "#,##0.00"
+            row += 1
+        # subtotal
+        ws.cell(row=row, column=3, value="Subtotal").font = Font(bold=True)
+        ws.cell(row=row, column=3).alignment = Alignment(horizontal="right")
+        ws.cell(row=row, column=4, value=float(c["total_debe"])).font = Font(bold=True)
+        ws.cell(row=row, column=4).number_format = "#,##0.00"
+        ws.cell(row=row, column=5, value=float(c["total_haber"])).font = Font(bold=True)
+        ws.cell(row=row, column=5).number_format = "#,##0.00"
+        ws.cell(row=row, column=6, value=float(c["total_debe"] - c["total_haber"])).font = Font(bold=True)
+        ws.cell(row=row, column=6).number_format = "#,##0.00"
+        for col in range(3, 7):
+            ws.cell(row=row, column=col).border = border
+        row += 2
+
+    ws.column_dimensions["A"].width = 12
+    ws.column_dimensions["B"].width = 16
+    ws.column_dimensions["C"].width = 42
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 14
+    ws.column_dimensions["F"].width = 14
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=f"libro_mayor_{date.today().isoformat()}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@app.route("/reportes/balance/excel")
+def balance_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    fecha_desde = request.args.get("desde", "").strip()
+    fecha_hasta = request.args.get("hasta", "").strip()
+
+    with SessionLocal() as session:
+        asientos = _filtrar_asientos_rango(session, fecha_desde, fecha_hasta)
+        por_cuenta = {}
+        for a in asientos:
+            for l in a.lineas:
+                if l.es_titulo:
+                    continue
+                k = l.cuenta_codigo
+                if k not in por_cuenta:
+                    por_cuenta[k] = {
+                        "codigo": k,
+                        "descripcion": CUENTAS_POR_CODIGO.get(k, {}).get("descripcion", ""),
+                        "elemento": CUENTAS_POR_CODIGO.get(k, {}).get("elemento", 0),
+                        "total_debe": Decimal("0"),
+                        "total_haber": Decimal("0"),
+                    }
+                por_cuenta[k]["total_debe"] += l.debe
+                por_cuenta[k]["total_haber"] += l.haber
+        cuentas_ord = sorted(por_cuenta.values(), key=lambda x: x["codigo"])
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Balance"
+    thin = Side(border_style="thin", color="999999")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+
+    ws["A1"] = "BALANCE DE COMPROBACION"
+    ws["A1"].font = Font(bold=True, size=14, color="1E3A5F")
+    ws.merge_cells("A1:G1")
+    ws["A1"].alignment = Alignment(horizontal="center")
+    ws["A2"] = f"Desde {fecha_desde or '-'} hasta {fecha_hasta or '-'}"
+    ws.merge_cells("A2:G2")
+    ws["A2"].font = Font(italic=True, color="666666")
+
+    headers = ["Codigo", "Descripcion", "Elem", "Debe", "Haber", "Saldo Deudor", "Saldo Acreedor"]
+    row = 4
+    for col, h in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = border
+
+    row = 5
+    tot_d = tot_h = tot_sd = tot_sa = Decimal("0")
+    for c in cuentas_ord:
+        saldo = c["total_debe"] - c["total_haber"]
+        sd = saldo if saldo > 0 else Decimal("0")
+        sa = -saldo if saldo < 0 else Decimal("0")
+        ws.cell(row=row, column=1, value=c["codigo"]).border = border
+        ws.cell(row=row, column=2, value=c["descripcion"]).border = border
+        ws.cell(row=row, column=3, value=c["elemento"]).border = border
+        ws.cell(row=row, column=3).alignment = Alignment(horizontal="center")
+        ws.cell(row=row, column=4, value=float(c["total_debe"])).border = border
+        ws.cell(row=row, column=4).number_format = "#,##0.00"
+        ws.cell(row=row, column=5, value=float(c["total_haber"])).border = border
+        ws.cell(row=row, column=5).number_format = "#,##0.00"
+        ws.cell(row=row, column=6, value=float(sd) if sd > 0 else None).border = border
+        ws.cell(row=row, column=6).number_format = "#,##0.00"
+        ws.cell(row=row, column=7, value=float(sa) if sa > 0 else None).border = border
+        ws.cell(row=row, column=7).number_format = "#,##0.00"
+        tot_d += c["total_debe"]
+        tot_h += c["total_haber"]
+        tot_sd += sd
+        tot_sa += sa
+        row += 1
+
+    ws.cell(row=row, column=3, value="TOTALES").font = Font(bold=True, size=12, color="1E3A5F")
+    ws.cell(row=row, column=3).alignment = Alignment(horizontal="right")
+    ws.cell(row=row, column=4, value=float(tot_d)).font = Font(bold=True)
+    ws.cell(row=row, column=4).number_format = "#,##0.00"
+    ws.cell(row=row, column=5, value=float(tot_h)).font = Font(bold=True)
+    ws.cell(row=row, column=5).number_format = "#,##0.00"
+    ws.cell(row=row, column=6, value=float(tot_sd)).font = Font(bold=True)
+    ws.cell(row=row, column=6).number_format = "#,##0.00"
+    ws.cell(row=row, column=7, value=float(tot_sa)).font = Font(bold=True)
+    ws.cell(row=row, column=7).number_format = "#,##0.00"
+    for col in range(3, 8):
+        ws.cell(row=row, column=col).border = border
+
+    ws.column_dimensions["A"].width = 10
+    ws.column_dimensions["B"].width = 42
+    ws.column_dimensions["C"].width = 6
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 14
+    ws.column_dimensions["F"].width = 15
+    ws.column_dimensions["G"].width = 15
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=f"balance_comprobacion_{date.today().isoformat()}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def _resumen_anual(session, year: int):
+    """Devuelve dict con desglose mensual, por elemento y top cuentas para `year`."""
+    desde = date(year, 1, 1)
+    hasta = date(year, 12, 31)
+    asientos = session.execute(
+        select(Asiento).where(Asiento.fecha >= desde, Asiento.fecha <= hasta).order_by(Asiento.fecha, Asiento.id)
+    ).scalars().all()
+    cerrados = _meses_cerrados_set(session)
+
+    meses = []
+    for m in range(1, 13):
+        meses.append({
+            "mes": m,
+            "nombre": ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"][m-1],
+            "total_debe": Decimal("0"),
+            "total_haber": Decimal("0"),
+            "num_asientos": 0,
+            "cerrado": (year, m) in cerrados,
+        })
+
+    por_elemento = {}
+    por_cuenta = {}
+    total_debe_anual = Decimal("0")
+    total_haber_anual = Decimal("0")
+
+    for a in asientos:
+        m_idx = a.fecha.month - 1
+        meses[m_idx]["num_asientos"] += 1
+        for l in a.lineas:
+            if l.es_titulo:
+                continue
+            meses[m_idx]["total_debe"] += l.debe
+            meses[m_idx]["total_haber"] += l.haber
+            total_debe_anual += l.debe
+            total_haber_anual += l.haber
+
+            info = CUENTAS_POR_CODIGO.get(l.cuenta_codigo, {})
+            e = info.get("elemento", 0)
+            if e not in por_elemento:
+                por_elemento[e] = {
+                    "elemento": e,
+                    "nombre": info.get("elemento_nombre", f"Elemento {e}"),
+                    "total_debe": Decimal("0"),
+                    "total_haber": Decimal("0"),
+                }
+            por_elemento[e]["total_debe"] += l.debe
+            por_elemento[e]["total_haber"] += l.haber
+
+            k = l.cuenta_codigo
+            if k not in por_cuenta:
+                por_cuenta[k] = {
+                    "codigo": k,
+                    "descripcion": info.get("descripcion", "(desconocida)"),
+                    "elemento": e,
+                    "total_debe": Decimal("0"),
+                    "total_haber": Decimal("0"),
+                }
+            por_cuenta[k]["total_debe"] += l.debe
+            por_cuenta[k]["total_haber"] += l.haber
+
+    for m in meses:
+        m["diferencia"] = m["total_debe"] - m["total_haber"]
+        m["cuadra"] = abs(m["diferencia"]) < Decimal("0.01")
+        m["total_movido"] = m["total_debe"]
+
+    for e in por_elemento.values():
+        e["saldo"] = e["total_debe"] - e["total_haber"]
+
+    elementos_ord = sorted(por_elemento.values(), key=lambda x: x["elemento"])
+    top_cuentas = sorted(
+        por_cuenta.values(),
+        key=lambda x: x["total_debe"] + x["total_haber"],
+        reverse=True,
+    )[:10]
+    for c in top_cuentas:
+        c["movimiento"] = c["total_debe"] + c["total_haber"]
+
+    diferencia_anual = total_debe_anual - total_haber_anual
+    return {
+        "year": year,
+        "meses": meses,
+        "elementos": elementos_ord,
+        "top_cuentas": top_cuentas,
+        "total_debe": total_debe_anual,
+        "total_haber": total_haber_anual,
+        "diferencia": diferencia_anual,
+        "cuadra": abs(diferencia_anual) < Decimal("0.01"),
+        "num_asientos": len(asientos),
+    }
+
+
+@app.route("/reportes/anual")
+def reporte_anual():
+    """Reporte anual consolidado: cuadre global + desglose mensual + por elemento."""
+    year_arg = request.args.get("year", "").strip()
+    try:
+        year = int(year_arg) if year_arg else date.today().year
+    except ValueError:
+        year = date.today().year
+
+    with SessionLocal() as session:
+        anios_rows = session.execute(
+            select(func.extract("year", Asiento.fecha)).distinct()
+        ).all()
+        anios = sorted({int(y[0]) for y in anios_rows if y[0] is not None}, reverse=True)
+        if date.today().year not in anios:
+            anios.insert(0, date.today().year)
+        if year not in anios:
+            anios.append(year)
+            anios = sorted(set(anios), reverse=True)
+
+        resumen = _resumen_anual(session, year)
+
+    return render_template(
+        "reporte_anual.html",
+        resumen=resumen,
+        year=year,
+        anios=anios,
+    )
+
+
+@app.route("/reportes/anual/excel")
+def reporte_anual_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    year_arg = request.args.get("year", "").strip()
+    try:
+        year = int(year_arg) if year_arg else date.today().year
+    except ValueError:
+        year = date.today().year
+
+    with SessionLocal() as session:
+        resumen = _resumen_anual(session, year)
+        asientos_year = session.execute(
+            select(Asiento).where(
+                Asiento.fecha >= date(year, 1, 1),
+                Asiento.fecha <= date(year, 12, 31),
+            ).order_by(Asiento.fecha, Asiento.id)
+        ).scalars().all()
+
+        asientos_por_mes = {m: [] for m in range(1, 13)}
+        for a in asientos_year:
+            td = sum((l.debe for l in a.lineas if not l.es_titulo), Decimal("0"))
+            th = sum((l.haber for l in a.lineas if not l.es_titulo), Decimal("0"))
+            asientos_por_mes[a.fecha.month].append({
+                "fecha": a.fecha.isoformat(),
+                "numero": a.numero,
+                "glosa": a.glosa or "",
+                "ruc": a.ruc_tercero or "",
+                "total_debe": td,
+                "total_haber": th,
+            })
+
+    wb = Workbook()
+    thin = Side(border_style="thin", color="999999")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+
+    # Hoja resumen
+    ws = wb.active
+    ws.title = "Resumen anual"
+    ws["A1"] = f"REPORTE ANUAL {year}"
+    ws["A1"].font = Font(bold=True, size=14, color="1E3A5F")
+    ws.merge_cells("A1:E1")
+    ws["A1"].alignment = Alignment(horizontal="center")
+
+    ws["A3"] = "Mes"
+    ws["B3"] = "Asientos"
+    ws["C3"] = "Debe"
+    ws["D3"] = "Haber"
+    ws["E3"] = "Diferencia"
+    ws["F3"] = "Cuadra"
+    ws["G3"] = "Cerrado"
+    for col in range(1, 8):
+        c = ws.cell(row=3, column=col)
+        c.fill = header_fill
+        c.font = header_font
+        c.alignment = Alignment(horizontal="center")
+        c.border = border
+
+    row = 4
+    for m in resumen["meses"]:
+        ws.cell(row=row, column=1, value=m["nombre"]).border = border
+        ws.cell(row=row, column=2, value=m["num_asientos"]).border = border
+        ws.cell(row=row, column=3, value=float(m["total_debe"])).border = border
+        ws.cell(row=row, column=3).number_format = "#,##0.00"
+        ws.cell(row=row, column=4, value=float(m["total_haber"])).border = border
+        ws.cell(row=row, column=4).number_format = "#,##0.00"
+        ws.cell(row=row, column=5, value=float(m["diferencia"])).border = border
+        ws.cell(row=row, column=5).number_format = "#,##0.00"
+        ws.cell(row=row, column=6, value="Si" if m["cuadra"] else "NO").border = border
+        ws.cell(row=row, column=7, value="Si" if m["cerrado"] else "").border = border
+        row += 1
+
+    ws.cell(row=row, column=1, value="TOTAL").font = Font(bold=True)
+    ws.cell(row=row, column=2, value=resumen["num_asientos"]).font = Font(bold=True)
+    ws.cell(row=row, column=3, value=float(resumen["total_debe"])).font = Font(bold=True)
+    ws.cell(row=row, column=3).number_format = "#,##0.00"
+    ws.cell(row=row, column=4, value=float(resumen["total_haber"])).font = Font(bold=True)
+    ws.cell(row=row, column=4).number_format = "#,##0.00"
+    ws.cell(row=row, column=5, value=float(resumen["diferencia"])).font = Font(bold=True)
+    ws.cell(row=row, column=5).number_format = "#,##0.00"
+    ws.cell(row=row, column=6, value="Si" if resumen["cuadra"] else "NO").font = Font(bold=True)
+    for col in range(1, 8):
+        ws.cell(row=row, column=col).border = border
+
+    # Por elemento
+    row += 3
+    ws.cell(row=row, column=1, value="POR ELEMENTO PCGE").font = Font(bold=True, size=12, color="1E3A5F")
+    row += 1
+    ws.cell(row=row, column=1, value="Elem").fill = header_fill
+    ws.cell(row=row, column=2, value="Nombre").fill = header_fill
+    ws.cell(row=row, column=3, value="Debe").fill = header_fill
+    ws.cell(row=row, column=4, value="Haber").fill = header_fill
+    ws.cell(row=row, column=5, value="Saldo").fill = header_fill
+    for col in range(1, 6):
+        c = ws.cell(row=row, column=col)
+        c.font = header_font
+        c.alignment = Alignment(horizontal="center")
+        c.border = border
+    row += 1
+    for e in resumen["elementos"]:
+        ws.cell(row=row, column=1, value=e["elemento"]).border = border
+        ws.cell(row=row, column=2, value=e["nombre"]).border = border
+        ws.cell(row=row, column=3, value=float(e["total_debe"])).border = border
+        ws.cell(row=row, column=3).number_format = "#,##0.00"
+        ws.cell(row=row, column=4, value=float(e["total_haber"])).border = border
+        ws.cell(row=row, column=4).number_format = "#,##0.00"
+        ws.cell(row=row, column=5, value=float(e["saldo"])).border = border
+        ws.cell(row=row, column=5).number_format = "#,##0.00"
+        row += 1
+
+    ws.column_dimensions["A"].width = 12
+    ws.column_dimensions["B"].width = 32
+    ws.column_dimensions["C"].width = 16
+    ws.column_dimensions["D"].width = 16
+    ws.column_dimensions["E"].width = 16
+    ws.column_dimensions["F"].width = 10
+    ws.column_dimensions["G"].width = 10
+
+    # Una hoja por mes con asientos
+    nombres_mes = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+    for m_idx in range(1, 13):
+        asientos_m = asientos_por_mes[m_idx]
+        if not asientos_m:
+            continue
+        ws_m = wb.create_sheet(title=f"{m_idx:02d}-{nombres_mes[m_idx-1]}")
+        ws_m["A1"] = f"{nombres_mes[m_idx-1]} {year}"
+        ws_m["A1"].font = Font(bold=True, size=14, color="1E3A5F")
+        ws_m.merge_cells("A1:F1")
+        headers = ["Fecha", "Numero", "Glosa", "RUC", "Debe", "Haber"]
+        for col, h in enumerate(headers, start=1):
+            c = ws_m.cell(row=3, column=col, value=h)
+            c.fill = header_fill
+            c.font = header_font
+            c.alignment = Alignment(horizontal="center")
+            c.border = border
+        r = 4
+        tot_d = tot_h = Decimal("0")
+        for a in asientos_m:
+            ws_m.cell(row=r, column=1, value=a["fecha"]).border = border
+            ws_m.cell(row=r, column=2, value=a["numero"]).border = border
+            ws_m.cell(row=r, column=3, value=a["glosa"]).border = border
+            ws_m.cell(row=r, column=4, value=a["ruc"]).border = border
+            ws_m.cell(row=r, column=5, value=float(a["total_debe"])).border = border
+            ws_m.cell(row=r, column=5).number_format = "#,##0.00"
+            ws_m.cell(row=r, column=6, value=float(a["total_haber"])).border = border
+            ws_m.cell(row=r, column=6).number_format = "#,##0.00"
+            tot_d += a["total_debe"]
+            tot_h += a["total_haber"]
+            r += 1
+        ws_m.cell(row=r, column=4, value="TOTAL").font = Font(bold=True)
+        ws_m.cell(row=r, column=5, value=float(tot_d)).font = Font(bold=True)
+        ws_m.cell(row=r, column=5).number_format = "#,##0.00"
+        ws_m.cell(row=r, column=6, value=float(tot_h)).font = Font(bold=True)
+        ws_m.cell(row=r, column=6).number_format = "#,##0.00"
+        for col in range(4, 7):
+            ws_m.cell(row=r, column=col).border = border
+        ws_m.column_dimensions["A"].width = 12
+        ws_m.column_dimensions["B"].width = 14
+        ws_m.column_dimensions["C"].width = 46
+        ws_m.column_dimensions["D"].width = 14
+        ws_m.column_dimensions["E"].width = 14
+        ws_m.column_dimensions["F"].width = 14
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=f"reporte_anual_{year}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def _validar_ruc(ruc: str) -> bool:
+    """Valida formato RUC peruano: 11 digitos + check digit."""
+    ruc = (ruc or "").strip()
+    if len(ruc) != 11 or not ruc.isdigit():
+        return False
+    if ruc[:2] not in ("10", "15", "17", "20"):
+        return False
+    pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+    suma = sum(int(ruc[i]) * pesos[i] for i in range(10))
+    resto = suma % 11
+    check = 11 - resto
+    if check == 10:
+        check = 0
+    elif check == 11:
+        check = 1
+    return check == int(ruc[10])
+
+
+def _consultar_sunat_online(ruc: str):
+    """Consulta RUC en apis.net.pe. Devuelve dict o None si falla."""
+    import urllib.request
+    import urllib.error
+
+    token = os.environ.get("APIS_NET_PE_TOKEN", "").strip()
+    # v2 requiere token; v1 es publico (limitado pero suficiente)
+    if token:
+        url = f"https://api.apis.net.pe/v2/sunat/ruc?numero={ruc}"
+    else:
+        url = f"https://api.apis.net.pe/v1/ruc?numero={ruc}"
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw)
+    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, TimeoutError):
+        return None
+
+
+@app.route("/entidades")
+def entidades_vista():
+    q = request.args.get("q", "").strip()
+    with SessionLocal() as session:
+        stmt = select(Entidad).order_by(Entidad.razon_social)
+        if q:
+            qn = f"%{q.lower()}%"
+            stmt = stmt.where(
+                (func.lower(Entidad.razon_social).like(qn)) |
+                (Entidad.ruc.like(f"%{q}%")) |
+                (func.lower(Entidad.nombre_comercial).like(qn))
+            )
+        rows = session.execute(stmt).scalars().all()
+        entidades = [
+            {
+                "id": e.id,
+                "ruc": e.ruc,
+                "razon_social": e.razon_social,
+                "nombre_comercial": e.nombre_comercial or "",
+                "estado": e.estado or "",
+                "condicion": e.condicion or "",
+                "direccion": e.direccion or "",
+                "distrito": e.distrito or "",
+                "provincia": e.provincia or "",
+                "departamento": e.departamento or "",
+                "tipo": e.tipo or "",
+                "nota": e.nota or "",
+                "updated_at": e.updated_at,
+            }
+            for e in rows
+        ]
+    return render_template("entidades.html", entidades=entidades, q=q)
+
+
+@app.route("/sunat/ruc/<ruc>")
+def sunat_consultar(ruc):
+    """Consulta un RUC: primero mira cache local, si no, consulta API externa."""
+    ruc = ruc.strip()
+    if not _validar_ruc(ruc):
+        return {"ok": False, "error": "RUC invalido (debe tener 11 digitos y check digit valido)."}, 400
+
+    forzar = request.args.get("refresh") == "1"
+    with SessionLocal() as session:
+        with session.begin():
+            cached = session.execute(select(Entidad).where(Entidad.ruc == ruc)).scalar_one_or_none()
+            if cached and not forzar:
+                return {
+                    "ok": True,
+                    "fuente": "cache",
+                    "data": {
+                        "ruc": cached.ruc,
+                        "razon_social": cached.razon_social,
+                        "nombre_comercial": cached.nombre_comercial,
+                        "estado": cached.estado,
+                        "condicion": cached.condicion,
+                        "direccion": cached.direccion,
+                        "distrito": cached.distrito,
+                        "provincia": cached.provincia,
+                        "departamento": cached.departamento,
+                        "ubigeo": cached.ubigeo,
+                        "tipo": cached.tipo,
+                        "nota": cached.nota,
+                    },
+                }
+
+            data = _consultar_sunat_online(ruc)
+            if not data:
+                if cached:
+                    return {
+                        "ok": True,
+                        "fuente": "cache_fallback",
+                        "aviso": "No se pudo consultar SUNAT en linea; mostrando datos en cache.",
+                        "data": {
+                            "ruc": cached.ruc,
+                            "razon_social": cached.razon_social,
+                            "estado": cached.estado,
+                            "condicion": cached.condicion,
+                            "direccion": cached.direccion,
+                        },
+                    }
+                return {"ok": False, "error": "No se pudo consultar SUNAT. Verifica tu conexion o el token APIS_NET_PE_TOKEN."}, 502
+
+            # Normalizar respuesta: apis.net.pe v2 usa razonSocial/estado/condicion/direccion/etc
+            def pick(*keys):
+                for k in keys:
+                    v = data.get(k)
+                    if v:
+                        return str(v).strip()
+                return None
+
+            razon_social = pick("razonSocial", "nombre") or ""
+            if not razon_social:
+                return {"ok": False, "error": "La API externa no devolvio razon social."}, 502
+
+            if cached:
+                cached.razon_social = razon_social
+                cached.nombre_comercial = pick("nombreComercial")
+                cached.estado = pick("estado")
+                cached.condicion = pick("condicion")
+                cached.direccion = pick("direccion")
+                cached.distrito = pick("distrito")
+                cached.provincia = pick("provincia")
+                cached.departamento = pick("departamento")
+                cached.ubigeo = pick("ubigeo")
+                cached.tipo = pick("tipo", "tipoContribuyente")
+                cached.updated_at = datetime.utcnow()
+                e = cached
+            else:
+                e = Entidad(
+                    ruc=ruc,
+                    razon_social=razon_social,
+                    nombre_comercial=pick("nombreComercial"),
+                    estado=pick("estado"),
+                    condicion=pick("condicion"),
+                    direccion=pick("direccion"),
+                    distrito=pick("distrito"),
+                    provincia=pick("provincia"),
+                    departamento=pick("departamento"),
+                    ubigeo=pick("ubigeo"),
+                    tipo=pick("tipo", "tipoContribuyente"),
+                )
+                session.add(e)
+            session.flush()
+            return {
+                "ok": True,
+                "fuente": "sunat",
+                "data": {
+                    "ruc": e.ruc,
+                    "razon_social": e.razon_social,
+                    "nombre_comercial": e.nombre_comercial,
+                    "estado": e.estado,
+                    "condicion": e.condicion,
+                    "direccion": e.direccion,
+                    "distrito": e.distrito,
+                    "provincia": e.provincia,
+                    "departamento": e.departamento,
+                    "ubigeo": e.ubigeo,
+                    "tipo": e.tipo,
+                },
+            }
+
+
+@app.route("/entidades/<int:entidad_id>", methods=["PUT"])
+def entidades_editar(entidad_id):
+    payload = request.get_json(silent=True) or {}
+    with SessionLocal() as session:
+        with session.begin():
+            e = session.get(Entidad, entidad_id)
+            if not e:
+                return {"ok": False, "error": "Entidad no encontrada."}, 404
+            if "nota" in payload:
+                e.nota = (payload.get("nota") or "").strip() or None
+            if "razon_social" in payload:
+                rs = (payload.get("razon_social") or "").strip()
+                if rs:
+                    e.razon_social = rs
+            e.updated_at = datetime.utcnow()
+        return {"ok": True}
+
+
+@app.route("/entidades/<int:entidad_id>", methods=["DELETE"])
+def entidades_eliminar(entidad_id):
+    with SessionLocal() as session:
+        with session.begin():
+            e = session.get(Entidad, entidad_id)
+            if not e:
+                return {"ok": False, "error": "Entidad no encontrada."}, 404
+            session.delete(e)
+        return {"ok": True}
+
+
+@app.route("/importar", methods=["GET"])
+def importar_vista():
+    return render_template("importar.html")
+
+
+@app.route("/importar/plantilla")
+def importar_plantilla():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Plantilla"
+    ws["A1"] = "PLANTILLA DE IMPORTACION — Libro Diario"
+    ws["A1"].font = Font(bold=True, size=12, color="1E3A5F")
+    ws.merge_cells("A1:F1")
+    ws["A2"] = "Reglas: una fila por linea. Agrupa lineas de un mismo asiento repitiendo Fecha + Documento (o Fecha + Glosa si no hay Documento)."
+    ws.merge_cells("A2:F2")
+    ws["A2"].font = Font(italic=True, color="666666")
+
+    headers = ["Fecha (YYYY-MM-DD)", "Documento", "Glosa", "Cuenta (codigo PCGE)", "Debe", "Haber"]
+    fill = PatternFill("solid", fgColor="1E3A5F")
+    for i, h in enumerate(headers, start=1):
+        c = ws.cell(row=4, column=i, value=h)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = fill
+        c.alignment = Alignment(horizontal="center")
+
+    ejemplo = [
+        ("2026-01-15", "F001-123", "Venta de mercaderia", "1212", 118.00, 0),
+        ("2026-01-15", "F001-123", "Venta de mercaderia", "4011", 0, 18.00),
+        ("2026-01-15", "F001-123", "Venta de mercaderia", "7011", 0, 100.00),
+    ]
+    for i, row in enumerate(ejemplo, start=5):
+        for j, val in enumerate(row, start=1):
+            ws.cell(row=i, column=j, value=val)
+
+    ws.column_dimensions["A"].width = 18
+    ws.column_dimensions["B"].width = 14
+    ws.column_dimensions["C"].width = 36
+    ws.column_dimensions["D"].width = 18
+    ws.column_dimensions["E"].width = 12
+    ws.column_dimensions["F"].width = 12
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name="plantilla_importacion_libro_diario.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def _parsear_excel_importacion(fileobj):
+    """Devuelve (asientos, errores). Cada asiento = {fecha, documento, glosa, lineas:[...], total_debe, total_haber}."""
+    from openpyxl import load_workbook
+
+    try:
+        wb = load_workbook(fileobj, data_only=True)
+    except Exception as e:
+        return [], [f"No se pudo leer el archivo: {e}"]
+    ws = wb.active
+    errores = []
+
+    # Buscar fila de headers: primera fila que tenga "Fecha" en col A
+    header_row = None
+    for row in range(1, 15):
+        v = ws.cell(row=row, column=1).value
+        if v and "fecha" in str(v).lower():
+            header_row = row
+            break
+    if header_row is None:
+        return [], ["No se encontro la fila de headers (debe comenzar con 'Fecha ...' en columna A)."]
+
+    grupos = {}
+    orden = []
+    for i, row in enumerate(ws.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1):
+        if not row or all(v in (None, "") for v in row[:6]):
+            continue
+        fecha_v, doc_v, glosa_v, cuenta_v, debe_v, haber_v = (list(row) + [None] * 6)[:6]
+        linea_num = i
+        if not fecha_v:
+            errores.append(f"Fila {linea_num}: falta fecha.")
+            continue
+        if isinstance(fecha_v, datetime):
+            fecha_d = fecha_v.date()
+        elif isinstance(fecha_v, date):
+            fecha_d = fecha_v
+        else:
+            try:
+                fecha_d = datetime.strptime(str(fecha_v).strip()[:10], "%Y-%m-%d").date()
+            except ValueError:
+                errores.append(f"Fila {linea_num}: fecha invalida '{fecha_v}'. Usa YYYY-MM-DD.")
+                continue
+
+        cuenta = str(cuenta_v or "").strip()
+        if not cuenta:
+            errores.append(f"Fila {linea_num}: falta cuenta.")
+            continue
+        if cuenta not in CUENTAS_POR_CODIGO:
+            errores.append(f"Fila {linea_num}: cuenta {cuenta} no existe en PCGE.")
+            continue
+        nivel = CUENTAS_POR_CODIGO[cuenta]["nivel"]
+        if nivel not in NIVELES_MOVIMIENTO:
+            errores.append(f"Fila {linea_num}: cuenta {cuenta} es nivel {nivel}; solo niveles 4 o 5.")
+            continue
+
+        try:
+            debe = _parse_decimal(debe_v or 0)
+            haber = _parse_decimal(haber_v or 0)
+        except ValueError as e:
+            errores.append(f"Fila {linea_num}: {e}")
+            continue
+        if debe < 0 or haber < 0:
+            errores.append(f"Fila {linea_num}: montos no pueden ser negativos.")
+            continue
+        if debe > 0 and haber > 0:
+            errores.append(f"Fila {linea_num}: no puede tener debe y haber a la vez.")
+            continue
+        if debe == 0 and haber == 0:
+            errores.append(f"Fila {linea_num}: ingresa monto en debe o haber.")
+            continue
+
+        doc = str(doc_v or "").strip()
+        glosa = str(glosa_v or "").strip()
+        key = (fecha_d.isoformat(), doc) if doc else (fecha_d.isoformat(), f"g:{glosa}")
+        if key not in grupos:
+            grupos[key] = {
+                "fecha": fecha_d,
+                "documento": doc or None,
+                "glosa": glosa or "Importado",
+                "lineas": [],
+                "total_debe": Decimal("0"),
+                "total_haber": Decimal("0"),
+            }
+            orden.append(key)
+        grupos[key]["lineas"].append({
+            "cuenta_codigo": cuenta,
+            "glosa_linea": glosa,
+            "debe": debe,
+            "haber": haber,
+            "cuenta_desc": CUENTAS_POR_CODIGO[cuenta]["descripcion"],
+            "fila_excel": linea_num,
+        })
+        grupos[key]["total_debe"] += debe
+        grupos[key]["total_haber"] += haber
+
+    asientos = [grupos[k] for k in orden]
+
+    for a in asientos:
+        if len(a["lineas"]) < 2:
+            errores.append(f"Asiento del {a['fecha']} doc={a['documento'] or '-'}: necesita al menos 2 lineas.")
+        if abs(a["total_debe"] - a["total_haber"]) > TOLERANCIA:
+            errores.append(f"Asiento del {a['fecha']} doc={a['documento'] or '-'}: no cuadra (debe={a['total_debe']} haber={a['total_haber']}).")
+    return asientos, errores
+
+
+@app.route("/importar/preview", methods=["POST"])
+def importar_preview():
+    f = request.files.get("archivo")
+    if not f:
+        return {"ok": False, "error": "No se recibio archivo."}, 400
+    asientos, errores = _parsear_excel_importacion(f)
+    data = []
+    for a in asientos:
+        data.append({
+            "fecha": a["fecha"].isoformat(),
+            "documento": a["documento"] or "",
+            "glosa": a["glosa"],
+            "total_debe": float(a["total_debe"]),
+            "total_haber": float(a["total_haber"]),
+            "cuadra": abs(a["total_debe"] - a["total_haber"]) <= TOLERANCIA and len(a["lineas"]) >= 2,
+            "lineas": [
+                {
+                    "cuenta": l["cuenta_codigo"],
+                    "cuenta_desc": l["cuenta_desc"],
+                    "glosa": l["glosa_linea"],
+                    "debe": float(l["debe"]),
+                    "haber": float(l["haber"]),
+                } for l in a["lineas"]
+            ],
+        })
+    return {"ok": True, "asientos": data, "errores": errores}
+
+
+@app.route("/importar/ejecutar", methods=["POST"])
+def importar_ejecutar():
+    f = request.files.get("archivo")
+    if not f:
+        return {"ok": False, "error": "No se recibio archivo."}, 400
+    asientos, errores = _parsear_excel_importacion(f)
+    if errores:
+        return {"ok": False, "errores": errores}, 400
+    if not asientos:
+        return {"ok": False, "error": "No hay asientos para importar."}, 400
+
+    creados = 0
+    with SessionLocal() as session:
+        meses_cerrados = _meses_cerrados_set(session)
+        for a in asientos:
+            if (a["fecha"].year, a["fecha"].month) in meses_cerrados:
+                return {"ok": False, "error": f"El asiento del {a['fecha']} cae en un mes cerrado ({a['fecha'].year}-{a['fecha'].month:02d}). Importacion abortada."}, 400
+        try:
+            with session.begin():
+                for a in asientos:
+                    numero = _generar_numero(session, a["fecha"])
+                    asiento = Asiento(
+                        numero=numero,
+                        fecha=a["fecha"],
+                        glosa=a["glosa"],
+                        moneda="PEN",
+                        tipo_cambio=Decimal("1"),
+                        numero_documento=a["documento"],
+                    )
+                    for i, l in enumerate(a["lineas"], start=1):
+                        asiento.lineas.append(AsientoLinea(
+                            orden=i,
+                            cuenta_codigo=l["cuenta_codigo"],
+                            glosa_linea=l["glosa_linea"],
+                            debe=l["debe"],
+                            haber=l["haber"],
+                            es_titulo=False,
+                        ))
+                    session.add(asiento)
+                    creados += 1
+        except Exception as e:
+            return {"ok": False, "error": f"Error al importar: {e}"}, 500
+    return {"ok": True, "creados": creados}
+
+
+@app.route("/cierres")
+def cierres_list():
+    with SessionLocal() as session:
+        rows = session.execute(
+            select(CierreMes).order_by(CierreMes.year.desc(), CierreMes.month.desc())
+        ).scalars().all()
+        cierres = [
+            {
+                "id": c.id,
+                "year": c.year,
+                "month": c.month,
+                "label": f"{c.year}-{c.month:02d}",
+                "cerrado_at": c.cerrado_at,
+                "cerrado_por": c.cerrado_por or "",
+                "nota": c.nota or "",
+            }
+            for c in rows
+        ]
+    hoy = date.today()
+    return render_template("cierres.html", cierres=cierres, hoy=hoy)
+
+
+@app.route("/cierres", methods=["POST"])
+def cierres_crear():
+    data = request.get_json(silent=True) or {}
+    try:
+        year = int(data.get("year"))
+        month = int(data.get("month"))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "year/month invalidos."}, 400
+    if not (1 <= month <= 12):
+        return {"ok": False, "error": "month fuera de rango."}, 400
+    nota = (data.get("nota") or "").strip() or None
+    cerrado_por = (data.get("cerrado_por") or "").strip() or None
+
+    primer_dia = date(year, month, 1)
+    if primer_dia > date.today().replace(day=1):
+        return {"ok": False, "error": "No se puede cerrar un mes futuro."}, 400
+
+    with SessionLocal() as session:
+        with session.begin():
+            existe = session.execute(
+                select(CierreMes).where(CierreMes.year == year, CierreMes.month == month)
+            ).scalar_one_or_none()
+            if existe:
+                return {"ok": False, "error": "Ese mes ya esta cerrado."}, 400
+            c = CierreMes(year=year, month=month, cerrado_por=cerrado_por, nota=nota)
+            session.add(c)
+        return {"ok": True}
+
+
+@app.route("/cierres/<int:cierre_id>", methods=["DELETE"])
+def cierres_reabrir(cierre_id):
+    with SessionLocal() as session:
+        with session.begin():
+            c = session.get(CierreMes, cierre_id)
+            if not c:
+                return {"ok": False, "error": "Cierre no encontrado."}, 404
+            session.delete(c)
+        return {"ok": True}
 
 
 @app.route("/favoritas", methods=["GET"])
@@ -1159,7 +2355,8 @@ def operacion_excel():
         ws["A2"] = f"Operacion: {titulo_op}"
         ws["A2"].font = Font(bold=True, size=11)
         ws.merge_cells("A2:F2")
-        ws["A3"] = f"Fecha: {asientos[0].fecha.isoformat()}  |  Documento: {asientos[0].numero_documento or '-'}  |  {len(asientos)} asiento(s)"
+        tercero = f"  |  Tercero: {asientos[0].ruc_tercero} - {asientos[0].razon_social_tercero}" if asientos[0].ruc_tercero else ""
+        ws["A3"] = f"Fecha: {asientos[0].fecha.isoformat()}  |  Documento: {asientos[0].numero_documento or '-'}{tercero}  |  {len(asientos)} asiento(s)"
         ws.merge_cells("A3:F3")
         ws["A3"].font = Font(italic=True, color="666666")
 

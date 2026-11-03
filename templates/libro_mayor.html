@@ -86,9 +86,15 @@
         <label>Fecha hasta</label>
         <input type="date" name="hasta" value="{{ fecha_hasta }}" max="{{ hoy }}">
       </div>
-      <button type="submit" class="btn primary" style="padding:.6rem 1.1rem;display:inline-flex;align-items:center;gap:.3rem;">
-        <span class="ic sm">search</span> Filtrar
-      </button>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        <button type="submit" class="btn primary" style="padding:.6rem 1.1rem;display:inline-flex;align-items:center;gap:.3rem;">
+          <span class="ic sm">search</span> Filtrar
+        </button>
+        <a href="/reportes/libro-mayor/excel?cuenta={{ cuenta_filtro }}&desde={{ fecha_desde }}&hasta={{ fecha_hasta }}"
+           class="btn" style="padding:.6rem 1.1rem;display:inline-flex;align-items:center;gap:.3rem;background:#1e8449;color:#fff;border:1px solid #1e8449;border-radius:8px;text-decoration:none;font-weight:600;">
+          <span class="ic sm">download</span> Excel
+        </a>
+      </div>
     </form>
 
     {% if cuentas %}

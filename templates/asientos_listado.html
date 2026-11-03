@@ -155,13 +155,50 @@
     </div>
     <nav>
       <a href="/" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">home</span> Inicio</a>
+      <a href="/dashboard" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">dashboard</span> Dashboard</a>
       <a href="/asientos" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <a href="/reportes/libro-mayor" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">menu_book</span> Libro Mayor</a>
+      <a href="/reportes/balance" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">balance</span> Balance</a>
       <a href="/asientos/nuevo" class="cta" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">add</span> Nueva operacion</a>
       <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
     </nav>
   </header>
 
   <main class="wrap">
+    {% if filtro_info %}
+    {% set cuadra = (total_debe_filtro - total_haber_filtro)|abs < 0.01 and total_debe_filtro > 0 %}
+    <div class="card" style="padding:1rem 1.2rem;background:linear-gradient(135deg,#eef3f8 0%,#f4f8fd 100%);border:1px solid #c9d6e5;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+        <span class="ic" style="color:#1e3a5f;">filter_alt</span>
+        <div>
+          <div style="font-size:.72rem;color:#6b7785;text-transform:uppercase;letter-spacing:.04em;font-weight:600;">Filtro activo</div>
+          <div style="font-weight:700;color:#1e3a5f;">
+            {% if filtro_info.tipo == 'mes' %}Periodo {{ filtro_info.label }}{% else %}Rango {{ filtro_info.label }}{% endif %}
+            · {{ operaciones|length }} operacion(es)
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+        <div style="font-size:.82rem;">
+          <span style="color:#6b7785;">Total Debe:</span>
+          <strong style="font-variant-numeric:tabular-nums;color:#2c5282;">S/ {{ '%.2f'|format(total_debe_filtro) }}</strong>
+        </div>
+        <div style="font-size:.82rem;">
+          <span style="color:#6b7785;">Total Haber:</span>
+          <strong style="font-variant-numeric:tabular-nums;color:#1e8449;">S/ {{ '%.2f'|format(total_haber_filtro) }}</strong>
+        </div>
+        {% if cuadra %}
+        <span style="background:#e8f6ee;color:#1e8449;padding:.25rem .7rem;border-radius:999px;font-size:.74rem;font-weight:700;"><span class="ic sm">check_circle</span> Cuadra</span>
+        {% elif total_debe_filtro > 0 %}
+        <span style="background:#fdecea;color:#c0392b;padding:.25rem .7rem;border-radius:999px;font-size:.74rem;font-weight:700;"><span class="ic sm">error</span> No cuadra ({{ '%.2f'|format(total_debe_filtro - total_haber_filtro) }})</span>
+        {% endif %}
+        <a href="/asientos" style="font-size:.78rem;color:#2c5282;text-decoration:none;padding:.3rem .65rem;border:1px solid #c9d6e5;border-radius:6px;background:#fff;display:inline-flex;align-items:center;gap:.25rem;">
+          <span class="ic sm">close</span> Quitar filtro
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="card">
       <div class="card-head">
         <h2>Historial de operaciones</h2>
@@ -176,12 +213,22 @@
             <div>
               <div class="op-titulo">{{ op.titulo }}</div>
               {% if op.numero_documento %}<div class="op-doc">Doc: {{ op.numero_documento }}</div>{% endif %}
+              {% if op.ruc_tercero %}
+              <div class="op-doc" style="color:#2c5282;">
+                <span class="ic sm" style="font-size:.9em;vertical-align:middle;">business</span>
+                <a href="/asientos?ruc={{ op.ruc_tercero }}" style="color:#2c5282;text-decoration:none;" title="Ver todas las operaciones de este RUC" onclick="event.stopPropagation();">{{ op.ruc_tercero }}</a>
+                {% if op.razon_social_tercero %}<span style="color:#4a5568;"> — {{ op.razon_social_tercero }}</span>{% endif %}
+              </div>
+              {% endif %}
             </div>
             <div>
               {% if op.n_asientos > 1 %}
                 <span class="op-badge">{{ op.n_asientos }} asientos</span>
               {% else %}
                 <span class="op-badge unico">1 asiento</span>
+              {% endif %}
+              {% if op.cerrado %}
+                <span class="op-badge" style="background:#fdecea;color:#c0392b;margin-left:.25rem;">🔒 CERRADO</span>
               {% endif %}
             </div>
             <div class="op-monto">S/ {{ '%.2f'|format(op.total_debe) }}</div>

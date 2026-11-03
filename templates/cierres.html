@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cierre de meses</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; }
+    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+    .topbar nav { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; }
+    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
+    .topbar a:hover { background:rgba(255,255,255,.24); }
+    .wrap { max-width:1100px; margin:0 auto; padding:1.4rem; }
+    .page-hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+      color: #fff; border-radius: 14px; padding: 1.6rem 1.8rem; margin-bottom: 1.4rem;
+      box-shadow: 0 10px 30px rgba(30, 58, 95, .18);
+      display:flex; align-items:center; gap:1rem;
+    }
+    .page-hero .hero-icon { width:54px; height:54px; border-radius:14px; background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center; font-size:1.9rem; flex-shrink:0; }
+    .page-hero h2 { margin:0 0 .2rem; font-size:1.3rem; }
+    .page-hero p { margin:0; opacity:.92; font-size:.88rem; }
+    .card { background:#fff; border-radius:14px; padding:1.3rem 1.5rem; margin-bottom:1rem; box-shadow:0 2px 10px rgba(15,23,42,.05); }
+    .card h2 { margin:0 0 .35rem; font-size:1rem; color:#4a5568; text-transform:uppercase; letter-spacing:.04em; }
+    .card .hint { color:#6b7785; font-size:.85rem; margin:0 0 1rem; }
+    .cerrar-form { display:grid; grid-template-columns: 120px 170px 1fr auto; gap:.9rem; align-items:end; }
+    @media (max-width:760px) { .cerrar-form { grid-template-columns: 1fr; } }
+    .cerrar-form label { font-size:.72rem; color:#6b7785; text-transform:uppercase; letter-spacing:.04em; font-weight:600; display:block; margin-bottom:.3rem; }
+    .cerrar-form input { width:100%; padding:.6rem .75rem; border:1px solid #d8dee7; border-radius:10px; font-size:.92rem; background:#fff; color:#1f2937; transition: border-color .15s, box-shadow .15s; }
+    .cerrar-form input:focus { outline:0; border-color:#2c5282; box-shadow:0 0 0 3px rgba(44,82,130,.15); }
+    .btn-cerrar { background:#c0392b; color:#fff; border:0; padding:.68rem 1.2rem; border-radius:10px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:.4rem; font-size:.9rem; transition: all .15s; box-shadow:0 2px 6px rgba(192,57,43,.3); }
+    .btn-cerrar:hover { background:#8e2a1f; transform:translateY(-1px); box-shadow:0 4px 10px rgba(192,57,43,.4); }
+    table.cierres { width:100%; border-collapse:collapse; }
+    table.cierres thead th { background:#fafbfd; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:#6b7785; font-weight:600; padding:.6rem .8rem; text-align:left; border-bottom:1px solid #e3e8ef; }
+    table.cierres tbody td { padding:.6rem .8rem; border-bottom:1px solid #f1f3f6; font-size:.88rem; }
+    table.cierres .mes { font-family:ui-monospace,Consolas,monospace; font-weight:700; color:#c0392b; }
+    .badge-cerrado { display:inline-flex; align-items:center; gap:.25rem; padding:.2rem .55rem; border-radius:999px; background:#fdecea; color:#c0392b; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .btn-reabrir { background:#fff; color:#b7791f; border:1px solid #e3cf9c; padding:.3rem .65rem; border-radius:6px; font-size:.78rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:.25rem; }
+    .btn-reabrir:hover { background:#b7791f; color:#fff; border-color:#b7791f; }
+    .btn-ver { background:#fff; color:#2c5282; border:1px solid #c9d6e5; padding:.3rem .65rem; border-radius:6px; font-size:.78rem; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:.25rem; margin-right:.3rem; }
+    .btn-ver:hover { background:#2c5282; color:#fff; border-color:#2c5282; }
+    .empty { text-align:center; padding:2rem; color:#6b7785; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1><span class="ic">lock</span> Cierre de meses</h1>
+    </div>
+    <nav>
+      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <button type="button" class="theme-toggle">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="page-hero">
+      <div class="hero-icon"><span class="ic">lock</span></div>
+      <div>
+        <h2>Cierre de meses</h2>
+        <p>Bloquea los asientos de un mes para evitar cambios accidentales. Puedes reabrirlo si necesitas corregir algo.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Cerrar un mes</h2>
+      <p class="hint">Al cerrar un mes, los asientos de ese periodo quedan bloqueados: no se podran crear, editar ni eliminar hasta reabrirlo.</p>
+      <form class="cerrar-form" onsubmit="cerrarMes(event)">
+        <div>
+          <label>Año</label>
+          <input type="number" id="in-year" min="2000" max="2100" value="{{ hoy.year }}" required>
+        </div>
+        <div>
+          <label>Mes</label>
+          <select id="in-month" data-custom required>
+            {% for m in range(1, 13) %}
+            <option value="{{ m }}" {% if m == hoy.month %}selected{% endif %}>{{ '%02d'|format(m) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Nota (opcional)</label>
+          <input type="text" id="in-nota" placeholder="Ej: Cierre mensual revisado por contador">
+        </div>
+        <button type="submit" class="btn-cerrar"><span class="ic sm">lock</span> Cerrar mes</button>
+      </form>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:.9rem 1.3rem;border-bottom:1px solid #e3e8ef;background:#fbfcfe;display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="margin:0;">Meses cerrados</h2>
+        <span style="font-size:.78rem;color:#6b7785;">{{ cierres|length }} periodo(s)</span>
+      </div>
+      {% if cierres %}
+      <table class="cierres">
+        <thead>
+          <tr>
+            <th style="width:120px;">Periodo</th>
+            <th style="width:180px;">Cerrado el</th>
+            <th style="width:160px;">Por</th>
+            <th>Nota</th>
+            <th style="width:320px;text-align:right;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in cierres %}
+          <tr>
+            <td><span class="mes">{{ c.label }}</span> <span class="badge-cerrado"><span class="ic sm">lock</span> Cerrado</span></td>
+            <td>{{ c.cerrado_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ c.cerrado_por or '—' }}</td>
+            <td>{{ c.nota or '—' }}</td>
+            <td style="text-align:right;white-space:nowrap;">
+              <a href="/asientos?year={{ c.year }}&month={{ c.month }}" class="btn-ver"
+                 title="Ver todos los asientos del mes {{ c.label }}">
+                <span class="ic sm">visibility</span> Ver asientos
+              </a>
+              <a href="/reportes/balance?desde={{ c.year }}-{{ '%02d'|format(c.month) }}-01&hasta={{ c.year }}-{{ '%02d'|format(c.month) }}-{{ '31' if c.month in [1,3,5,7,8,10,12] else ('30' if c.month in [4,6,9,11] else ('29' if (c.year % 4 == 0 and (c.year % 100 != 0 or c.year % 400 == 0)) else '28')) }}"
+                 class="btn-ver" title="Ver balance del mes {{ c.label }}">
+                <span class="ic sm">balance</span> Balance
+              </a>
+              <button type="button" class="btn-reabrir" onclick="reabrir({{ c.id }}, '{{ c.label }}')">
+                <span class="ic sm">lock_open</span> Reabrir
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state" style="padding:2.5rem 1rem;">
+        <div class="empty-icon">lock_open</div>
+        <h3>No hay meses cerrados</h3>
+        <p>Cuando cierres un mes aparecera aqui.<br>Los asientos de meses cerrados quedan bloqueados contra edicion.</p>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+
+  <script>
+    async function cerrarMes(ev) {
+      ev.preventDefault();
+      var year = parseInt(document.getElementById('in-year').value, 10);
+      var month = parseInt(document.getElementById('in-month').value, 10);
+      var nota = document.getElementById('in-nota').value.trim();
+      var ok = await UI.confirm({
+        type: 'danger',
+        icon: 'lock',
+        title: 'Cerrar mes ' + year + '-' + String(month).padStart(2, '0'),
+        msg: 'Los asientos de ese mes quedaran bloqueados.\nNo podras crear, editar ni eliminar asientos en ese periodo hasta reabrirlo.\n\n¿Confirmas?',
+        confirmText: 'Si, cerrar mes',
+        cancelText: 'Cancelar'
+      });
+      if (!ok) return;
+      fetch('/cierres', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: year, month: month, nota: nota })
+      })
+      .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+      .then(function (res) {
+        if (res.data.ok) {
+          UI.success('Mes cerrado correctamente.', 'Listo');
+          setTimeout(function () { location.reload(); }, 700);
+        } else {
+          UI.error(res.data.error || 'Error', 'No se pudo cerrar');
+        }
+      })
+      .catch(function () { UI.error('Error de red.', 'Sin conexion'); });
+    }
+    async function reabrir(id, label) {
+      var ok1 = await UI.confirm({
+        type: 'warning',
+        icon: 'lock_open',
+        title: 'Reabrir ' + label + '?',
+        msg: 'Esto permitira volver a crear, editar y eliminar asientos en ese mes.',
+        confirmText: 'Continuar',
+        cancelText: 'Cancelar'
+      });
+      if (!ok1) return;
+      var ok2 = await UI.confirm({
+        type: 'danger',
+        icon: 'warning',
+        title: 'Confirmacion final',
+        msg: 'Esta accion rompe el bloqueo de auditoria del mes ' + label + '. ¿Seguro?',
+        confirmText: 'Si, reabrir',
+        cancelText: 'Mejor no'
+      });
+      if (!ok2) return;
+      fetch('/cierres/' + id, { method: 'DELETE' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) {
+            UI.success('Mes reabierto.', 'Listo');
+            setTimeout(function () { location.reload(); }, 700);
+          } else {
+            UI.error(d.error || 'Error', 'No se pudo reabrir');
+          }
+        })
+        .catch(function () { UI.error('Error de red.', 'Sin conexion'); });
+    }
+  </script>
+</body>
+</html>
