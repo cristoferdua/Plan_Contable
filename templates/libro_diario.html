@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Libro Diario</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; }
+    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+    .topbar nav { display:flex; gap:.4rem; align-items:center; }
+    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
+    .wrap { max-width:1300px; margin:0 auto; padding:1.4rem; }
+    .filters-card {
+      background:#fff; border-radius:14px; padding:1rem; margin-bottom:1rem;
+      box-shadow:0 2px 10px rgba(15,23,42,.05);
+      display:grid; grid-template-columns: 1fr 160px 160px auto; gap:.7rem; align-items:end;
+    }
+    @media (max-width: 760px) { .filters-card { grid-template-columns: 1fr; } }
+    .filters-card label { font-size:.72rem; color:#6b7785; text-transform:uppercase; letter-spacing:.04em; font-weight:600; display:block; margin-bottom:.2rem; }
+
+    .totales-bar {
+      background:#fff; border-radius:14px; padding:.9rem 1.2rem; margin-bottom:1rem;
+      box-shadow:0 2px 10px rgba(15,23,42,.05);
+      display:flex; gap:1.5rem; align-items:center; justify-content:flex-end; flex-wrap:wrap;
+    }
+    .tot-stat .lbl { font-size:.68rem; color:#6b7785; text-transform:uppercase; letter-spacing:.04em; }
+    .tot-stat .val { font-size:1.05rem; font-weight:700; font-variant-numeric:tabular-nums; }
+    .tot-stat.debe .val { color:#2c5282; }
+    .tot-stat.haber .val { color:#1e8449; }
+    .tot-stat.dif .val.ok { color:#1e8449; }
+    .tot-stat.dif .val.bad { color:#c0392b; }
+
+    .asiento-card {
+      background:#fff; border-radius:14px; margin-bottom:.9rem;
+      box-shadow:0 2px 10px rgba(15,23,42,.05); overflow:hidden;
+    }
+    .asiento-head {
+      padding:.8rem 1.2rem;
+      background: linear-gradient(90deg, #eaf1fb 0%, #f4f8fd 100%);
+      border-bottom:1px solid #d8dee7;
+      display:flex; gap:1rem; align-items:center; flex-wrap:wrap;
+    }
+    .asiento-fecha { font-family:ui-monospace,Consolas,monospace; font-weight:700; color:#1e3a5f; }
+    .asiento-num { background:#1e3a5f; color:#fff; padding:.15rem .55rem; border-radius:6px; font-size:.78rem; font-weight:700; }
+    .asiento-glosa { font-size:.9rem; color:#1f2937; font-weight:600; flex:1; min-width:200px; }
+    .asiento-meta { font-size:.75rem; color:#6b7785; }
+    .asiento-link { margin-left:auto; color:#2c5282; text-decoration:none; font-weight:600; font-size:.82rem; }
+    .asiento-link:hover { text-decoration:underline; }
+
+    table.lineas { width:100%; border-collapse:collapse; }
+    table.lineas thead th { background:#fafbfd; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:#6b7785; font-weight:600; padding:.5rem .8rem; text-align:left; border-bottom:1px solid #e3e8ef; }
+    table.lineas tbody td { padding:.5rem .8rem; border-bottom:1px solid #f1f3f6; font-size:.85rem; }
+    table.lineas tbody tr:hover td { background:#fafbfd; }
+    table.lineas tfoot td { padding:.55rem .8rem; font-weight:700; background:#f4f8fd; border-top:2px solid #d8dee7; font-size:.85rem; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; }
+    .cta-code { font-family:ui-monospace,Consolas,monospace; color:#1e3a5f; font-weight:600; }
+    .empty-state { background:#fff; border-radius:14px; padding:3rem 1rem; text-align:center; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1><span class="ic">auto_stories</span> Libro Diario</h1>
+    </div>
+    <nav>
+      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/"><span class="ic sm">home</span> Inicio</a>
+      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
+      <a href="/reportes/libro-mayor"><span class="ic sm">menu_book</span> Libro Mayor</a>
+      <button type="button" class="theme-toggle">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <form method="get" class="filters-card">
+      <div>
+        <label>Numero de asiento</label>
+        <input type="text" name="numero" value="{{ numero_filtro }}" placeholder="Ej: 001-00001">
+      </div>
+      <div>
+        <label>Fecha desde</label>
+        <input type="date" name="desde" value="{{ fecha_desde }}" max="{{ hoy }}">
+      </div>
+      <div>
+        <label>Fecha hasta</label>
+        <input type="date" name="hasta" value="{{ fecha_hasta }}" max="{{ hoy }}">
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        <button type="submit" class="btn primary" style="padding:.6rem 1.1rem;display:inline-flex;align-items:center;gap:.3rem;">
+          <span class="ic sm">search</span> Filtrar
+        </button>
+      </div>
+    </form>
+
+    {% if filas %}
+    <div class="totales-bar">
+      <div style="color:#6b7785;font-size:.82rem;margin-right:auto;">
+        Mostrando <strong>{{ filas|length }}</strong> asiento(s)
+      </div>
+      <div class="tot-stat debe">
+        <div class="lbl">Total Debe</div>
+        <div class="val">{{ '%.2f'|format(total_debe) }}</div>
+      </div>
+      <div class="tot-stat haber">
+        <div class="lbl">Total Haber</div>
+        <div class="val">{{ '%.2f'|format(total_haber) }}</div>
+      </div>
+      <div class="tot-stat dif">
+        <div class="lbl">Diferencia</div>
+        {% set dif = total_debe - total_haber %}
+        <div class="val {% if dif < 0.01 and dif > -0.01 %}ok{% else %}bad{% endif %}">
+          {{ '%.2f'|format(total_debe - total_haber) }}
+        </div>
+      </div>
+    </div>
+
+    {% for f in filas %}
+    <div class="asiento-card">
+      <div class="asiento-head">
+        <div class="asiento-fecha">{{ f.fecha }}</div>
+        <div class="asiento-num">{{ f.numero }}</div>
+        <div class="asiento-glosa">{{ f.glosa }}</div>
+        <div class="asiento-meta">
+          {% if f.documento %}<span class="ic sm" style="vertical-align:middle;">description</span> {{ f.documento }}{% endif %}
+          {% if f.ruc %} &middot; RUC {{ f.ruc }} - {{ f.razon_social }}{% endif %}
+          {% if f.codigo_libro %} &middot; Libro {{ f.codigo_libro }}{% endif %}
+        </div>
+        <a href="/asientos/{{ f.id }}" class="asiento-link">Ver detalle →</a>
+      </div>
+      <table class="lineas">
+        <thead>
+          <tr>
+            <th style="width:100px;">Cuenta</th>
+            <th>Descripcion</th>
+            <th>Glosa linea</th>
+            <th class="num" style="width:130px;">Debe</th>
+            <th class="num" style="width:130px;">Haber</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in f.lineas %}
+          <tr>
+            <td class="cta-code">{{ l.cuenta }}</td>
+            <td>{{ l.descripcion }}</td>
+            <td style="color:#6b7785;">{{ l.glosa }}</td>
+            <td class="num">{% if l.debe > 0 %}{{ '%.2f'|format(l.debe) }}{% endif %}</td>
+            <td class="num">{% if l.haber > 0 %}{{ '%.2f'|format(l.haber) }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="text-align:right;">Totales asiento</td>
+            <td class="num">{{ '%.2f'|format(f.sub_debe) }}</td>
+            <td class="num">{{ '%.2f'|format(f.sub_haber) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">auto_stories</div>
+      <h3>Sin asientos</h3>
+      <p>No hay asientos registrados en el rango seleccionado.</p>
+      <a href="/reportes/libro-diario" class="empty-cta"><span class="ic sm">refresh</span> Limpiar filtros</a>
+    </div>
+    {% endif %}
+  </main>
+</body>
+</html>

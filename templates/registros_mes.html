@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registros {{ mes_nombre }} {{ year }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <script src="{{ url_for('static', filename='ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:13px; }
+    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
+    .topbar nav { display:flex; gap:.4rem; align-items:center; }
+    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
+    .wrap { max-width:1500px; margin:0 auto; padding:1.2rem; }
+    .hero { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); color:#fff; border-radius:16px; padding:1.2rem 1.4rem; margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+    .hero h2 { margin:0 0 .25rem 0; font-size:1.3rem; font-weight:700; }
+    .hero .sub { font-size:.85rem; opacity:.85; }
+    .section-head { display:flex; align-items:center; justify-content:space-between; margin:1.3rem 0 .6rem; }
+    .section-head h3 { margin:0; font-size:1rem; color:#1e3a5f; font-weight:700; display:flex; align-items:center; gap:.5rem;}
+    .pill { font-size:.7rem; padding:.2rem .55rem; border-radius:999px; font-weight:700; background:#eef5ff; color:#2c5282; }
+    .card { background:#fff; border-radius:14px; overflow:auto; box-shadow:0 2px 10px rgba(15,23,42,.05); margin-bottom:1rem; }
+    table.reg { width:100%; border-collapse:collapse; font-size:.78rem; min-width:1300px; }
+    table.reg thead th { background:#1e3a5f; color:#fff; padding:.5rem .45rem; font-weight:700; text-align:center; font-size:.68rem; text-transform:uppercase; letter-spacing:.03em; border:1px solid #16304d; vertical-align:middle; }
+    table.reg thead th.grp { background:#15304d; }
+    table.reg tbody td { padding:.45rem .5rem; border:1px solid #e5e9ef; vertical-align:middle; }
+    table.reg tbody tr:nth-child(even) td { background:#fafbfd; }
+    table.reg tbody tr:hover td { background:#eef5ff; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; }
+    .c { text-align:center; }
+    tfoot td { background:#eaf0f7; font-weight:800; padding:.6rem .5rem; border:1px solid #cbd3dc; }
+    .vacio { text-align:center; padding:2rem; color:#6b7785; font-size:.85rem; }
+    .mes-select { background:rgba(255,255,255,.18); color:#fff; border:1px solid rgba(255,255,255,.3); padding:.45rem .7rem; border-radius:8px; font-size:.85rem; font-weight:600; }
+    .mes-select option { color:#1e3a5f; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <a href="/reportes/anual?year={{ year }}" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
+      <h1><span class="ic">menu_book</span> Registros</h1>
+    </div>
+    <nav>
+      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
+      <a href="/reportes/anual?year={{ year }}"><span class="ic sm">calendar_month</span> Anual</a>
+      <a href="/asientos?year={{ year }}&month={{ month }}"><span class="ic sm">receipt_long</span> Asientos</a>
+      <button type="button" class="theme-toggle">dark_mode</button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <h2>Registros — {{ mes_nombre }} {{ year }}</h2>
+        <div class="sub">Formato SUNAT 8.1 (Compras) y 14.1 (Ventas e Ingresos)</div>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <form method="get" action="/reportes/registros" style="display:flex;gap:.5rem;">
+          <select name="month" class="mes-select" onchange="this.form.submit()">
+            {% for i in range(1,13) %}
+              {% set nombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+              <option value="{{ i }}" {% if i == month %}selected{% endif %}>{{ nombres[i-1] }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="year" value="{{ year }}">
+        </form>
+        <a href="/reportes/registros/excel?year={{ year }}&month={{ month }}"
+           style="background:#1e8449;color:#fff;padding:.5rem .9rem;border-radius:8px;text-decoration:none;font-weight:600;font-size:.85rem;display:inline-flex;align-items:center;gap:.35rem;">
+          <span class="ic sm">download</span> Excel
+        </a>
+      </div>
+    </section>
+
+    <!-- REGISTRO DE COMPRAS 8.1 -->
+    <div class="section-head">
+      <h3><span class="ic">shopping_cart</span> FORMATO 8.1: Registro de Compras <span class="pill">{{ compras|length }} comprobante{{ 's' if compras|length != 1 else '' }}</span></h3>
+    </div>
+    <div class="card">
+      <table class="reg">
+        <thead>
+          <tr>
+            <th rowspan="2">N° corr.</th>
+            <th rowspan="2">Fecha<br>emisión</th>
+            <th rowspan="2">Fecha<br>venc. / pago</th>
+            <th colspan="3" class="grp">Comprobante de pago</th>
+            <th colspan="4" class="grp">Información del proveedor</th>
+            <th colspan="3" class="grp">Adquisiciones gravadas</th>
+            <th rowspan="2">Importe<br>total</th>
+          </tr>
+          <tr>
+            <th>Tipo<br>(T.10)</th>
+            <th>N° serie</th>
+            <th>N° comprobante</th>
+            <th>Tipo doc.<br>(T.2)</th>
+            <th>N° documento</th>
+            <th>Razón social</th>
+            <th>&nbsp;</th>
+            <th>Base imp.</th>
+            <th>IGV</th>
+            <th>Exoneradas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if compras %}
+            {% for c in compras %}
+            <tr>
+              <td class="c">{{ c.n }}</td>
+              <td class="c">{{ c.fecha.strftime('%d/%m/%Y') }}</td>
+              <td class="c">{{ c.fecha_venc.strftime('%d/%m/%Y') if c.fecha_venc else '' }}</td>
+              <td class="c">{{ c.tipo_doc }}</td>
+              <td class="c">{{ c.serie }}</td>
+              <td class="c">{{ c.numero }}</td>
+              <td class="c">6</td>
+              <td class="c">{{ c.ruc }}</td>
+              <td>{{ c.razon_social }}</td>
+              <td></td>
+              <td class="num">{{ '%.2f'|format(c.base) }}</td>
+              <td class="num">{{ '%.2f'|format(c.igv) }}</td>
+              <td class="num">{{ '%.2f'|format(c.exonerado) if c.exonerado else '' }}</td>
+              <td class="num"><strong>{{ '%.2f'|format(c.importe_total) }}</strong></td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="14" class="vacio">Sin compras registradas en el período</td></tr>
+          {% endif %}
+        </tbody>
+        {% if compras %}
+        <tfoot>
+          <tr>
+            <td colspan="10" style="text-align:right;">TOTALES:</td>
+            <td class="num">{{ '%.2f'|format(totales_compras.base) }}</td>
+            <td class="num">{{ '%.2f'|format(totales_compras.igv) }}</td>
+            <td class="num">{{ '%.2f'|format(totales_compras.exonerado) }}</td>
+            <td class="num">{{ '%.2f'|format(totales_compras.total) }}</td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+
+    <!-- REGISTRO DE VENTAS 14.1 -->
+    <div class="section-head">
+      <h3><span class="ic">point_of_sale</span> FORMATO 14.1: Registro de Ventas e Ingresos <span class="pill">{{ ventas|length }} comprobante{{ 's' if ventas|length != 1 else '' }}</span></h3>
+    </div>
+    <div class="card">
+      <table class="reg">
+        <thead>
+          <tr>
+            <th rowspan="2">N° corr.</th>
+            <th rowspan="2">Fecha<br>emisión</th>
+            <th rowspan="2">Fecha<br>venc. / pago</th>
+            <th colspan="3" class="grp">Comprobante de pago</th>
+            <th colspan="4" class="grp">Información del cliente</th>
+            <th rowspan="2">Base imponible<br>operación gravada</th>
+            <th rowspan="2">IGV<br>y/o IPM</th>
+            <th rowspan="2">Importe total<br>del comprobante</th>
+          </tr>
+          <tr>
+            <th>Tipo<br>(T.10)</th>
+            <th>N° serie</th>
+            <th>Número</th>
+            <th>Tipo doc.<br>(T.2)</th>
+            <th>N° documento</th>
+            <th>Razón social</th>
+            <th>&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if ventas %}
+            {% for v in ventas %}
+            <tr>
+              <td class="c">{{ v.n }}</td>
+              <td class="c">{{ v.fecha.strftime('%d/%m/%Y') }}</td>
+              <td class="c">{{ v.fecha_venc.strftime('%d/%m/%Y') if v.fecha_venc else '' }}</td>
+              <td class="c">{{ v.tipo_doc }}</td>
+              <td class="c">{{ v.serie }}</td>
+              <td class="c">{{ v.numero }}</td>
+              <td class="c">6</td>
+              <td class="c">{{ v.ruc }}</td>
+              <td>{{ v.razon_social }}</td>
+              <td></td>
+              <td class="num">{{ '%.2f'|format(v.base) }}</td>
+              <td class="num">{{ '%.2f'|format(v.igv) }}</td>
+              <td class="num"><strong>{{ '%.2f'|format(v.importe_total) }}</strong></td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="13" class="vacio">Sin ventas registradas en el período</td></tr>
+          {% endif %}
+        </tbody>
+        {% if ventas %}
+        <tfoot>
+          <tr>
+            <td colspan="10" style="text-align:right;">TOTALES:</td>
+            <td class="num">{{ '%.2f'|format(totales_ventas.base) }}</td>
+            <td class="num">{{ '%.2f'|format(totales_ventas.igv) }}</td>
+            <td class="num">{{ '%.2f'|format(totales_ventas.total) }}</td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </main>
+</body>
+</html>

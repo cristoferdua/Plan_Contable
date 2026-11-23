@@ -1768,6 +1768,26 @@
         if (!lineas.length) errores.push('Agrega lineas al asiento.');
         if (errores.length) { mostrarErrores(errores); return; }
 
+        // Advertencia SUNAT: si el asiento contiene cuentas de compra/venta, verificar datos del tercero
+        var esCompra = lineas.some(function (l) { return /^(60|63)/.test(l.cuenta_codigo || ''); });
+        var esVenta = lineas.some(function (l) { return /^(70|75)/.test(l.cuenta_codigo || ''); });
+        if ((esCompra || esVenta) && !window._sunatWarningShown) {
+          var faltantesS = [];
+          if (!(rucEl.value || '').trim()) faltantesS.push('RUC del tercero');
+          if (!(razonSocialTercero || '').trim()) faltantesS.push('Razon social del tercero');
+          if (!documentoEl.value.trim()) faltantesS.push('N° documento (ej: F001-1234)');
+          if (faltantesS.length) {
+            var etiqueta2 = esCompra ? 'Registro de Compras (8.1)' : 'Registro de Ventas (14.1)';
+            window._sunatWarningShown = true;
+            UI.warning(
+              'Faltan datos obligatorios para el ' + etiqueta2 + ':\n• ' + faltantesS.join('\n• ') +
+              '\n\nEl asiento se guardara igual, pero NO aparecera en el Registro SUNAT. Presiona guardar otra vez para continuar.',
+              'Datos SUNAT incompletos'
+            );
+            return;
+          }
+        }
+
         ocultarErrores();
         setGuardando(true);
         var url = EDITAR ? '/asientos/' + EDITAR.id : '/asientos';
@@ -1892,6 +1912,7 @@
         venta: {
           nombre: 'Venta con IGV',
           campos: [
+            { id: 'numero_documento', label: 'N° comprobante emitido (serie-numero)', tipo: 'text', req: true, placeholder: 'F001-2559 o B001-4588' },
             { id: 'base', label: 'Base imponible (sin IGV)', tipo: 'num', req: true, placeholder: '1000.00' },
             { id: 'forma', label: 'Como te paga el cliente?', tipo: 'select', opts: [
               { v: 'contado', t: 'Al contado (100% ya)' },
@@ -1952,6 +1973,7 @@
         compra: {
           nombre: 'Compra con IGV',
           campos: [
+            { id: 'numero_documento', label: 'N° comprobante del proveedor (serie-numero)', tipo: 'text', req: true, placeholder: 'F001-1234 o B001-4589' },
             { id: 'base', label: 'Base imponible (sin IGV)', tipo: 'num', req: true, placeholder: '1000.00' },
             { id: 'tipo', label: 'Que compraste?', tipo: 'select', opts: [
               { v: 'mercaderia', t: 'Mercaderia (para revender)' },
@@ -2505,7 +2527,9 @@
           } else if (c.tipo === 'ruc') {
             d[c.id] = (el.value || '').trim();
           } else {
-            d[c.id] = el.value.trim();
+            var v = el.value.trim();
+            if (c.req === true && !v) { ok = false; }
+            d[c.id] = v;
           }
         });
         return { ok: ok, datos: d };
@@ -2687,7 +2711,7 @@
         if (!tpl) return;
         var r = leerDatosPlantilla();
         if (!r.ok) {
-          UI.warning('Ingresa un monto valido para la plantilla.', 'Datos incompletos');
+          UI.warning('Completa todos los campos obligatorios de la plantilla (monto, N° comprobante, etc.).', 'Datos incompletos');
           return;
         }
         // Aplicar fecha seleccionada en la plantilla al editor principal
@@ -2708,6 +2732,10 @@
             pintarSunat({ ok: true, fuente: 'plantilla', data: { razon_social: tplRazonSocial, estado: 'ACTIVO', condicion: 'HABIDO' } });
           }
         }
+        // Propagar N° documento de la plantilla al editor principal
+        if (r.datos.numero_documento) {
+          documentoEl.value = r.datos.numero_documento;
+        }
         var resultado = tpl.build(r.datos);
         var asientos = Array.isArray(resultado) ? resultado :
                         (resultado.asientos ? resultado.asientos : [resultado]);
@@ -2719,6 +2747,22 @@
         }
         cerrarModalForm();
         cerrarModal();
+
+        // Advertencia SUNAT: compras/ventas requieren datos del tercero y documento para los Registros 8.1 / 14.1
+        if (plantillaActual === 'compra' || plantillaActual === 'venta') {
+          var faltantes = [];
+          if (!(rucEl.value || '').trim()) faltantes.push('RUC del tercero');
+          if (!(razonSocialTercero || '').trim()) faltantes.push('Razon social del tercero');
+          if (!documentoEl.value.trim()) faltantes.push('N° documento (ej: F001-1234)');
+          if (faltantes.length) {
+            var etiqueta = plantillaActual === 'compra' ? 'Registro de Compras (8.1)' : 'Registro de Ventas (14.1)';
+            UI.warning(
+              'Faltan datos obligatorios para el ' + etiqueta + ':\n• ' + faltantes.join('\n• ') +
+              '\n\nPuedes guardar igual, pero el asiento NO aparecera en el Registro SUNAT hasta completarlos.',
+              'Datos SUNAT incompletos'
+            );
+          }
+        }
       }
 
       document.getElementById('btn-plantillas').addEventListener('click', abrirModal);

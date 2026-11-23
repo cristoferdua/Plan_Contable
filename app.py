@@ -1203,12 +1203,24 @@ def dashboard():
         # Totales por tipo (venta/compra/otro) via heuristica: cuentas 70 = venta, 60/63 = compra
         ventas_mes = Decimal("0")
         compras_mes = Decimal("0")
+        igv_ventas_mes = Decimal("0")
+        igv_compras_mes = Decimal("0")
         for a in asientos_mes:
+            es_venta = any(l.cuenta_codigo.startswith("70") or l.cuenta_codigo.startswith("75") for l in a.lineas)
+            es_compra = any(l.cuenta_codigo.startswith("60") or l.cuenta_codigo.startswith("63") for l in a.lineas)
             for l in a.lineas:
                 if l.cuenta_codigo.startswith("70") or l.cuenta_codigo.startswith("75"):
                     ventas_mes += l.haber
                 elif l.cuenta_codigo.startswith("60") or l.cuenta_codigo.startswith("63"):
                     compras_mes += l.debe
+                # IGV: cuenta 4011* (debito en ventas al haber, credito en compras al debe)
+                if l.cuenta_codigo.startswith("4011"):
+                    if es_venta and l.haber > 0:
+                        igv_ventas_mes += l.haber
+                    if es_compra and l.debe > 0:
+                        igv_compras_mes += l.debe
+
+        igv_por_pagar = igv_ventas_mes - igv_compras_mes
 
     return render_template(
         "dashboard.html",
@@ -1219,7 +1231,89 @@ def dashboard():
         ultima_glosa=ultima_glosa,
         ventas_mes=ventas_mes,
         compras_mes=compras_mes,
+        igv_ventas_mes=igv_ventas_mes,
+        igv_compras_mes=igv_compras_mes,
+        igv_por_pagar=igv_por_pagar,
         hoy=hoy,
+    )
+
+
+@app.route("/reportes/libro-diario")
+def libro_diario():
+    """Libro Diario: todos los asientos en orden cronologico con sus lineas."""
+    fecha_desde = request.args.get("desde", "").strip()
+    fecha_hasta = request.args.get("hasta", "").strip()
+    numero_filtro = request.args.get("numero", "").strip()
+
+    with SessionLocal() as session:
+        asientos = session.execute(
+            select(Asiento).order_by(Asiento.fecha, Asiento.id)
+        ).scalars().all()
+
+        filas = []
+        total_debe = Decimal("0")
+        total_haber = Decimal("0")
+
+        for a in asientos:
+            if fecha_desde:
+                try:
+                    if a.fecha < datetime.strptime(fecha_desde, "%Y-%m-%d").date():
+                        continue
+                except ValueError:
+                    pass
+            if fecha_hasta:
+                try:
+                    if a.fecha > datetime.strptime(fecha_hasta, "%Y-%m-%d").date():
+                        continue
+                except ValueError:
+                    pass
+            if numero_filtro and numero_filtro.lower() not in (a.numero or "").lower():
+                continue
+
+            lineas = []
+            sub_d = Decimal("0")
+            sub_h = Decimal("0")
+            for l in a.lineas:
+                if l.es_titulo:
+                    continue
+                lineas.append({
+                    "cuenta": l.cuenta_codigo,
+                    "descripcion": CUENTAS_POR_CODIGO.get(l.cuenta_codigo, {}).get("descripcion", ""),
+                    "glosa": l.glosa_linea or "",
+                    "debe": l.debe,
+                    "haber": l.haber,
+                })
+                sub_d += l.debe
+                sub_h += l.haber
+
+            if not lineas:
+                continue
+
+            filas.append({
+                "id": a.id,
+                "fecha": a.fecha,
+                "numero": a.numero,
+                "glosa": a.glosa,
+                "documento": a.numero_documento or "",
+                "ruc": a.ruc_tercero or "",
+                "razon_social": a.razon_social_tercero or "",
+                "codigo_libro": a.codigo_libro or "",
+                "lineas": lineas,
+                "sub_debe": sub_d,
+                "sub_haber": sub_h,
+            })
+            total_debe += sub_d
+            total_haber += sub_h
+
+    return render_template(
+        "libro_diario.html",
+        filas=filas,
+        total_debe=total_debe,
+        total_haber=total_haber,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        numero_filtro=numero_filtro,
+        hoy=date.today().isoformat(),
     )
 
 
@@ -2650,6 +2744,329 @@ def asientos_excel(asiento_id):
             download_name=f"asiento_{asiento.numero}.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+
+
+def _tipo_doc_sunat(numero_documento: str) -> str:
+    """Devuelve el codigo SUNAT Tabla 10 segun el prefijo serie del numero de documento.
+    F = 01 Factura, B = 03 Boleta, 07 NC, 08 ND, sino 00."""
+    if not numero_documento:
+        return ""
+    s = numero_documento.strip().upper()
+    if s.startswith("F"):
+        return "01"
+    if s.startswith("B"):
+        return "03"
+    if s.startswith("FC") or s.startswith("BC") or "NC" in s[:3]:
+        return "07"
+    if s.startswith("FD") or s.startswith("BD") or "ND" in s[:3]:
+        return "08"
+    return "00"
+
+
+def _parse_serie_numero(numero_documento: str):
+    """Separa 'F001-2559' -> ('F001', '2559'). Si no hay guion, todo va a 'numero'."""
+    if not numero_documento:
+        return ("", "")
+    s = numero_documento.strip()
+    if "-" in s:
+        serie, num = s.split("-", 1)
+        return (serie.strip(), num.strip())
+    return ("", s)
+
+
+def _registro_compras_ventas(session, year: int, month: int):
+    """Construye las filas del Registro de Compras (8.1) y Ventas (14.1) del mes."""
+    from calendar import monthrange
+    inicio = date(year, month, 1)
+    fin = date(year, month, monthrange(year, month)[1])
+    rows = session.execute(
+        select(Asiento).where(
+            Asiento.fecha >= inicio,
+            Asiento.fecha <= fin,
+            Asiento.reversa_de_id.is_(None),
+            Asiento.anulado_por_id.is_(None),
+        ).order_by(Asiento.fecha, Asiento.id)
+    ).scalars().all()
+
+    # Agrupar por numero_documento + ruc para consolidar los asientos que forman una sola operacion
+    compras_grp = {}
+    ventas_grp = {}
+    for a in rows:
+        base = Decimal("0")
+        igv = Decimal("0")
+        es_compra = False
+        es_venta = False
+        for l in a.lineas:
+            if l.es_titulo:
+                continue
+            c = l.cuenta_codigo
+            if c.startswith("60") or c.startswith("63"):
+                base += l.debe
+                es_compra = True
+            elif c.startswith("70") or c.startswith("75"):
+                base += l.haber
+                es_venta = True
+            if c.startswith("4011") or c.startswith("40111"):
+                # IGV: debe para compras, haber para ventas
+                igv += (l.debe if l.debe > 0 else l.haber)
+
+        if not (es_compra or es_venta):
+            continue
+        key = (a.numero_documento or f"__sindoc_{a.id}", a.ruc_tercero or "")
+        destino = compras_grp if es_compra else ventas_grp
+        if key not in destino:
+            serie, num = _parse_serie_numero(a.numero_documento or "")
+            destino[key] = {
+                "fecha": a.fecha,
+                "fecha_venc": None,
+                "tipo_doc": _tipo_doc_sunat(a.numero_documento or ""),
+                "serie": serie,
+                "numero": num,
+                "numero_documento": a.numero_documento or "",
+                "ruc": a.ruc_tercero or "",
+                "razon_social": a.razon_social_tercero or "",
+                "base": Decimal("0"),
+                "igv": Decimal("0"),
+                "exonerado": Decimal("0"),
+            }
+        destino[key]["base"] += base
+        destino[key]["igv"] += igv
+
+    def _finalize(d):
+        filas = []
+        for i, v in enumerate(sorted(d.values(), key=lambda x: (x["fecha"], x["numero_documento"])), 1):
+            v["n"] = i
+            v["importe_total"] = v["base"] + v["igv"]
+            filas.append(v)
+        totales = {
+            "base": sum((f["base"] for f in filas), Decimal("0")),
+            "igv": sum((f["igv"] for f in filas), Decimal("0")),
+            "exonerado": sum((f["exonerado"] for f in filas), Decimal("0")),
+            "total": sum((f["importe_total"] for f in filas), Decimal("0")),
+        }
+        return filas, totales
+
+    compras, totales_c = _finalize(compras_grp)
+    ventas, totales_v = _finalize(ventas_grp)
+    return {
+        "compras": compras,
+        "ventas": ventas,
+        "totales_compras": totales_c,
+        "totales_ventas": totales_v,
+    }
+
+
+@app.route("/reportes/registros")
+def reporte_registros():
+    """Registro de Compras (8.1) y Ventas (14.1) del periodo (year + month)."""
+    try:
+        year = int(request.args.get("year", date.today().year))
+        month = int(request.args.get("month", date.today().month))
+    except ValueError:
+        year, month = date.today().year, date.today().month
+    if month < 1 or month > 12:
+        month = date.today().month
+
+    meses_nombres = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+                     "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+
+    with SessionLocal() as session:
+        data = _registro_compras_ventas(session, year, month)
+
+    return render_template(
+        "registros_mes.html",
+        year=year,
+        month=month,
+        mes_nombre=meses_nombres[month - 1],
+        **data,
+    )
+
+
+@app.route("/reportes/registros/excel")
+def reporte_registros_excel():
+    """Exporta Registros 8.1 y 14.1 a Excel con formato SUNAT."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    try:
+        year = int(request.args.get("year", date.today().year))
+        month = int(request.args.get("month", date.today().month))
+    except ValueError:
+        year, month = date.today().year, date.today().month
+
+    meses_nombres = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+                     "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"]
+    with SessionLocal() as session:
+        data = _registro_compras_ventas(session, year, month)
+
+    wb = Workbook()
+    thin = Side(border_style="thin", color="666666")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+    title_font = Font(bold=True, size=13, color="1E3A5F")
+    totals_fill = PatternFill("solid", fgColor="EAF0F7")
+    totals_font = Font(bold=True, size=10)
+
+    # ===== HOJA 1: COMPRAS 8.1 =====
+    ws = wb.active
+    ws.title = "8.1 Compras"
+    ws["A1"] = f"FORMATO 8.1: REGISTRO DE COMPRAS"
+    ws["A1"].font = title_font
+    ws.merge_cells("A1:N1")
+    ws["A2"] = f"PERIODO: {meses_nombres[month-1]} {year}"
+    ws["A2"].font = Font(bold=True, size=10)
+    ws.merge_cells("A2:N2")
+
+    headers_c = [
+        "N° CORR.", "FECHA EMISION", "FECHA VENC/PAGO",
+        "TIPO DOC (T.10)", "N° SERIE", "N° COMPROBANTE",
+        "TIPO DOC (T.2)", "N° DOCUMENTO", "RAZON SOCIAL",
+        "BASE IMPONIBLE", "IGV", "COMPRAS EXONERADAS",
+        "IMPORTE TOTAL", "GLOSA"
+    ]
+    for col, h in enumerate(headers_c, 1):
+        c = ws.cell(row=4, column=col, value=h)
+        c.fill = header_fill
+        c.font = header_font
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = border
+
+    row = 5
+    for f in data["compras"]:
+        vals = [
+            f["n"], f["fecha"].strftime("%d/%m/%Y"),
+            f["fecha_venc"].strftime("%d/%m/%Y") if f["fecha_venc"] else "",
+            f["tipo_doc"], f["serie"], f["numero"],
+            "6" if f["ruc"] else "", f["ruc"], f["razon_social"],
+            float(f["base"]), float(f["igv"]), float(f["exonerado"]),
+            float(f["importe_total"]), ""
+        ]
+        for col, v in enumerate(vals, 1):
+            c = ws.cell(row=row, column=col, value=v)
+            c.border = border
+            if col in (10, 11, 12, 13):
+                c.number_format = "#,##0.00"
+                c.alignment = Alignment(horizontal="right")
+            elif col in (1, 2, 3, 4, 5, 6, 7, 8):
+                c.alignment = Alignment(horizontal="center")
+        row += 1
+
+    # Totales compras
+    if data["compras"]:
+        ws.cell(row=row, column=9, value="TOTALES:").font = totals_font
+        ws.cell(row=row, column=9).alignment = Alignment(horizontal="right")
+        for col, key in [(10, "base"), (11, "igv"), (12, "exonerado"), (13, "total")]:
+            c = ws.cell(row=row, column=col, value=float(data["totales_compras"][key]))
+            c.font = totals_font
+            c.fill = totals_fill
+            c.number_format = "#,##0.00"
+            c.border = border
+            c.alignment = Alignment(horizontal="right")
+
+    widths_c = [8, 13, 13, 10, 10, 15, 10, 15, 35, 15, 12, 15, 15, 25]
+    for i, w in enumerate(widths_c, 1):
+        ws.column_dimensions[chr(64 + i) if i <= 26 else "A" + chr(64 + i - 26)].width = w
+
+    # ===== HOJA 2: VENTAS 14.1 =====
+    ws2 = wb.create_sheet("14.1 Ventas")
+    ws2["A1"] = f"FORMATO 14.1: REGISTRO DE VENTAS E INGRESOS"
+    ws2["A1"].font = title_font
+    ws2.merge_cells("A1:M1")
+    ws2["A2"] = f"PERIODO: {meses_nombres[month-1]} {year}"
+    ws2["A2"].font = Font(bold=True, size=10)
+    ws2.merge_cells("A2:M2")
+
+    headers_v = [
+        "N° CORR.", "FECHA EMISION", "FECHA VENC/PAGO",
+        "TIPO DOC (T.10)", "N° SERIE", "NUMERO",
+        "TIPO DOC (T.2)", "N° DOCUMENTO", "RAZON SOCIAL",
+        "BASE IMPONIBLE", "IGV Y/O IPM",
+        "IMPORTE TOTAL", "GLOSA"
+    ]
+    for col, h in enumerate(headers_v, 1):
+        c = ws2.cell(row=4, column=col, value=h)
+        c.fill = header_fill
+        c.font = header_font
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = border
+
+    row = 5
+    for f in data["ventas"]:
+        vals = [
+            f["n"], f["fecha"].strftime("%d/%m/%Y"),
+            f["fecha_venc"].strftime("%d/%m/%Y") if f["fecha_venc"] else "",
+            f["tipo_doc"], f["serie"], f["numero"],
+            "6" if (f["ruc"] and len(f["ruc"]) == 11) else ("1" if f["ruc"] else ""),
+            f["ruc"], f["razon_social"],
+            float(f["base"]), float(f["igv"]),
+            float(f["importe_total"]), ""
+        ]
+        for col, v in enumerate(vals, 1):
+            c = ws2.cell(row=row, column=col, value=v)
+            c.border = border
+            if col in (10, 11, 12):
+                c.number_format = "#,##0.00"
+                c.alignment = Alignment(horizontal="right")
+            elif col in (1, 2, 3, 4, 5, 6, 7, 8):
+                c.alignment = Alignment(horizontal="center")
+        row += 1
+
+    if data["ventas"]:
+        ws2.cell(row=row, column=9, value="TOTALES:").font = totals_font
+        ws2.cell(row=row, column=9).alignment = Alignment(horizontal="right")
+        for col, key in [(10, "base"), (11, "igv"), (12, "total")]:
+            c = ws2.cell(row=row, column=col, value=float(data["totales_ventas"][key]))
+            c.font = totals_font
+            c.fill = totals_fill
+            c.number_format = "#,##0.00"
+            c.border = border
+            c.alignment = Alignment(horizontal="right")
+
+    widths_v = [8, 13, 13, 10, 10, 15, 10, 15, 35, 15, 12, 15, 25]
+    for i, w in enumerate(widths_v, 1):
+        ws2.column_dimensions[chr(64 + i) if i <= 26 else "A" + chr(64 + i - 26)].width = w
+
+    # ===== HOJA 3: RESUMEN IGV =====
+    ws3 = wb.create_sheet("Resumen IGV")
+    ws3["A1"] = f"RESUMEN IGV — {meses_nombres[month-1]} {year}"
+    ws3["A1"].font = title_font
+    ws3.merge_cells("A1:B1")
+
+    igv_ventas = data["totales_ventas"]["igv"]
+    igv_compras = data["totales_compras"]["igv"]
+    igv_pagar = igv_ventas - igv_compras
+
+    filas_resumen = [
+        ("IGV de Ventas (debito fiscal)", float(igv_ventas)),
+        ("IGV de Compras (credito fiscal)", float(igv_compras)),
+        ("IGV por pagar (ventas - compras)", float(igv_pagar)),
+        ("", ""),
+        ("Total Base Ventas", float(data["totales_ventas"]["base"])),
+        ("Total Base Compras", float(data["totales_compras"]["base"])),
+        ("Utilidad bruta aproximada", float(data["totales_ventas"]["base"] - data["totales_compras"]["base"])),
+    ]
+    for i, (label, val) in enumerate(filas_resumen, start=3):
+        ws3.cell(row=i, column=1, value=label).font = Font(bold=True, size=10)
+        c = ws3.cell(row=i, column=2, value=val)
+        if isinstance(val, (int, float)):
+            c.number_format = "#,##0.00"
+            c.alignment = Alignment(horizontal="right")
+        if "por pagar" in label.lower() or "Utilidad" in label:
+            ws3.cell(row=i, column=1).fill = totals_fill
+            c.fill = totals_fill
+    ws3.column_dimensions["A"].width = 40
+    ws3.column_dimensions["B"].width = 18
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=f"Registros_{year}_{month:02d}_{meses_nombres[month-1]}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 if __name__ == "__main__":
