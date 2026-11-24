@@ -246,7 +246,8 @@
     .sub-ver a:hover { background: var(--primary-2); color: #fff; }
     .empty { text-align: center; padding: 2rem; color: var(--muted); }
     @media (max-width: 760px) {
-      .op-header { grid-template-columns: 1fr auto; gap: .5rem; }
+      .op-header { grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; }
+      .op-header > * { min-width: 0; overflow-wrap: anywhere; }
       .op-fecha, .op-doc, .op-monto { grid-column: 1 / -1; font-size: .75rem; }
       .op-ver { grid-column: 1 / -1; text-align: left; }
       .sub-asiento { grid-template-columns: 32px 1fr; }
@@ -274,16 +275,16 @@
       <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
         <div style="font-size:.82rem;">
           <span style="color:#6b7785;">Total Debe:</span>
-          <strong style="font-variant-numeric:tabular-nums;color:#2c5282;">S/ {{ '%.2f'|format(total_debe_filtro) }}</strong>
+          <strong style="font-variant-numeric:tabular-nums;color:#2c5282;">S/ {{ '{:,.2f}'.format(total_debe_filtro) }}</strong>
         </div>
         <div style="font-size:.82rem;">
           <span style="color:#6b7785;">Total Haber:</span>
-          <strong style="font-variant-numeric:tabular-nums;color:#1e8449;">S/ {{ '%.2f'|format(total_haber_filtro) }}</strong>
+          <strong style="font-variant-numeric:tabular-nums;color:#1e8449;">S/ {{ '{:,.2f}'.format(total_haber_filtro) }}</strong>
         </div>
         {% if cuadra %}
         <span style="background:#e8f6ee;color:#1e8449;padding:.25rem .7rem;border-radius:999px;font-size:.74rem;font-weight:700;"><span class="ic sm">check_circle</span> Cuadra</span>
         {% elif total_debe_filtro > 0 %}
-        <span style="background:#fdecea;color:#c0392b;padding:.25rem .7rem;border-radius:999px;font-size:.74rem;font-weight:700;"><span class="ic sm">error</span> No cuadra ({{ '%.2f'|format(total_debe_filtro - total_haber_filtro) }})</span>
+        <span style="background:#fdecea;color:#c0392b;padding:.25rem .7rem;border-radius:999px;font-size:.74rem;font-weight:700;"><span class="ic sm">error</span> No cuadra ({{ '{:,.2f}'.format(total_debe_filtro - total_haber_filtro) }})</span>
         {% endif %}
         <a href="/asientos" style="font-size:.78rem;color:#2c5282;text-decoration:none;padding:.3rem .65rem;border:1px solid #c9d6e5;border-radius:6px;background:#fff;display:inline-flex;align-items:center;gap:.25rem;">
           <span class="ic sm">close</span> Quitar filtro
@@ -324,7 +325,7 @@
                 <span class="op-badge" style="background:#fdecea;color:#c0392b;margin-left:.25rem;">🔒 CERRADO</span>
               {% endif %}
             </div>
-            <div class="op-monto">S/ {{ '%.2f'|format(op.total_debe) }}</div>
+            <div class="op-monto">S/ {{ '{:,.2f}'.format(op.total_debe) }}</div>
             <div class="op-ver">
               {% if op.n_asientos > 1 %}
                 <span class="op-expand"><span class="ic">chevron_right</span></span>

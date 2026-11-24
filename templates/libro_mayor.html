@@ -97,16 +97,16 @@
         <div class="cuenta-desc">{{ c.descripcion }}</div>
         <div class="cuenta-stat debe">
           <div class="lbl">Total debe</div>
-          <div class="val">{{ '%.2f'|format(c.total_debe) }}</div>
+          <div class="val">{{ '{:,.2f}'.format(c.total_debe) }}</div>
         </div>
         <div class="cuenta-stat haber">
           <div class="lbl">Total haber</div>
-          <div class="val">{{ '%.2f'|format(c.total_haber) }}</div>
+          <div class="val">{{ '{:,.2f}'.format(c.total_haber) }}</div>
         </div>
         <div class="cuenta-stat saldo">
           <div class="lbl">Saldo</div>
           <div class="val {% if c.saldo >= 0 %}pos{% else %}neg{% endif %}">
-            {{ '%.2f'|format(c.saldo) }}
+            {{ '{:,.2f}'.format(c.saldo) }}
           </div>
         </div>
       </div>
@@ -126,8 +126,8 @@
             <td>{{ m.fecha }}</td>
             <td><a href="/asientos/{{ m.asiento_id }}" class="mov-link">{{ m.numero }}</a></td>
             <td>{{ m.glosa }}</td>
-            <td class="num">{% if m.debe > 0 %}{{ '%.2f'|format(m.debe) }}{% endif %}</td>
-            <td class="num">{% if m.haber > 0 %}{{ '%.2f'|format(m.haber) }}{% endif %}</td>
+            <td class="num">{% if m.debe > 0 %}{{ '{:,.2f}'.format(m.debe) }}{% endif %}</td>
+            <td class="num">{% if m.haber > 0 %}{{ '{:,.2f}'.format(m.haber) }}{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>

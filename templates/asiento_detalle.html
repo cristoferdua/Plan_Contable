@@ -158,6 +158,7 @@
 <body>
   {% set active = 'asientos' %}
   {% set breadcrumb = [('Operaciones','/asientos'), ('Detalle asiento','')] %}
+  {% set sin_titulo = true %}
   {% include 'partials/shell_open.html' %}
     <div class="card">
       <div class="detail-hero">
@@ -169,11 +170,11 @@
         <div class="hero-stats">
           <div class="hero-stat">
             <div class="lbl">Total debe</div>
-            <div class="val">{{ '%.2f'|format(total_debe) }}</div>
+            <div class="val">{{ '{:,.2f}'.format(total_debe) }}</div>
           </div>
           <div class="hero-stat">
             <div class="lbl">Total haber</div>
-            <div class="val">{{ '%.2f'|format(total_haber) }}</div>
+            <div class="val">{{ '{:,.2f}'.format(total_haber) }}</div>
           </div>
         </div>
       </div>
@@ -233,7 +234,7 @@
           {% if asiento.detraccion_monto %}
           <div class="meta-item">
             <div class="lbl">Detraccion</div>
-            <div class="val">{{ '%.2f'|format(asiento.detraccion_monto) }}{% if asiento.detraccion_constancia %} &middot; const. {{ asiento.detraccion_constancia }}{% endif %}</div>
+            <div class="val">{{ '{:,.2f}'.format(asiento.detraccion_monto) }}{% if asiento.detraccion_constancia %} &middot; const. {{ asiento.detraccion_constancia }}{% endif %}</div>
           </div>
           {% endif %}
           <div class="meta-item">
@@ -282,7 +283,7 @@
           {% if diff|abs < 0.01 and total_debe > 0 %}
             <span class="balance-chip ok"><span class="ic sm">check_circle</span> Cuadra</span>
           {% elif total_debe > 0 or total_haber > 0 %}
-            <span class="balance-chip bad"><span class="ic sm">error</span> Diferencia {{ '%.2f'|format(diff) }}</span>
+            <span class="balance-chip bad"><span class="ic sm">error</span> Diferencia {{ '{:,.2f}'.format(diff) }}</span>
           {% endif %}
         </div>
       </div>
@@ -305,16 +306,16 @@
               <td class="cod">{{ l.cuenta_codigo }}</td>
               <td>{{ l.cuenta_desc }}</td>
               <td>{{ l.glosa_linea }}</td>
-              <td class="num debe">{% if not l.es_titulo %}{{ '%.2f'|format(l.debe) }}{% endif %}</td>
-              <td class="num haber">{% if not l.es_titulo %}{{ '%.2f'|format(l.haber) }}{% endif %}</td>
+              <td class="num debe">{% if not l.es_titulo %}{{ '{:,.2f}'.format(l.debe) }}{% endif %}</td>
+              <td class="num haber">{% if not l.es_titulo %}{{ '{:,.2f}'.format(l.haber) }}{% endif %}</td>
             </tr>
             {% endfor %}
           </tbody>
           <tfoot>
             <tr>
               <td colspan="4" class="label">Total</td>
-              <td class="num">{{ '%.2f'|format(total_debe) }}</td>
-              <td class="num">{{ '%.2f'|format(total_haber) }}</td>
+              <td class="num">{{ '{:,.2f}'.format(total_debe) }}</td>
+              <td class="num">{{ '{:,.2f}'.format(total_haber) }}</td>
             </tr>
           </tfoot>
         </table>

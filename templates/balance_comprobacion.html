@@ -82,7 +82,7 @@
     {% elif total_debe == 0 and total_haber == 0 %}
       <div class="status-chip" style="background:#eef1f5;color:#6b7785;"><span class="ic sm">info</span> Sin movimientos</div>
     {% else %}
-      <div class="status-chip bad"><span class="ic sm">error</span> Totales NO cuadran. Diferencia: {{ '%.2f'|format(diff) }}</div>
+      <div class="status-chip bad"><span class="ic sm">error</span> Totales NO cuadran. Diferencia: {{ '{:,.2f}'.format(diff) }}</div>
     {% endif %}
 
     <div class="balance-card">
@@ -104,10 +104,10 @@
             <td class="cod">{{ c.codigo }}</td>
             <td>{{ c.descripcion }}</td>
             <td class="c"><span class="elem-pill">{{ c.elemento }}</span></td>
-            <td class="num">{{ '%.2f'|format(c.total_debe) }}</td>
-            <td class="num">{{ '%.2f'|format(c.total_haber) }}</td>
-            <td class="num">{% if c.saldo_deudor > 0 %}{{ '%.2f'|format(c.saldo_deudor) }}{% endif %}</td>
-            <td class="num">{% if c.saldo_acreedor > 0 %}{{ '%.2f'|format(c.saldo_acreedor) }}{% endif %}</td>
+            <td class="num">{{ '{:,.2f}'.format(c.total_debe) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(c.total_haber) }}</td>
+            <td class="num">{% if c.saldo_deudor > 0 %}{{ '{:,.2f}'.format(c.saldo_deudor) }}{% endif %}</td>
+            <td class="num">{% if c.saldo_acreedor > 0 %}{{ '{:,.2f}'.format(c.saldo_acreedor) }}{% endif %}</td>
           </tr>
           {% else %}
           <tr><td colspan="7" style="text-align:center;padding:2rem;color:#6b7785;">Sin movimientos en el rango seleccionado.</td></tr>
@@ -117,10 +117,10 @@
         <tfoot>
           <tr>
             <td colspan="3" style="text-align:right;">TOTALES:</td>
-            <td class="num">{{ '%.2f'|format(total_debe) }}</td>
-            <td class="num">{{ '%.2f'|format(total_haber) }}</td>
-            <td class="num">{{ '%.2f'|format(total_saldo_deudor) }}</td>
-            <td class="num">{{ '%.2f'|format(total_saldo_acreedor) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(total_debe) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(total_haber) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(total_saldo_deudor) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(total_saldo_acreedor) }}</td>
           </tr>
         </tfoot>
         {% endif %}

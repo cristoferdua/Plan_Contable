@@ -95,17 +95,17 @@
       </div>
       <div class="tot-stat debe">
         <div class="lbl">Total Debe</div>
-        <div class="val">{{ '%.2f'|format(total_debe) }}</div>
+        <div class="val">{{ '{:,.2f}'.format(total_debe) }}</div>
       </div>
       <div class="tot-stat haber">
         <div class="lbl">Total Haber</div>
-        <div class="val">{{ '%.2f'|format(total_haber) }}</div>
+        <div class="val">{{ '{:,.2f}'.format(total_haber) }}</div>
       </div>
       <div class="tot-stat dif">
         <div class="lbl">Diferencia</div>
         {% set dif = total_debe - total_haber %}
         <div class="val {% if dif < 0.01 and dif > -0.01 %}ok{% else %}bad{% endif %}">
-          {{ '%.2f'|format(total_debe - total_haber) }}
+          {{ '{:,.2f}'.format(total_debe - total_haber) }}
         </div>
       </div>
     </div>
@@ -139,16 +139,16 @@
             <td class="cta-code">{{ l.cuenta }}</td>
             <td>{{ l.descripcion }}</td>
             <td style="color:#6b7785;">{{ l.glosa }}</td>
-            <td class="num">{% if l.debe > 0 %}{{ '%.2f'|format(l.debe) }}{% endif %}</td>
-            <td class="num">{% if l.haber > 0 %}{{ '%.2f'|format(l.haber) }}{% endif %}</td>
+            <td class="num">{% if l.debe > 0 %}{{ '{:,.2f}'.format(l.debe) }}{% endif %}</td>
+            <td class="num">{% if l.haber > 0 %}{{ '{:,.2f}'.format(l.haber) }}{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr>
             <td colspan="3" style="text-align:right;">Totales asiento</td>
-            <td class="num">{{ '%.2f'|format(f.sub_debe) }}</td>
-            <td class="num">{{ '%.2f'|format(f.sub_haber) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(f.sub_debe) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(f.sub_haber) }}</td>
           </tr>
         </tfoot>
       </table>

@@ -13,6 +13,7 @@
     entidades, cierres, importar
 #}
 <link rel="stylesheet" href="{{ url_for('static', filename='layout.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='sistema.css') }}">
 <div class="app-shell" id="appShell">
   <div class="app-sidebar-backdrop" onclick="document.getElementById('appShell').classList.remove('sidebar-open')"></div>
 
@@ -133,12 +134,15 @@
     </div>
     <div class="app-topbar-actions">
       {% if usuario_actual %}
-      <span class="app-user" title="{{ ROLES.get(usuario_actual.rol, '') }}" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--muted, #6b7785);">
-        <span class="ic sm">person</span> {{ usuario_actual.nombre }}
-        <small style="opacity:.75;">({{ ROLES.get(usuario_actual.rol, usuario_actual.rol) }})</small>
+      <span class="app-user" title="{{ ROLES.get(usuario_actual.rol, '') }}">
+        <span class="app-user-avatar" aria-hidden="true">{{ (usuario_actual.nombre or usuario_actual.username or '?')[:1]|upper }}</span>
+        <span class="app-user-text">
+          <span class="app-user-name">{{ usuario_actual.nombre }}</span>
+          <span class="app-user-rol">{{ ROLES.get(usuario_actual.rol, usuario_actual.rol) }}</span>
+        </span>
       </span>
-      <a href="/logout" class="app-logout" title="Cerrar sesion" style="display:inline-flex;align-items:center;gap:.25rem;font-size:.8rem;text-decoration:none;color:inherit;padding:.3rem .55rem;border-radius:8px;border:1px solid rgba(127,127,127,.3);">
-        <span class="ic sm">logout</span> Salir
+      <a href="/logout" class="app-logout" title="Cerrar sesion">
+        <span class="ic sm">logout</span> <span class="app-logout-txt">Salir</span>
       </a>
       {% endif %}
       <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
@@ -146,3 +150,27 @@
   </header>
 
   <main class="app-main">
+    {% if not sin_titulo and breadcrumb %}
+    {% set _cab = {
+      'asientos_nuevo': ('edit_note', 'Registra una operacion con partida doble: el Debe debe igualar al Haber.'),
+      'asientos':       ('receipt_long', 'Historial de operaciones agrupadas, con exportacion a Excel y anulacion por reversa.'),
+      'libro_diario':   ('book', 'Asientos en orden cronologico con sus cuentas, glosas y totales.'),
+      'libro_mayor':    ('menu_book', 'Movimientos y saldo de cada cuenta en el periodo elegido.'),
+      'balance':        ('balance', 'Sumas y saldos por cuenta para comprobar que Debe y Haber cuadren.'),
+      'eeff':           ('account_balance', 'Situacion financiera y resultados del ejercicio a partir del PCGE.'),
+      'ple':            ('description', 'Genera los archivos .txt del Libro Diario y Mayor para el PLE de SUNAT.'),
+      'ejercicio':      ('event_available', 'Asientos de destino (clase 9) y cierre del ejercicio contable.'),
+      'importar':       ('upload_file', 'Carga asientos de forma masiva desde una plantilla de Excel.'),
+      'auditoria':      ('history', 'Bitacora de altas, ediciones, anulaciones y cierres, con usuario y fecha.'),
+      'usuarios':       ('manage_accounts', 'Crea usuarios, asigna roles y controla quien puede hacer cada cambio.'),
+      'configuracion':  ('settings', 'Datos de la empresa, tasa de IGV y cuentas de destino.'),
+    } %}
+    {% set _c = _cab.get(active, ('article', '')) %}
+    <header class="page-hero page-head">
+      <div class="hero-icon"><span class="ic">{{ _c[0] }}</span></div>
+      <div>
+        <h1>{{ titulo_pagina or breadcrumb[-1][0] }}</h1>
+        {% if subtitulo_pagina or _c[1] %}<p>{{ subtitulo_pagina or _c[1] }}</p>{% endif %}
+      </div>
+    </header>
+    {% endif %}
