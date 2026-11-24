@@ -68,7 +68,7 @@ Sistema web de contabilidad para empresas peruanas, basado en el **Plan Contable
 | Backend | Python 3.12, Flask 3.1 |
 | ORM y migraciones | SQLAlchemy 2.0, Alembic |
 | Base de datos | SQLite (local) o PostgreSQL (producción) |
-| Frontend | HTML (Jinja2), CSS y JavaScript sin frameworks |
+| Frontend | HTML (Jinja2), CSS y JavaScript sin frameworks; tipografía IBM Plex incluida en el proyecto |
 | Búsqueda de cuentas | RapidFuzz (tolera errores de tipeo) |
 | Excel | openpyxl |
 | Servidor de producción | Gunicorn |
@@ -268,9 +268,11 @@ Plan_Contable/
 │   ├── polish.js          # Desplegable personalizado para todos los <select>
 │   ├── ui.js              # Avisos, confirmaciones y diálogos
 │   ├── dashboard.js       # Gráficos del dashboard
-│   └── *.css              # Estilos (tema claro/oscuro, layout, componentes)
+│   ├── sistema.css        # Sistema visual común: colores, tipografía, cabeceras, modo oscuro
+│   ├── fonts/             # IBM Plex Sans y Mono incluidas (funcionan sin internet)
+│   └── *.css              # Estilos por componente (layout, desplegables, tema)
 ├── templates/             # Vistas Jinja2 (una por pantalla)
-│   └── partials/          # Cabecera, menú lateral y pie comunes
+│   └── partials/          # Menú lateral, barra superior y cabecera de cada pantalla
 ├── respaldos/             # Respaldos automáticos de la base (no se suben a git)
 ├── MANUAL.md              # Manual de usuario
 └── README.md
@@ -344,7 +346,7 @@ pg_dump "$DATABASE_URL" > respaldo_$(date +%Y%m%d).sql
 | `iniciar.bat` dice *"No se encontró Python"* | Instala Python 3.12 marcando **"Add Python to PATH"** y vuelve a abrirlo. |
 | Me equivoqué y quiero volver a un estado anterior | Restaura un archivo de la carpeta `respaldos/` (ver [Respaldos](#respaldos)). |
 | La consulta de RUC o tipo de cambio falla | Revisa la conexión a internet o configura `APIS_NET_PE_TOKEN`. |
-| Los cambios de diseño no se ven | Recarga sin caché con `Ctrl + F5`. |
+| Los cambios de diseño no se ven | Recarga sin caché con `Ctrl + F5`. Si cambiaste plantillas (`templates/`), cierra la ventana negra y vuelve a abrir `iniciar.bat`: las plantillas se cargan al iniciar. Si aún se ve lo anterior, revisa que no quede otra ventana del sistema abierta ocupando el puerto. |
 | `Address already in use` | El puerto está ocupado: cierra la otra instancia o usa `PORT=5001`. |
 | Olvidé la contraseña del administrador | Otro administrador puede cambiarla en **Usuarios**. Si no hay otro, contacta al responsable técnico. |
 
