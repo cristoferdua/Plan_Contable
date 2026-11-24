@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
   <script src="{{ url_for('static', filename='ui.js') }}"></script>
   <script src="{{ url_for('static', filename='polish.js') }}"></script>
+  <script src="{{ url_for('static', filename='plantillas.js') }}"></script>
   <style>
     :root {
       --bg: #f2f5f9;
@@ -419,6 +420,29 @@
     .plantilla-card .ic { display: block; margin-bottom: .4rem; }
     .plantilla-card .tt { font-size: .95rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: .2rem; }
     .plantilla-card .ds { font-size: .75rem; color: var(--muted); line-height: 1.3; }
+    .tpl-grupo { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+                 color: var(--muted); margin: 1rem 0 .45rem; }
+    .nl-box { padding: .8rem; border: 2px dashed #c5d2e2; border-radius: 10px; background: #f8fbff; }
+    .nl-box label { font-size: .82rem; font-weight: 700; color: var(--primary); display: flex; gap: .3rem; align-items: center; margin-bottom: .35rem; }
+    .nl-box input { width: 100%; padding: .6rem .7rem; font-size: .95rem; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; }
+    .nl-sug { display: block; width: 100%; text-align: left; margin-top: .45rem; padding: .55rem .7rem; border: 1px solid var(--border);
+              border-radius: 8px; background: #fff; cursor: pointer; font-family: inherit; }
+    .nl-sug:hover, .nl-sug:focus { border-color: var(--accent); background: #fff8f0; }
+    .nl-sug .tt { font-weight: 700; color: var(--primary); }
+    .nl-sug .det { font-size: .75rem; color: var(--muted); margin-top: .15rem; }
+    .nl-conf { font-size: .65rem; font-weight: 700; padding: .05rem .4rem; border-radius: 99px; margin-left: .35rem; }
+    .nl-conf.alta { background: #e8f6ee; color: #1e8449; } .nl-conf.media { background: #fff4e0; color: #b9770e; }
+    .nl-conf.baja { background: #eef1f5; color: #4a5568; }
+    .plantilla-card.propia { position: relative; }
+    .plantilla-card .del { position: absolute; top: .35rem; right: .45rem; color: var(--muted); font-size: 1rem; }
+    .plantilla-card .del:hover { color: var(--danger); }
+    .plantilla-preview .pp-why { font-size: .7rem; color: var(--muted); font-style: italic; margin: -.05rem 0 .25rem 0; }
+    .plantilla-preview .pp-nom { color: var(--text); }
+    .plantilla-preview .pp-bad { color: var(--danger); font-weight: 700; }
+    .plantilla-preview .pp-notas { margin-top: .6rem; padding: .5rem .6rem; background: #fff8e1; border-radius: 6px; color: #7a4d00; }
+    .plantilla-preview .pp-notas li { margin: .15rem 0; }
+    .plantilla-preview .pp-tot { display: flex; justify-content: space-between; font-weight: 700; border-top: 1px solid #c5d2e2;
+                                 margin-top: .2rem; padding-top: .2rem; font-variant-numeric: tabular-nums; }
     .plantilla-layout {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -570,20 +594,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div style="display:flex;align-items:center;gap:.6rem;">
-      <a href="javascript:history.back()" class="topbar-back" title="Volver atras" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;color:#fff;text-decoration:none;font-size:.82rem;font-weight:600;display:inline-flex;align-items:center;gap:.25rem;"><span class="ic sm">arrow_back</span> Volver</a>
-      <h1 style="margin:0;display:flex;align-items:center;gap:.5rem;"><span class="ic">edit_note</span> Libro Diario &mdash; Nuevo asiento</h1>
-    </div>
-    <nav>
-      <a href="/dashboard" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">dashboard</span> Dashboard</a>
-      <a href="/" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">home</span> Inicio</a>
-      <a href="/asientos" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">receipt_long</span> Asientos</a>
-      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
-    </nav>
-  </header>
-
-  <main class="wrap">
+  {% set active = 'asientos_nuevo' %}
+  {% set breadcrumb = [('Operaciones',''), ('Nuevo asiento','')] %}
+  {% include 'partials/shell_open.html' %}
     <div id="errores" class="errores" style="display:none;"></div>
     <div id="draft-banner-slot"></div>
 
@@ -649,8 +662,13 @@
               <label for="tipo_cambio">Tipo de cambio</label>
               <span class="help-ic" data-tip="Cuantos soles vale 1 dolar hoy segun SUNAT. Solo se usa si la moneda es USD.">?</span>
             </div>
-            <input type="text" id="tipo_cambio" inputmode="decimal" value="1" placeholder="1.0000">
-            <div class="field-hint">Solo si vendes en USD. En PEN se queda en 1.</div>
+            <div style="display:flex;gap:.4rem;">
+              <input type="text" id="tipo_cambio" inputmode="decimal" value="1" placeholder="1.0000" style="flex:1;min-width:0;">
+              <button type="button" id="btn-tc" class="btn ghost" style="padding:.45rem .6rem;white-space:nowrap;" title="Traer el tipo de cambio venta publicado por SUNAT para la fecha">
+                <span class="ic sm">currency_exchange</span> SUNAT
+              </button>
+            </div>
+            <div class="field-hint" id="tc-hint">Solo si la operacion es en USD. En PEN se queda en 1.</div>
           </div>
           <div class="field">
             <div class="label-row">
@@ -691,6 +709,84 @@
             <div id="sunat-result" style="display:none;margin-top:.4rem;padding:.5rem .7rem;border-radius:8px;background:#eef3f8;border:1px solid #c9d6e5;font-size:.78rem;line-height:1.35;"></div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="card" id="sunat-card">
+      <div class="card-head">
+        <h2>Comprobante y datos SUNAT</h2>
+        <span class="hint">Necesarios para el Libro Diario 5.1 (PLE) y los registros de compras/ventas (SIRE).</span>
+      </div>
+      <div class="card-body">
+        <div class="cabecera">
+          <div class="field">
+            <div class="label-row">
+              <label for="tipo_comprobante">Tipo de comprobante</label>
+              <span class="help-ic" data-tip="Tabla 10 de SUNAT. Si lo dejas vacio se deduce de la serie (F = factura, B = boleta), pero las notas de credito/debito deben elegirse aqui.">?</span>
+            </div>
+            <select id="tipo_comprobante">
+              <option value="">(deducir de la serie)</option>
+              {% for k, v in tabla_10.items() %}<option value="{{ k }}">{{ k }} - {{ v }}</option>{% endfor %}
+            </select>
+            <div class="field-hint" id="tipo-sugerido"></div>
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="tipo_doc_tercero">Doc. identidad del tercero</label>
+              <span class="help-ic" data-tip="Tabla 2 de SUNAT. Vacio = se deduce: 11 digitos RUC, 8 digitos DNI.">?</span>
+            </div>
+            <select id="tipo_doc_tercero">
+              <option value="">(deducir)</option>
+              {% for k, v in tabla_2.items() %}<option value="{{ k }}">{{ k }} - {{ v }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <div class="label-row"><label for="fecha_emision">Fecha de emision</label></div>
+            <input type="date" id="fecha_emision" max="{{ hoy }}">
+            <div class="field-hint">Del comprobante. Vacio = fecha del asiento.</div>
+          </div>
+          <div class="field">
+            <div class="label-row"><label for="fecha_vencimiento">Fecha de vencimiento</label></div>
+            <input type="date" id="fecha_vencimiento">
+          </div>
+          <div class="field">
+            <div class="label-row">
+              <label for="estado_ple">Estado PLE</label>
+              <span class="help-ic" data-tip="1: operacion del periodo. 8: operacion de un periodo anterior que no se anoto. 9: correccion de una operacion de un periodo anterior.">?</span>
+            </div>
+            <select id="estado_ple">
+              <option value="1">1 - Del periodo</option>
+              <option value="8">8 - Periodo anterior no anotada</option>
+              <option value="9">9 - Correccion de periodo anterior</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="cabecera" id="ref-box" style="display:none;margin-top:.8rem;padding-top:.8rem;border-top:1px dashed rgba(127,127,127,.35);">
+          <div class="field">
+            <div class="label-row"><label for="ref_tipo_comprobante">Comprobante que modifica</label></div>
+            <select id="ref_tipo_comprobante">
+              <option value="">--</option>
+              {% for k, v in tabla_10.items() %}<option value="{{ k }}">{{ k }} - {{ v }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field"><div class="label-row"><label for="ref_serie">Serie</label></div><input type="text" id="ref_serie" maxlength="20" placeholder="F001"></div>
+          <div class="field"><div class="label-row"><label for="ref_numero">Numero</label></div><input type="text" id="ref_numero" maxlength="20" placeholder="1234"></div>
+          <div class="field"><div class="label-row"><label for="ref_fecha">Fecha</label></div><input type="date" id="ref_fecha" max="{{ hoy }}"></div>
+        </div>
+
+        <details style="margin-top:.8rem;" id="det-tributos">
+          <summary style="cursor:pointer;font-weight:600;font-size:.85rem;">Detraccion, retencion y percepcion</summary>
+          <div class="cabecera" style="margin-top:.6rem;">
+            <div class="field"><div class="label-row"><label for="detraccion_monto">Monto detraccion (S/)</label></div><input type="text" id="detraccion_monto" inputmode="decimal" placeholder="0.00"></div>
+            <div class="field"><div class="label-row"><label for="detraccion_constancia">N&deg; constancia deposito</label></div><input type="text" id="detraccion_constancia" maxlength="30"></div>
+            <div class="field"><div class="label-row"><label for="detraccion_fecha">Fecha constancia</label></div><input type="date" id="detraccion_fecha" max="{{ hoy }}"></div>
+            <div class="field"><div class="label-row"><label for="percepcion_monto">Percepcion (S/)</label></div><input type="text" id="percepcion_monto" inputmode="decimal" placeholder="0.00"></div>
+            <div class="field" style="justify-content:flex-end;">
+              <label style="display:flex;gap:.45rem;align-items:center;font-size:.85rem;"><input type="checkbox" id="sujeto_retencion"> Sujeto a retencion del IGV</label>
+            </div>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -742,6 +838,7 @@
         <button type="button" class="btn ghost" id="btn-add-titulo">+ Titulo (nivel 2-3)</button>
         <button type="button" class="btn ghost" id="btn-cuadrar">Cuadrar ultima linea</button>
         <button type="button" class="btn ghost" id="btn-limpiar">Limpiar</button>
+        <button type="button" class="btn ghost" id="btn-guardar-plantilla" title="Guarda estas lineas como plantilla reutilizable"><span class="ic sm">bookmark_add</span> Guardar como plantilla</button>
         <span class="spacer"></span>
         <span id="estado" class="estado muted">Agrega al menos dos lineas de cuenta.</span>
         <button type="button" class="btn secondary" id="btn-guardar-otro" disabled>Guardar y crear otro</button>
@@ -758,7 +855,7 @@
         <textarea id="glosa" rows="2" maxlength="500" placeholder="Ej: Por aumento de capital de Jose Perez"></textarea>
       </div>
     </section>
-  </main>
+  {% include 'partials/shell_close.html' %}
 
   <div id="modal-plantillas" class="modal-backdrop" hidden>
     <div class="modal" role="dialog" aria-modal="true">
@@ -767,67 +864,18 @@
         <button type="button" class="modal-close" id="modal-close" aria-label="Cerrar">&times;</button>
       </div>
       <div class="modal-body" id="modal-body">
-        <div class="plantillas-grid" id="plantillas-grid">
-          <button type="button" class="plantilla-card" data-tpl="venta">
-            <span class="ic xl" style="color:#1e8449;">point_of_sale</span>
-            <span class="tt">Venta con IGV</span>
-            <span class="ds">Factura o boleta: cobras al cliente, declaras IGV y registras tu venta.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="venta_sin_igv">
-            <span class="ic xl" style="color:#1e8449;">sell</span>
-            <span class="tt">Venta SIN IGV (RUS/exonerada)</span>
-            <span class="ds">Boleta sin IGV o regimen RUS. Solo registras lo que vendes.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="compra">
-            <span class="ic xl" style="color:#2c5282;">shopping_cart</span>
-            <span class="tt">Compra con IGV</span>
-            <span class="ds">Compras mercaderia o servicios con factura, usas el IGV como credito fiscal.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="compra_sin_igv">
-            <span class="ic xl" style="color:#2c5282;">inventory_2</span>
-            <span class="tt">Compra SIN IGV</span>
-            <span class="ds">Compra a RUS, boleta o exonerada: no hay IGV que recuperar.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="gasto">
-            <span class="ic xl" style="color:#e67e22;">payments</span>
-            <span class="tt">Pago de gasto / servicio</span>
-            <span class="ds">Luz, agua, alquiler, telefono: pagas y lo registras como gasto.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="cobranza">
-            <span class="ic xl" style="color:#1e8449;">account_balance_wallet</span>
-            <span class="tt">Cobranza de factura</span>
-            <span class="ds">El cliente paga una factura pendiente: entra plata, baja lo que te debian.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="pago_prov">
-            <span class="ic xl" style="color:#c0392b;">credit_card</span>
-            <span class="tt">Pago a proveedor</span>
-            <span class="ds">Pagas una factura pendiente: sale plata, baja lo que debias.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="caja_banco">
-            <span class="ic xl" style="color:#2c5282;">account_balance</span>
-            <span class="tt">Deposito caja a banco</span>
-            <span class="ds">Mueves efectivo de caja al banco (o del banco a caja).</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="prestamo">
-            <span class="ic xl" style="color:#7c4a0f;">request_quote</span>
-            <span class="tt">Prestamo bancario</span>
-            <span class="ds">El banco te presta dinero: entra plata y queda una deuda.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="planilla">
-            <span class="ic xl" style="color:#5b4b8a;">groups</span>
-            <span class="tt">Planilla / sueldos</span>
-            <span class="ds">Registras los sueldos del mes como gasto por pagar al trabajador.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="nota_credito">
-            <span class="ic xl" style="color:#c0392b;">keyboard_return</span>
-            <span class="tt">Devolucion de venta</span>
-            <span class="ds">Nota de credito: el cliente devuelve mercaderia o le haces un descuento.</span>
-          </button>
-          <button type="button" class="plantilla-card" data-tpl="capital">
-            <span class="ic xl" style="color:#2c5282;">corporate_fare</span>
-            <span class="tt">Aporte de capital</span>
-            <span class="ds">El dueno o socio aporta dinero al negocio (entra a caja o banco).</span>
-          </button>
+        <div id="plantillas-grid">
+          <div class="nl-box">
+            <label for="nl-input"><span class="ic sm">auto_awesome</span> Describe la operacion con tus palabras</label>
+            <input type="text" id="nl-input" autocomplete="off" spellcheck="false"
+                   placeholder="Ej: compre una camioneta en 120 mil al credito / pague la luz 150 / planilla 8500">
+            <div id="nl-sugerencias"></div>
+          </div>
+          <div id="mis-plantillas-wrap" hidden>
+            <div class="tpl-grupo">Plantillas de mi empresa</div>
+            <div class="plantillas-grid" id="mis-plantillas"></div>
+          </div>
+          <div id="tarjetas-wrap"></div>
         </div>
         <div id="plantilla-form-wrap" hidden></div>
       </div>
@@ -875,6 +923,66 @@
       var sunatResultEl = document.getElementById('sunat-result');
       var razonSocialTercero = '';
       var guardando = false;
+
+      // ===== Datos SUNAT del comprobante =====
+      var motivoEdicion = null;
+      var SUNAT_IDS = ['tipo_comprobante', 'tipo_doc_tercero', 'fecha_emision', 'fecha_vencimiento', 'estado_ple',
+        'ref_tipo_comprobante', 'ref_serie', 'ref_numero', 'ref_fecha',
+        'detraccion_monto', 'detraccion_constancia', 'detraccion_fecha', 'percepcion_monto'];
+      function sunatExtra() {
+        var o = {};
+        SUNAT_IDS.forEach(function (id) {
+          var el = document.getElementById(id);
+          o[id] = el ? (el.value || '').trim() : '';
+        });
+        o.sujeto_retencion = !!document.getElementById('sujeto_retencion').checked;
+        return o;
+      }
+      function tipoDesdeSerie(doc) {
+        var d = (doc || '').trim().toUpperCase();
+        if (!d) return '';
+        if (/^(FC|BC)/.test(d) || d.slice(0, 3).indexOf('NC') >= 0) return '07';
+        if (/^(FD|BD)/.test(d) || d.slice(0, 3).indexOf('ND') >= 0) return '08';
+        if (/^E001/.test(d)) return '02';
+        if (/^F/.test(d)) return '01';
+        if (/^B/.test(d)) return '03';
+        return '00';
+      }
+      function syncSunatUI() {
+        var tipoEl = document.getElementById('tipo_comprobante');
+        var tipo = tipoEl.value || tipoDesdeSerie(documentoEl.value);
+        document.getElementById('ref-box').style.display = (tipo === '07' || tipo === '08') ? '' : 'none';
+        var hint = document.getElementById('tipo-sugerido');
+        if (!tipoEl.value && documentoEl.value.trim()) {
+          var opt = tipoEl.querySelector('option[value="' + tipo + '"]');
+          hint.textContent = 'Se usara: ' + (opt ? opt.textContent : tipo);
+        } else {
+          hint.textContent = '';
+        }
+        var esMe = monedaEl.value !== 'PEN';
+        document.getElementById('tc-hint').textContent = esMe
+          ? 'Montos del detalle en ' + monedaEl.value + '; se convierten a soles con este T.C. (SUNAT venta).'
+          : 'Solo si la operacion es en USD. En PEN se queda en 1.';
+      }
+      document.getElementById('tipo_comprobante').addEventListener('change', syncSunatUI);
+      documentoEl.addEventListener('input', syncSunatUI);
+      monedaEl.addEventListener('change', syncSunatUI);
+      document.getElementById('btn-tc').addEventListener('click', function () {
+        if (monedaEl.value === 'PEN') { UI.info('El tipo de cambio solo se usa en operaciones en moneda extranjera.', 'Moneda PEN'); return; }
+        var f = document.getElementById('fecha_emision').value || fechaEl.value;
+        fetch('/tipo-cambio?fecha=' + encodeURIComponent(f))
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.ok) {
+              tcEl.value = d.venta;
+              tcEl.dispatchEvent(new Event('input'));
+              UI.success('T.C. venta SUNAT del ' + d.fecha + ': ' + d.venta, 'Tipo de cambio');
+            } else {
+              UI.warning(d.error || 'No disponible', 'Tipo de cambio');
+            }
+          })
+          .catch(function () { UI.error('No se pudo consultar el tipo de cambio.', 'Sin conexion'); });
+      });
 
       function pintarSunat(res) {
         if (!res || !res.ok) {
@@ -1088,7 +1196,7 @@
           '<td class="orden c"></td>' +
           '<td class="celda-cuenta">' +
             '<div class="cuenta-box">' +
-              '<input class="in-cuenta cell-input" type="text" autocomplete="off" spellcheck="false" placeholder="' + (esTitulo ? 'Buscar titulo nivel 2-3' : 'Buscar cuenta nivel 4-5') + '">' +
+              '<input class="in-cuenta cell-input" type="text" autocomplete="off" spellcheck="false" placeholder="' + (esTitulo ? 'Buscar titulo nivel 2-3' : 'Buscar cuenta (ej: 4212, 417, vehiculo)') + '">' +
               '<div class="suggest" hidden></div>' +
             '</div>' +
             '<div class="desc-cuenta"></div>' +
@@ -1141,7 +1249,7 @@
         function aplicar(item) {
           cuenta.value = item.codigo;
           tr.dataset.codigo = item.codigo;
-          tr.dataset.nivel = String(item.nivel);
+          tr.dataset.nivel = String(item.nivel); tr.dataset.mov = item.movimiento ? '1' : '0';
           tr.dataset.validado = '1';
           descEl.textContent = item.descripcion;
           descEl.title = item.descripcion;
@@ -1393,8 +1501,8 @@
                 msg = 'Falta la cuenta.';
               } else if (!validado) {
                 msg = 'Selecciona la cuenta desde la lista.';
-              } else if (!(nivel >= 4 && nivel <= 5)) {
-                msg = 'La cuenta debe ser de nivel 4 o 5.';
+              } else if (!(nivel >= 4 && nivel <= 5) && tr.dataset.mov !== '1') {
+                msg = 'La cuenta debe ser de nivel 4-5 o no tener subcuentas.';
               } else if (!isFinite(debe) || !isFinite(haber)) {
                 msg = 'Monto invalido.';
               } else if (debe <= 0 && haber <= 0) {
@@ -1694,61 +1802,66 @@
 
         ocultarErrores();
         setGuardando(true);
-        var ids = [];
-        function enviar(i) {
-          if (i >= orden.length) {
-            window._plantillaMulti = null;
-            if (window.limpiarBorradorActual) window.limpiarBorradorActual();
-            UI.success(ids.length + ' asientos guardados correctamente.', 'Operacion completa');
-            setTimeout(function () {
-              if (modo === 'otro') window.location.href = '/asientos/nuevo';
-              else window.location.href = '/asientos/' + ids[0];
-            }, 700);
-            return;
-          }
-          var b = orden[i];
+        var extra = sunatExtra();
+        var asientosPayload = orden.map(function (b, i) {
           var glosaBloque = (info[Number(b)] && info[Number(b)].glosa) || glosaEl.value.trim();
-          var correlativo = meta.numero_correlativo ? (meta.numero_correlativo + '-' + (i + 1)) : '';
-          fetch('/asientos', {
+          return Object.assign({
+            fecha: meta.fecha,
+            glosa: glosaBloque,
+            moneda: meta.moneda,
+            tipo_cambio: meta.tipo_cambio,
+            codigo_libro: meta.codigo_libro,
+            numero_correlativo: meta.numero_correlativo ? (meta.numero_correlativo + '-' + (i + 1)) : '',
+            numero_documento: meta.numero_documento,
+            ruc_tercero: meta.ruc_tercero,
+            razon_social_tercero: meta.razon_social_tercero,
+            lineas: grupos[b]
+          }, extra);
+        });
+        function enviarLote(confirmarDuplicado) {
+          fetch('/asientos/lote', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fecha: meta.fecha,
-              glosa: glosaBloque,
-              moneda: meta.moneda,
-              tipo_cambio: meta.tipo_cambio,
-              codigo_libro: meta.codigo_libro,
-              numero_correlativo: correlativo,
-              numero_documento: meta.numero_documento,
-              ruc_tercero: meta.ruc_tercero,
-              razon_social_tercero: meta.razon_social_tercero,
-              lineas: grupos[b]
-            })
+            body: JSON.stringify({ asientos: asientosPayload, confirmar_duplicado: !!confirmarDuplicado })
           }).then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
             .then(function (out) {
               if (out.status === 200 && out.body.ok) {
-                ids.push(out.body.id);
-                enviar(i + 1);
-              } else {
-                var errs = (out.body.errores || [out.body.error || 'Error']).map(function (e) {
-                  return 'Asiento ' + (i + 1) + ': ' + e;
+                var ids = out.body.ids || [];
+                window._plantillaMulti = null;
+                if (window.limpiarBorradorActual) window.limpiarBorradorActual();
+                UI.success(ids.length + ' asientos guardados como una sola operacion.', 'Operacion completa');
+                setTimeout(function () {
+                  if (modo === 'otro') window.location.href = '/asientos/nuevo';
+                  else window.location.href = '/asientos/' + ids[0];
+                }, 700);
+              } else if (out.status === 409 && out.body.duplicado) {
+                confirmarDuplicadoUI(out.body).then(function (ok) {
+                  if (ok) enviarLote(true); else setGuardando(false);
                 });
-                if (ids.length) {
-                  errs.unshift('Se guardaron ' + ids.length + ' asiento(s) antes del error. IDs: ' + ids.join(', '));
-                }
-                mostrarErrores(errs);
+              } else {
+                // El backend es atomico: si hay error no se guardo ningun asiento.
+                mostrarErrores((out.body.errores || [out.body.error || 'Error']).concat(['No se guardo ningun asiento de la operacion.']));
                 setGuardando(false);
               }
             })
             .catch(function () {
-              mostrarErrores(['Error de red al guardar el asiento ' + (i + 1) + '.']);
+              mostrarErrores(['Error de red al guardar la operacion. Revisa el listado antes de reintentar.']);
               setGuardando(false);
             });
         }
-        enviar(0);
+        enviarLote(false);
       }
 
-      function guardar(modo) {
+      function confirmarDuplicadoUI(body) {
+        var msg = (body.errores || []).join(' ') +
+          ' Si es otra compra/venta distinta con el mismo numero, puedes continuar; si no, cancela para evitar registrarla dos veces.';
+        return UI.confirm({
+          type: 'warning', icon: 'content_copy', title: 'Comprobante ya registrado',
+          msg: msg, confirmText: 'Registrar de todos modos', cancelText: 'Cancelar'
+        });
+      }
+
+      function guardar(modo, confirmarDup) {
         // Si hay plantilla multi-bloque cargada, dividir y enviar N asientos.
         if (window._plantillaMulti && window._plantillaMulti.length > 1) {
           guardarMultiBloques(modo);
@@ -1788,14 +1901,25 @@
           }
         }
 
+        if (EDITAR && motivoEdicion === null) {
+          UI.prompt({
+            type: 'warning', icon: 'edit_note', title: 'Motivo de la modificacion',
+            msg: 'La edicion queda registrada en la auditoria con los datos anteriores y los nuevos. Indica brevemente el motivo.',
+            placeholder: 'Ej: se corrigio la cuenta de gasto', minLength: 5, confirmText: 'Guardar cambios'
+          }).then(function (m) {
+            if (m) { motivoEdicion = m; guardar(modo); }
+          });
+          return;
+        }
         ocultarErrores();
         setGuardando(true);
         var url = EDITAR ? '/asientos/' + EDITAR.id : '/asientos';
         var method = EDITAR ? 'PUT' : 'POST';
+        var dupFlags = EDITAR ? {} : { verificar_duplicado: true, confirmar_duplicado: !!confirmarDup };
         fetch(url, {
           method: method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: JSON.stringify(Object.assign({
             fecha: fechaEl.value,
             glosa: glosaEl.value.trim(),
             moneda: monedaEl.value,
@@ -1806,7 +1930,7 @@
             ruc_tercero: (rucEl.value || '').trim(),
             razon_social_tercero: razonSocialTercero,
             lineas: lineas
-          })
+          }, sunatExtra(), dupFlags, EDITAR ? { motivo: motivoEdicion } : {}))
         })
         .then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
         .then(function (out) {
@@ -1816,6 +1940,10 @@
             setTimeout(function () {
               window.location.href = modo === 'otro' ? '/asientos/nuevo' : '/asientos/' + out.body.id;
             }, 600);
+          } else if (out.status === 409 && out.body.duplicado) {
+            confirmarDuplicadoUI(out.body).then(function (ok) {
+              if (ok) guardar(modo, true); else setGuardando(false);
+            });
           } else {
             mostrarErrores(out.body.errores || [out.body.error || 'Error desconocido']);
             setGuardando(false);
@@ -1908,396 +2036,11 @@
       var modalTitulo = document.getElementById('modal-titulo');
       var plantillaActual = null;
 
-      var PLANTILLAS = {
-        venta: {
-          nombre: 'Venta con IGV',
-          campos: [
-            { id: 'numero_documento', label: 'N° comprobante emitido (serie-numero)', tipo: 'text', req: true, placeholder: 'F001-2559 o B001-4588' },
-            { id: 'base', label: 'Base imponible (sin IGV)', tipo: 'num', req: true, placeholder: '1000.00' },
-            { id: 'forma', label: 'Como te paga el cliente?', tipo: 'select', opts: [
-              { v: 'contado', t: 'Al contado (100% ya)' },
-              { v: 'credito', t: 'Al credito (100% despues)' },
-              { v: 'mixto', t: 'Mixto (parte contado, parte credito)' }
-            ]},
-            { id: 'medio', label: 'Donde entra el pago?', tipo: 'select', showIf: { forma: ['contado', 'mixto'] }, opts: [
-              { v: 'efectivo', t: 'Caja (efectivo)' },
-              { v: 'banco', t: 'Banco (deposito)' }
-            ]},
-            { id: 'pct_contado', label: '% cobrado al contado (resto queda al credito)', tipo: 'num', showIf: { forma: 'mixto' }, placeholder: '40' },
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Venta segun factura F001-...' }
-          ],
-          build: function (d) {
-            var base = d.base, igv = round2(base * IGV_RATE), total = round2(base + igv);
-            var medio = d.medio === 'banco' ? '1041' : '1011';
-            var g = d.glosa || 'Venta con IGV';
-            var asientos = [];
-
-            // Asiento 1: Provision (siempre)
-            asientos.push({
-              glosa: '1) Provision - ' + g,
-              lineas: [
-                { codigo: '1212', debe: total, haber: 0, g: g },
-                { codigo: '4011', debe: 0, haber: igv, g: 'IGV por pagar' },
-                { codigo: '7011', debe: 0, haber: base, g: g }
-              ]
-            });
-
-            // Asiento 2: Cancelacion (contado 100% o parcial mixto)
-            var cobrar = 0;
-            var sufijoMixto = '';
-            if (d.forma === 'contado') cobrar = total;
-            else if (d.forma === 'mixto') {
-              var pct = Number(d.pct_contado) || 0;
-              cobrar = round2(total * pct / 100);
-              var pctCred = round2(100 - pct);
-              var queda = round2(total - cobrar);
-              sufijoMixto = ' [MIXTO: ' + pct + '% contado S/ ' + money(cobrar) +
-                            ' - ' + pctCred + '% credito S/ ' + money(queda) + ']';
-            }
-            if (cobrar > 0) {
-              asientos.push({
-                glosa: '2) Cancelacion ' + (d.forma === 'mixto' ? 'parcial ' : '') + '- ' + g + sufijoMixto,
-                lineas: [
-                  { codigo: medio, debe: cobrar, haber: 0, g: d.forma === 'mixto' ? ('Cobro ' + pct + '% al contado') : g },
-                  { codigo: '1212', debe: 0, haber: cobrar, g: g }
-                ]
-              });
-            }
-            // Si es mixto, anotar tambien el porcentaje en la glosa de la provision
-            if (d.forma === 'mixto' && sufijoMixto) {
-              asientos[0].glosa = asientos[0].glosa + sufijoMixto;
-            }
-            return { asientos: asientos };
-          }
-        },
-        compra: {
-          nombre: 'Compra con IGV',
-          campos: [
-            { id: 'numero_documento', label: 'N° comprobante del proveedor (serie-numero)', tipo: 'text', req: true, placeholder: 'F001-1234 o B001-4589' },
-            { id: 'base', label: 'Base imponible (sin IGV)', tipo: 'num', req: true, placeholder: '1000.00' },
-            { id: 'tipo', label: 'Que compraste?', tipo: 'select', opts: [
-              { v: 'mercaderia', t: 'Mercaderia (para revender)' },
-              { v: 'activo', t: 'Activo fijo (laptop, camioneta...)' },
-              { v: 'servicio', t: 'Servicio (publicidad, etc.)' }
-            ]},
-            { id: 'forma', label: 'Como pagas?', tipo: 'select', opts: [
-              { v: 'contado', t: 'Al contado (100% ya)' },
-              { v: 'credito', t: 'Al credito (100% despues)' },
-              { v: 'mixto', t: 'Mixto (parte contado, parte credito)' }
-            ]},
-            { id: 'medio', label: 'Con que pagas?', tipo: 'select', showIf: { forma: ['contado', 'mixto'] }, opts: [
-              { v: 'efectivo', t: 'Caja (efectivo)' },
-              { v: 'banco', t: 'Banco (transferencia)' }
-            ]},
-            { id: 'pct_contado', label: '% pagado al contado (resto queda al credito)', tipo: 'num', showIf: { forma: 'mixto' }, placeholder: '40' },
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Compra segun factura F001-...' }
-          ],
-          build: function (d) {
-            var base = d.base, igv = round2(base * IGV_RATE), total = round2(base + igv);
-            var cuentaCompra = d.tipo === 'servicio' ? '6361' :
-                                d.tipo === 'activo' ? '3361' : '6011';
-            var cuentaDestino = d.tipo === 'servicio' ? '9411' :
-                                 d.tipo === 'activo' ? null : '2011';
-            var cuentaVariacion = d.tipo === 'servicio' ? '7911' : '6111';
-            var medio = d.medio === 'banco' ? '1041' : '1011';
-            var g = d.glosa || 'Compra con IGV';
-            var asientos = [];
-
-            // Asiento 1: Provision
-            asientos.push({
-              glosa: '1) Provision - ' + g,
-              lineas: [
-                { codigo: cuentaCompra, debe: base, haber: 0, g: g },
-                { codigo: '40111', debe: igv, haber: 0, g: 'IGV credito fiscal' },
-                { codigo: '4212', debe: 0, haber: total, g: g }
-              ]
-            });
-
-            // Asiento 2: Destino (mercaderia o servicio)
-            if (cuentaDestino) {
-              asientos.push({
-                glosa: '2) Destino - ' + g,
-                lineas: [
-                  { codigo: cuentaDestino, debe: base, haber: 0, g: g },
-                  { codigo: cuentaVariacion, debe: 0, haber: base, g: g }
-                ]
-              });
-            }
-
-            // Asiento 3: Cancelacion (contado 100% o parcial si mixto)
-            var pagar = 0;
-            var sufijoMixto = '';
-            if (d.forma === 'contado') pagar = total;
-            else if (d.forma === 'mixto') {
-              var pct = Number(d.pct_contado) || 0;
-              pagar = round2(total * pct / 100);
-              var pctCred = round2(100 - pct);
-              var queda = round2(total - pagar);
-              sufijoMixto = ' [MIXTO: ' + pct + '% contado S/ ' + money(pagar) +
-                            ' - ' + pctCred + '% credito S/ ' + money(queda) + ']';
-            }
-            if (pagar > 0) {
-              asientos.push({
-                glosa: (cuentaDestino ? '3' : '2') + ') Cancelacion ' + (d.forma === 'mixto' ? 'parcial ' : '') + '- ' + g + sufijoMixto,
-                lineas: [
-                  { codigo: '4212', debe: pagar, haber: 0, g: g },
-                  { codigo: medio, debe: 0, haber: pagar, g: d.forma === 'mixto' ? ('Pago ' + pct + '% al contado') : g }
-                ]
-              });
-            }
-            // Si es mixto, anotar tambien el porcentaje en la glosa de la provision
-            if (d.forma === 'mixto' && sufijoMixto) {
-              asientos[0].glosa = asientos[0].glosa + sufijoMixto;
-            }
-            return { asientos: asientos };
-          }
-        },
-        gasto: {
-          nombre: 'Pago de gasto / servicio',
-          campos: [
-            { id: 'monto', label: 'Monto total pagado', tipo: 'num', req: true, placeholder: '150.00' },
-            { id: 'tipo', label: 'Que tipo de gasto?', tipo: 'select', opts: [
-              { v: 'luz', t: 'Luz / agua / energia' },
-              { v: 'tel', t: 'Telefono / internet' },
-              { v: 'alq', t: 'Alquiler' },
-              { v: 'otro', t: 'Otros servicios' }
-            ]},
-            { id: 'desde', label: 'De donde pagas?', tipo: 'select', opts: [
-              { v: 'efectivo', t: 'Caja (efectivo)' },
-              { v: 'banco', t: 'Banco (transferencia)' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Recibo luz julio' }
-          ],
-          build: function (d) {
-            var cuentaGasto = d.tipo === 'alq' ? { c: '6352', n: 'Alquileres' } :
-                               d.tipo === 'tel' ? { c: '6364', n: 'Telefono' } :
-                               d.tipo === 'luz' ? { c: '6361', n: 'Energia electrica' } :
-                                                   { c: '6391', n: 'Otros servicios' };
-            var cuentaPago = d.desde === 'banco' ? { c: '1041', n: 'Banco' } : { c: '1011', n: 'Caja' };
-            return {
-              glosa: d.glosa || 'Pago de gasto',
-              lineas: [
-                { codigo: cuentaGasto.c, debe: d.monto, haber: 0, g: d.glosa || '' },
-                { codigo: cuentaPago.c, debe: 0, haber: d.monto, g: d.glosa || '' }
-              ]
-            };
-          }
-        },
-        venta_sin_igv: {
-          nombre: 'Venta SIN IGV',
-          campos: [
-            { id: 'monto', label: 'Monto total vendido', tipo: 'num', req: true, placeholder: '500.00' },
-            { id: 'cobro', label: 'Como cobras?', tipo: 'select', opts: [
-              { v: 'credito', t: 'A credito (cliente debe)' },
-              { v: 'efectivo', t: 'Efectivo (caja)' },
-              { v: 'banco', t: 'Deposito en banco' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Venta segun boleta B001-...' }
-          ],
-          build: function (d) {
-            var cuentaCobro = d.cobro === 'efectivo' ? { c: '1011' } :
-                               d.cobro === 'banco' ? { c: '1041' } : { c: '1212' };
-            return {
-              glosa: d.glosa || 'Venta sin IGV',
-              lineas: [
-                { codigo: cuentaCobro.c, debe: d.monto, haber: 0, g: d.glosa || '' },
-                { codigo: '7011', debe: 0, haber: d.monto, g: d.glosa || '' }
-              ]
-            };
-          }
-        },
-        compra_sin_igv: {
-          nombre: 'Compra SIN IGV',
-          campos: [
-            { id: 'monto', label: 'Monto total', tipo: 'num', req: true, placeholder: '200.00' },
-            { id: 'tipo', label: 'Que compraste?', tipo: 'select', opts: [
-              { v: 'mercaderia', t: 'Mercaderia' },
-              { v: 'servicio', t: 'Servicio' }
-            ]},
-            { id: 'pago', label: 'Como pagas?', tipo: 'select', opts: [
-              { v: 'credito', t: 'A credito (debes al proveedor)' },
-              { v: 'efectivo', t: 'Efectivo (caja)' },
-              { v: 'banco', t: 'Banco' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Compra sin IGV' }
-          ],
-          build: function (d) {
-            var cuentaCompra = d.tipo === 'servicio' ? { c: '6391' } : { c: '6011' };
-            var cuentaPago = d.pago === 'efectivo' ? { c: '1011' } :
-                              d.pago === 'banco' ? { c: '1041' } : { c: '4212' };
-            return {
-              glosa: d.glosa || 'Compra sin IGV',
-              lineas: [
-                { codigo: cuentaCompra.c, debe: d.monto, haber: 0, g: d.glosa || '' },
-                { codigo: cuentaPago.c, debe: 0, haber: d.monto, g: d.glosa || '' }
-              ]
-            };
-          }
-        },
-        cobranza: {
-          nombre: 'Cobranza de factura',
-          campos: [
-            { id: 'monto', label: 'Monto cobrado', tipo: 'num', req: true, placeholder: '1180.00' },
-            { id: 'destino', label: 'Donde entra el dinero?', tipo: 'select', opts: [
-              { v: 'efectivo', t: 'Caja (efectivo)' },
-              { v: 'banco', t: 'Banco' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Cobranza factura F001-...' }
-          ],
-          build: function (d) {
-            var destino = d.destino === 'banco' ? { c: '1041' } : { c: '1011' };
-            return {
-              glosa: d.glosa || 'Cobranza de factura',
-              lineas: [
-                { codigo: destino.c, debe: d.monto, haber: 0, g: d.glosa || '' },
-                { codigo: '1212', debe: 0, haber: d.monto, g: d.glosa || '' }
-              ]
-            };
-          }
-        },
-        pago_prov: {
-          nombre: 'Pago a proveedor',
-          campos: [
-            { id: 'monto', label: 'Monto pagado', tipo: 'num', req: true, placeholder: '1180.00' },
-            { id: 'desde', label: 'De donde pagas?', tipo: 'select', opts: [
-              { v: 'efectivo', t: 'Caja (efectivo)' },
-              { v: 'banco', t: 'Banco' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Pago factura F001-...' }
-          ],
-          build: function (d) {
-            var desde = d.desde === 'banco' ? { c: '1041' } : { c: '1011' };
-            return {
-              glosa: d.glosa || 'Pago a proveedor',
-              lineas: [
-                { codigo: '4212', debe: d.monto, haber: 0, g: d.glosa || '' },
-                { codigo: desde.c, debe: 0, haber: d.monto, g: d.glosa || '' }
-              ]
-            };
-          }
-        },
-        caja_banco: {
-          nombre: 'Deposito caja a banco',
-          campos: [
-            { id: 'monto', label: 'Monto', tipo: 'num', req: true, placeholder: '2000.00' },
-            { id: 'direccion', label: 'Direccion del movimiento', tipo: 'select', opts: [
-              { v: 'cb', t: 'De caja -> a banco (deposito)' },
-              { v: 'bc', t: 'De banco -> a caja (retiro)' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Deposito en BCP' }
-          ],
-          build: function (d) {
-            var deb = d.direccion === 'cb' ? '1041' : '1011';
-            var hab = d.direccion === 'cb' ? '1011' : '1041';
-            return {
-              glosa: d.glosa || 'Movimiento caja/banco',
-              lineas: [
-                { codigo: deb, debe: d.monto, haber: 0, g: d.glosa || '' },
-                { codigo: hab, debe: 0, haber: d.monto, g: d.glosa || '' }
-              ]
-            };
-          }
-        },
-        prestamo: {
-          nombre: 'Prestamo bancario recibido',
-          campos: [
-            { id: 'monto', label: 'Monto del prestamo', tipo: 'num', req: true, placeholder: '10000.00' },
-            { id: 'plazo', label: 'Plazo del prestamo', tipo: 'select', opts: [
-              { v: 'corto', t: 'Corto plazo (menos de 1 ano)' },
-              { v: 'largo', t: 'Largo plazo (mas de 1 ano)' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Prestamo BCP' }
-          ],
-          build: function (d) {
-            var cuentaDeuda = d.plazo === 'largo' ? '4511' : '4511';
-            return {
-              glosa: d.glosa || 'Prestamo bancario',
-              lineas: [
-                { codigo: '1041', debe: d.monto, haber: 0, g: d.glosa || '' },
-                { codigo: cuentaDeuda, debe: 0, haber: d.monto, g: d.glosa || '' }
-              ]
-            };
-          }
-        },
-        planilla: {
-          nombre: 'Planilla / sueldos',
-          campos: [
-            { id: 'bruto', label: 'Total sueldos brutos', tipo: 'num', req: true, placeholder: '3000.00' },
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Planilla mes de ...' }
-          ],
-          build: function (d) {
-            return {
-              glosa: d.glosa || 'Planilla de sueldos',
-              lineas: [
-                { codigo: '6211', debe: d.bruto, haber: 0, g: d.glosa || '' },
-                { codigo: '4031', debe: 0, haber: d.bruto, g: d.glosa || '' }
-              ]
-            };
-          }
-        },
-        nota_credito: {
-          nombre: 'Devolucion de venta (nota de credito)',
-          campos: [
-            { id: 'base', label: 'Base devuelta (sin IGV)', tipo: 'num', req: true, placeholder: '500.00' },
-            { id: 'con_igv', label: 'La venta original tenia IGV?', tipo: 'select', opts: [
-              { v: 'si', t: 'Si (venta con IGV)' },
-              { v: 'no', t: 'No (venta sin IGV)' }
-            ]},
-            { id: 'reembolso', label: 'Como se reembolsa?', tipo: 'select', opts: [
-              { v: 'credito', t: 'Baja cuenta por cobrar al cliente' },
-              { v: 'efectivo', t: 'Devuelves efectivo (caja)' },
-              { v: 'banco', t: 'Transferencia desde banco' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'NC por devolucion de F001-...' }
-          ],
-          build: function (d) {
-            var base = d.base;
-            var igv = d.con_igv === 'si' ? round2(base * IGV_RATE) : 0;
-            var total = round2(base + igv);
-            var reemb = d.reembolso === 'efectivo' ? '1011' :
-                         d.reembolso === 'banco' ? '1041' : '1212';
-            var lineas = [
-              { codigo: '7011', debe: base, haber: 0, g: d.glosa || '' }
-            ];
-            if (igv > 0) lineas.push({ codigo: '4011', debe: igv, haber: 0, g: 'IGV de la NC' });
-            lineas.push({ codigo: reemb, debe: 0, haber: total, g: d.glosa || '' });
-            return { glosa: d.glosa || 'Devolucion de venta', lineas: lineas };
-          }
-        },
-        capital: {
-          nombre: 'Aporte de capital',
-          campos: [
-            { id: 'monto', label: 'Monto aportado', tipo: 'num', req: true, placeholder: '5000.00' },
-            { id: 'destino', label: 'Donde entra el dinero?', tipo: 'select', opts: [
-              { v: 'efectivo', t: 'Caja (efectivo)' },
-              { v: 'banco', t: 'Banco' }
-            ]},
-            { id: 'glosa', label: 'Glosa / detalle', tipo: 'text', placeholder: 'Aporte de capital de Jose Perez' }
-          ],
-          build: function (d) {
-            var medio = d.destino === 'banco' ? '1041' : '1011';
-            var g = d.glosa || 'Aporte de capital';
-            return {
-              asientos: [
-                {
-                  glosa: '1) Compromiso de aporte - ' + g,
-                  lineas: [
-                    { codigo: '1412', debe: d.monto, haber: 0, g: g },
-                    { codigo: '5011', debe: 0, haber: d.monto, g: g }
-                  ]
-                },
-                {
-                  glosa: '2) Cancelacion del aporte - ' + g,
-                  lineas: [
-                    { codigo: medio, debe: d.monto, haber: 0, g: g },
-                    { codigo: '1412', debe: 0, haber: d.monto, g: g }
-                  ]
-                }
-              ]
-            };
-          }
-        }
-      };
+      var EMP_CFG = {{ (emp_cfg or {})|tojson }};
+      var TPL_CTX = { igv: (Number(EMP_CFG.tasa_igv) || 18) / 100, usaClase9: !!EMP_CFG.usa_clase9 };
+      IGV_RATE = TPL_CTX.igv;
+      var PLANTILLAS = Plantillas.crear(TPL_CTX);
+      var plantillaPreset = null;
 
       var modalForm = document.getElementById('modal-plantilla-form');
       var modalFormBody = document.getElementById('modal-form-body');
@@ -2308,6 +2051,7 @@
         modalGrid.hidden = false;
         modalTitulo.textContent = 'Elige el tipo de operacion';
         plantillaActual = null;
+        setTimeout(function () { var n = document.getElementById('nl-input'); if (n) n.focus(); }, 60);
       }
 
       function cerrarModal() {
@@ -2326,7 +2070,7 @@
       }
 
       // Plantillas que involucran un tercero externo con RUC
-      var PLANTILLAS_CON_TERCERO = ['venta', 'venta_sin_igv', 'compra', 'compra_sin_igv', 'gasto', 'cobranza', 'pago_prov', 'nota_credito'];
+      var PLANTILLAS_CON_TERCERO = ['venta', 'compra', 'gasto', 'cobranza', 'pago_prov', 'nota_credito', 'honorarios', 'importacion', 'anticipo'];
 
       // Razon social obtenida al consultar RUC desde la plantilla
       var tplRazonSocial = '';
@@ -2376,14 +2120,79 @@
         });
       }
 
-      function abrirFormularioPlantilla(key) {
+      // Campo "cuenta": busca en el plan contable (/buscar) solo cuentas de movimiento.
+      function initBuscadorCuenta(input) {
+        if (!input) return;
+        var list = document.getElementById(input.id + '-list');
+        var desc = document.getElementById(input.id + '-desc');
+        var timer = null, seq = 0, items = [], idx = -1;
+        function cerrar() { list.hidden = true; idx = -1; }
+        function marcar(i) {
+          idx = i;
+          Array.prototype.forEach.call(list.children, function (el, j) { el.classList.toggle('active', j === i); });
+        }
+        function elegir(r) {
+          input.value = r.codigo;
+          desc.textContent = r.codigo + ' — ' + r.descripcion;
+          desc.className = 'tpl-cuenta-desc ok';
+          cerrar();
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        function describir() {
+          var v = input.value.trim();
+          if (!/^\d{3,6}$/.test(v)) { desc.textContent = v ? 'Elige una cuenta de la lista.' : ''; desc.className = 'tpl-cuenta-desc'; return; }
+          pedirInfoCuentas([v]).then(function () {
+            var i = CUENTA_INFO[v];
+            if (!i || !i.existe) { desc.textContent = 'La cuenta ' + v + ' no existe en el PCGE.'; desc.className = 'tpl-cuenta-desc err'; }
+            else if (!i.movimiento) { desc.textContent = v + ' — ' + i.descripcion + ' (tiene subcuentas: elige una mas detallada)'; desc.className = 'tpl-cuenta-desc err'; }
+            else { desc.textContent = v + ' — ' + i.descripcion; desc.className = 'tpl-cuenta-desc ok'; }
+          });
+        }
+        function buscar() {
+          var q = input.value.trim();
+          if (q.length < 2) { cerrar(); describir(); return; }
+          var mi = ++seq;
+          var url = '/buscar?solo_movimiento=1&q=' + encodeURIComponent(q);
+          if (input.dataset.elemento && !/^\d/.test(q)) url += '&elemento=' + encodeURIComponent(input.dataset.elemento);
+          fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+            if (mi !== seq) return;
+            items = (d.resultados || []).slice(0, 12);
+            list.innerHTML = '';
+            items.forEach(function (r, i) {
+              var el = document.createElement('div');
+              el.className = 'tpl-cuenta-opt';
+              el.innerHTML = '<b>' + escapeHtml(r.codigo) + '</b> ' + escapeHtml(r.descripcion);
+              el.addEventListener('mousedown', function (e) { e.preventDefault(); elegir(r); });
+              el.addEventListener('mouseenter', function () { marcar(i); });
+              list.appendChild(el);
+            });
+            if (!items.length) list.innerHTML = '<div class="tpl-cuenta-vacio">Sin resultados en el plan contable</div>';
+            list.hidden = false;
+            idx = -1;
+          }).catch(function () {});
+          describir();
+        }
+        input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(buscar, 180); });
+        input.addEventListener('keydown', function (e) {
+          if (list.hidden || !items.length) return;
+          if (e.key === 'ArrowDown') { e.preventDefault(); marcar(Math.min(idx + 1, items.length - 1)); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); marcar(Math.max(idx - 1, 0)); }
+          else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); elegir(items[idx]); }
+          else if (e.key === 'Escape') { cerrar(); }
+        });
+        input.addEventListener('blur', function () { setTimeout(cerrar, 120); describir(); });
+        if (input.value) describir();
+      }
+
+      function abrirFormularioPlantilla(key, preset) {
         var tpl = PLANTILLAS[key];
         if (!tpl) return;
         plantillaActual = key;
+        plantillaPreset = preset || null;
         tplRazonSocial = '';
         // Cerrar modal de seleccion y abrir modal del formulario
         cerrarModal();
-        modalTitulo2.textContent = tpl.nombre;
+        modalTitulo2.textContent = (preset && preset._titulo) || tpl.nombre;
         modalForm.hidden = false;
 
         var campos = camposConRuc(tpl, key);
@@ -2400,16 +2209,31 @@
           html += '<div class="field" id="tpl-wrap-' + c.id + '"><label for="tpl-' + c.id + '">' + escapeHtml(c.label) + '</label>';
           if (c.tipo === 'select') {
             html += '<select id="tpl-' + c.id + '" data-custom>';
+            var grupoAbierto = null;
             c.opts.forEach(function (o) {
+              if ((o.g || null) !== grupoAbierto) {
+                if (grupoAbierto) html += '</optgroup>';
+                grupoAbierto = o.g || null;
+                if (grupoAbierto) html += '<optgroup label="' + escapeHtml(grupoAbierto) + '">';
+              }
               html += '<option value="' + escapeHtml(o.v) + '">' + escapeHtml(o.t) + '</option>';
             });
+            if (grupoAbierto) html += '</optgroup>';
             html += '</select>';
+          } else if (c.tipo === 'cuenta') {
+            html += '<div class="tpl-cuenta-wrap" style="position:relative;">' +
+                    '<input type="text" id="tpl-' + c.id + '" autocomplete="off" data-elemento="' + escapeHtml(c.elemento || '') + '" placeholder="' + escapeHtml(c.placeholder || '') + '">' +
+                    '<div class="tpl-cuenta-list" id="tpl-' + c.id + '-list" hidden></div>' +
+                    '<div class="tpl-cuenta-desc" id="tpl-' + c.id + '-desc"></div>' +
+                    '</div>';
           } else if (c.tipo === 'ruc') {
             html += '<div style="display:flex;gap:.4rem;align-items:center;">' +
                     '<input type="text" id="tpl-' + c.id + '" inputmode="numeric" maxlength="11" pattern="[0-9]{11}" placeholder="' + escapeHtml(c.placeholder || '20131312955') + '" style="flex:1;font-family:ui-monospace,Consolas,monospace;letter-spacing:.05em;" value="' + escapeHtml((rucEl.value || '').trim()) + '">' +
                     '<button type="button" id="btn-tpl-sunat" class="btn" style="padding:.5rem .8rem;display:inline-flex;align-items:center;gap:.3rem;background:#2c5282;color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;"><span class="ic sm">verified</span> SUNAT</button>' +
                     '</div>' +
                     '<div id="tpl-sunat-result" style="display:none;margin-top:.4rem;padding:.5rem .7rem;border-radius:8px;font-size:.82rem;"></div>';
+          } else if (c.tipo === 'date') {
+            html += '<input type="date" id="tpl-' + c.id + '" max="' + HOY + '">';
           } else {
             var im = c.tipo === 'num' ? ' inputmode="decimal"' : '';
             html += '<input type="text" id="tpl-' + c.id + '"' + im +
@@ -2421,6 +2245,17 @@
         html += '<div class="plantilla-preview" id="tpl-preview"><em style="color:var(--muted);">Ingresa los datos para ver la vista previa.</em></div>';
         html += '</div>';
         modalFormBody.innerHTML = html;
+
+        // Valores iniciales (tarjeta elegida o frase interpretada)
+        if (preset) {
+          Object.keys(preset).forEach(function (k) {
+            var el = document.getElementById('tpl-' + k);
+            if (!el || preset[k] === undefined || preset[k] === null) return;
+            var v = String(preset[k]);
+            if (el.tagName === 'SELECT' && !el.querySelector('option[value="' + v.replace(/"/g, '') + '"]')) return;
+            el.value = (el.inputMode === 'decimal' && v) ? money(Number(v)) : v;
+          });
+        }
 
         campos.forEach(function (c) {
           var el = document.getElementById('tpl-' + c.id);
@@ -2491,6 +2326,10 @@
           });
         }
 
+        campos.filter(function (c) { return c.tipo === 'cuenta'; }).forEach(function (c) {
+          initBuscadorCuenta(document.getElementById('tpl-' + c.id));
+        });
+
         // Inicializar los selects custom nuevos
         modalFormBody.querySelectorAll('select[data-custom]').forEach(function (sel) {
           if (window.initCustomSelectForElement) window.initCustomSelectForElement(sel);
@@ -2498,6 +2337,7 @@
         if (window.polishInitAll) window.polishInitAll();
 
         aplicarShowIf();
+        actualizarPreview();
 
         var primero = modalFormBody.querySelector('input[inputmode="decimal"], input:not([type="date"]):not(#tpl-ruc), .custom-select-trigger');
         if (primero) setTimeout(function () { primero.focus(); }, 80);
@@ -2535,36 +2375,76 @@
         return { ok: ok, datos: d };
       }
 
-      function actualizarPreview() {
+      // Cache de nombres de cuentas: { codigo: {existe, descripcion, movimiento} }
+      var CUENTA_INFO = {};
+      function pedirInfoCuentas(codigos) {
+        var faltan = codigos.filter(function (c) { return c && !(c in CUENTA_INFO); });
+        if (!faltan.length) return Promise.resolve();
+        return fetch('/cuentas/info?codigos=' + encodeURIComponent(faltan.join(',')))
+          .then(function (r) { return r.json(); })
+          .then(function (d) { Object.keys(d).forEach(function (k) { CUENTA_INFO[k] = d[k]; }); })
+          .catch(function () {});
+      }
+      function resultadoPlantilla() {
         var tpl = PLANTILLAS[plantillaActual];
-        if (!tpl) return;
         var r = leerDatosPlantilla();
+        if (!tpl || !r.ok) return null;
+        var out = tpl.build(r.datos);
+        if (Array.isArray(out)) out = { asientos: out };
+        else if (!out.asientos) out = { asientos: [out] };
+        out.notas = out.notas || [];
+        out.datos = r.datos;
+        if (out.asientos.length === 1) out.asientos[0].glosa = out.asientos[0].glosa.replace(/^1\) (Provision - )?/, '');
+        return out;
+      }
+      function cuentasInvalidas(res) {
+        var malas = [];
+        res.asientos.forEach(function (a) {
+          a.lineas.forEach(function (l) {
+            var info = CUENTA_INFO[l.codigo];
+            if (!info || !info.existe || !info.movimiento) { if (malas.indexOf(l.codigo) < 0) malas.push(l.codigo); }
+          });
+        });
+        return malas;
+      }
+      var previewSeq = 0;
+      function actualizarPreview() {
+        if (!PLANTILLAS[plantillaActual]) return;
         var preview = document.getElementById('tpl-preview');
-        if (!r.ok) {
+        if (!preview) return;
+        var res = resultadoPlantilla();
+        if (!res) {
           preview.innerHTML = '<em style="color:var(--muted);">Ingresa un monto valido para ver la vista previa.</em>';
           return;
         }
-        var resultado = tpl.build(r.datos);
-        var asientos = Array.isArray(resultado) ? resultado :
-                        (resultado.asientos ? resultado.asientos : [resultado]);
-        var html = '';
-        if (asientos.length > 1) {
-          html += '<div style="font-weight:600;margin-bottom:.4rem;color:var(--accent);">Se crearan ' +
-                   asientos.length + ' asientos consecutivos:</div>';
-        } else {
-          html += '<div style="font-weight:600;margin-bottom:.3rem;color:var(--primary);">Se crearan estas lineas:</div>';
-        }
-        asientos.forEach(function (a, i) {
-          if (asientos.length > 1) {
-            html += '<div style="margin-top:.4rem;font-weight:600;color:var(--primary);">' +
-                    escapeHtml(a.glosa) + '</div>';
-          }
-          a.lineas.forEach(function (l) {
-            html += '<div class="pp-line"><span class="cta">' + l.codigo + '</span>' +
-                    '<span>D: ' + money(l.debe) + ' / H: ' + money(l.haber) + '</span></div>';
+        var codigos = [];
+        res.asientos.forEach(function (a) { a.lineas.forEach(function (l) { codigos.push(l.codigo); }); });
+        var seq = ++previewSeq;
+        pedirInfoCuentas(codigos).then(function () {
+          if (seq !== previewSeq) return;
+          var html = res.asientos.length > 1
+            ? '<div style="font-weight:600;margin-bottom:.4rem;color:var(--accent);">Se crearan ' + res.asientos.length + ' asientos:</div>'
+            : '<div style="font-weight:600;margin-bottom:.3rem;color:var(--primary);">Se creara este asiento:</div>';
+          res.asientos.forEach(function (a) {
+            if (res.asientos.length > 1) html += '<div class="pp-section-title">' + escapeHtml(a.glosa.replace(/\s*\[MIXTO:[^\]]*\]/, '')) + '</div>';
+            var td = 0, th = 0;
+            a.lineas.forEach(function (l) {
+              var info = CUENTA_INFO[l.codigo] || {};
+              td += l.debe || 0; th += l.haber || 0;
+              var nombre = info.existe
+                ? '<span class="pp-nom">' + escapeHtml(info.descripcion) + '</span>' + (info.movimiento ? '' : ' <span class="pp-bad">(no acepta montos)</span>')
+                : '<span class="pp-bad">Cuenta no existe</span>';
+              html += '<div class="pp-line"><span><span class="cta">' + escapeHtml(l.codigo) + '</span> ' + nombre + '</span>' +
+                      '<span style="white-space:nowrap;margin-left:.5rem;">' + (l.debe ? 'D ' + money(l.debe) : 'H ' + money(l.haber)) + '</span></div>';
+              if (l.why) html += '<div class="pp-why">' + escapeHtml(l.why) + '</div>';
+            });
+            html += '<div class="pp-tot"><span>Total</span><span>D ' + money(td) + ' / H ' + money(th) + '</span></div>';
           });
+          if (res.notas.length) {
+            html += '<ul class="pp-notas">' + res.notas.map(function (n) { return '<li>' + escapeHtml(n) + '</li>'; }).join('') + '</ul>';
+          }
+          preview.innerHTML = html;
         });
-        preview.innerHTML = html;
       }
 
       function cargarAsientoEnTabla(asiento) {
@@ -2587,7 +2467,7 @@
               var exacto = (d.resultados || []).find(function (r) { return r.codigo === l.codigo; });
               if (exacto) {
                 tr.dataset.codigo = exacto.codigo;
-                tr.dataset.nivel = String(exacto.nivel);
+                tr.dataset.nivel = String(exacto.nivel); tr.dataset.mov = exacto.movimiento ? '1' : '0';
                 tr.dataset.validado = '1';
                 var descEl = tr.querySelector('.desc-cuenta');
                 if (descEl) { descEl.textContent = exacto.descripcion; descEl.title = exacto.descripcion; }
@@ -2599,42 +2479,6 @@
         });
         renumerar();
         recalc();
-      }
-
-      function guardarAsientosEnLote(asientos, metaBase) {
-        // Guarda N asientos consecutivos directamente al backend. Devuelve una promesa.
-        var guardados = [];
-        function siguiente(i) {
-          if (i >= asientos.length) return Promise.resolve(guardados);
-          var a = asientos[i];
-          var payload = {
-            fecha: metaBase.fecha,
-            glosa: a.glosa,
-            moneda: metaBase.moneda,
-            tipo_cambio: metaBase.tipo_cambio,
-            codigo_libro: metaBase.codigo_libro,
-            numero_correlativo: metaBase.numero_correlativo ? (metaBase.numero_correlativo + '-' + (i + 1)) : '',
-            numero_documento: metaBase.numero_documento,
-            ruc_tercero: metaBase.ruc_tercero,
-            razon_social_tercero: metaBase.razon_social_tercero,
-            lineas: a.lineas.map(function (l) {
-              return { cuenta_codigo: l.codigo, glosa_linea: l.g || '', debe: l.debe || 0, haber: l.haber || 0 };
-            })
-          };
-          return fetch('/asientos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          }).then(function (res) { return res.json().then(function (body) { return { status: res.status, body: body }; }); })
-            .then(function (out) {
-              if (out.status === 200 && out.body.ok) {
-                guardados.push(out.body.id);
-                return siguiente(i + 1);
-              }
-              throw new Error((out.body.errores || [out.body.error || 'Error']).join(' / ') + ' (asiento ' + (i + 1) + ')');
-            });
-        }
-        return siguiente(0);
       }
 
       function cargarMultiAsientoEnTabla(asientos) {
@@ -2690,7 +2534,7 @@
               var exacto = (d.resultados || []).find(function (r) { return r.codigo === l.codigo; });
               if (exacto) {
                 tr.dataset.codigo = exacto.codigo;
-                tr.dataset.nivel = String(exacto.nivel);
+                tr.dataset.nivel = String(exacto.nivel); tr.dataset.mov = exacto.movimiento ? '1' : '0';
                 tr.dataset.validado = '1';
                 var descEl = tr.querySelector('.desc-cuenta');
                 if (descEl) { descEl.textContent = exacto.descripcion; descEl.title = exacto.descripcion; }
@@ -2712,6 +2556,18 @@
         var r = leerDatosPlantilla();
         if (!r.ok) {
           UI.warning('Completa todos los campos obligatorios de la plantilla (monto, N° comprobante, etc.).', 'Datos incompletos');
+          return;
+        }
+        var res = resultadoPlantilla();
+        var codigosRes = [];
+        res.asientos.forEach(function (a) { a.lineas.forEach(function (l) { codigosRes.push(l.codigo); }); });
+        if (codigosRes.some(function (c) { return !(c in CUENTA_INFO); })) {
+          pedirInfoCuentas(codigosRes).then(aplicarPlantilla);
+          return;
+        }
+        var malas = cuentasInvalidas(res);
+        if (malas.length) {
+          UI.warning('Estas cuentas no existen o no aceptan montos: ' + malas.join(', ') + '. Corrige la cuenta en la plantilla.', 'Cuenta invalida');
           return;
         }
         // Aplicar fecha seleccionada en la plantilla al editor principal
@@ -2736,9 +2592,8 @@
         if (r.datos.numero_documento) {
           documentoEl.value = r.datos.numero_documento;
         }
-        var resultado = tpl.build(r.datos);
-        var asientos = Array.isArray(resultado) ? resultado :
-                        (resultado.asientos ? resultado.asientos : [resultado]);
+        var asientos = res.asientos;
+        aplicarSunatPlantilla(res.sunat || {}, r.datos);
 
         if (asientos.length === 1) {
           cargarAsientoEnTabla(asientos[0]);
@@ -2749,13 +2604,13 @@
         cerrarModal();
 
         // Advertencia SUNAT: compras/ventas requieren datos del tercero y documento para los Registros 8.1 / 14.1
-        if (plantillaActual === 'compra' || plantillaActual === 'venta') {
+        if (plantillaActual === 'compra' || plantillaActual === 'venta' || plantillaActual === 'nota_credito') {
           var faltantes = [];
           if (!(rucEl.value || '').trim()) faltantes.push('RUC del tercero');
           if (!(razonSocialTercero || '').trim()) faltantes.push('Razon social del tercero');
           if (!documentoEl.value.trim()) faltantes.push('N° documento (ej: F001-1234)');
           if (faltantes.length) {
-            var etiqueta = plantillaActual === 'compra' ? 'Registro de Compras (8.1)' : 'Registro de Ventas (14.1)';
+            var etiqueta = plantillaActual === 'compra' ? 'Registro de Compras' : 'Registro de Ventas';
             UI.warning(
               'Faltan datos obligatorios para el ' + etiqueta + ':\n• ' + faltantes.join('\n• ') +
               '\n\nPuedes guardar igual, pero el asiento NO aparecera en el Registro SUNAT hasta completarlos.',
@@ -2765,6 +2620,152 @@
         }
       }
 
+      // Copia al bloque "Comprobante y datos SUNAT" lo que la plantilla ya sabe
+      function aplicarSunatPlantilla(sunat, datos) {
+        var valores = Object.assign({}, sunat);
+        if (datos.ruc && /^\d{11}$/.test(datos.ruc)) valores.tipo_doc_tercero = '6';
+        if (!valores.fecha_emision) {
+          var f = document.getElementById('tpl-fecha');
+          if (f && f.value && (valores.tipo_comprobante || datos.numero_documento)) valores.fecha_emision = f.value;
+        }
+        Object.keys(valores).forEach(function (k) {
+          var el = document.getElementById(k);
+          if (!el || valores[k] === undefined || valores[k] === null || valores[k] === '') return;
+          el.value = String(valores[k]);
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        if (valores.detraccion_monto || valores.ref_serie) {
+          var det = document.querySelector('#sunat-card details');
+          if (det && valores.detraccion_monto) det.open = true;
+        }
+        if (typeof syncSunatUI === 'function') syncSunatUI();
+      }
+
+      // ---------- Tarjetas agrupadas ----------
+      var tarjetasWrap = document.getElementById('tarjetas-wrap');
+      function renderTarjetas() {
+        var html = '';
+        Plantillas.TARJETAS.forEach(function (g, gi) {
+          html += '<div class="tpl-grupo">' + escapeHtml(g.grupo) + '</div><div class="plantillas-grid">';
+          g.items.forEach(function (it, ii) {
+            html += '<button type="button" class="plantilla-card" data-g="' + gi + '" data-i="' + ii + '">' +
+                    '<span class="ic xl" style="color:' + it.c + ';">' + it.ic + '</span>' +
+                    '<span class="tt">' + escapeHtml(it.t) + '</span><span class="ds">' + escapeHtml(it.ds) + '</span></button>';
+          });
+          html += '</div>';
+        });
+        tarjetasWrap.innerHTML = html;
+        Array.prototype.forEach.call(tarjetasWrap.querySelectorAll('.plantilla-card'), function (btn) {
+          btn.addEventListener('click', function () {
+            var it = Plantillas.TARJETAS[+btn.dataset.g].items[+btn.dataset.i];
+            abrirFormularioPlantilla(it.tpl, Object.assign({ _titulo: it.t }, it.preset || {}));
+          });
+        });
+      }
+      renderTarjetas();
+
+      // ---------- Lenguaje natural ----------
+      var nlInput = document.getElementById('nl-input');
+      var nlSug = document.getElementById('nl-sugerencias');
+      var nlTimer = null;
+      function renderSugerencias() {
+        var lista = Plantillas.interpretar(nlInput.value, TPL_CTX);
+        if (!nlInput.value.trim()) { nlSug.innerHTML = ''; return; }
+        if (!lista.length) {
+          nlSug.innerHTML = '<div style="font-size:.78rem;color:var(--muted);margin-top:.4rem;">No reconoci la operacion. Prueba con "compre...", "vendi...", "pague..." o elige una tarjeta.</div>';
+          return;
+        }
+        nlSug.innerHTML = lista.map(function (c, i) {
+          var tpl = PLANTILLAS[c.tpl];
+          var titulo = c.etiquetas[0] || (tpl && tpl.nombre) || c.tpl;
+          return '<button type="button" class="nl-sug" data-i="' + i + '">' +
+                 '<span class="tt">' + escapeHtml(titulo) + '</span>' +
+                 '<span class="nl-conf ' + c.confianza + '">' + (c.confianza === 'alta' ? 'muy probable' : c.confianza === 'media' ? 'probable' : 'revisar') + '</span>' +
+                 '<div class="det">' + escapeHtml(c.detalles.slice(1).join(' · ')) + '</div></button>';
+        }).join('');
+        Array.prototype.forEach.call(nlSug.querySelectorAll('.nl-sug'), function (b) {
+          b.addEventListener('click', function () {
+            var c = lista[+b.dataset.i];
+            var preset = Object.assign({ _titulo: c.etiquetas[0] || PLANTILLAS[c.tpl].nombre }, c.preset);
+            abrirFormularioPlantilla(c.tpl, preset);
+          });
+        });
+      }
+      nlInput.addEventListener('input', function () { clearTimeout(nlTimer); nlTimer = setTimeout(renderSugerencias, 180); });
+      nlInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          clearTimeout(nlTimer);
+          renderSugerencias();
+          var b = nlSug.querySelector('.nl-sug');
+          if (b) b.click();
+        }
+      });
+
+      // ---------- Plantillas propias de la empresa ----------
+      var misWrap = document.getElementById('mis-plantillas-wrap');
+      var misGrid = document.getElementById('mis-plantillas');
+      var MIS_PLANTILLAS = [];
+      function cargarMisPlantillas() {
+        fetch('/plantillas-propias').then(function (r) { return r.json(); }).then(function (d) {
+          MIS_PLANTILLAS = d.plantillas || [];
+          misWrap.hidden = !MIS_PLANTILLAS.length;
+          misGrid.innerHTML = MIS_PLANTILLAS.map(function (p, i) {
+            return '<button type="button" class="plantilla-card propia" data-i="' + i + '">' +
+                   '<span class="del" data-del="' + p.id + '" title="Borrar plantilla">&times;</span>' +
+                   '<span class="ic xl" style="color:#5b4b8a;">bookmark</span>' +
+                   '<span class="tt">' + escapeHtml(p.nombre) + '</span>' +
+                   '<span class="ds">' + p.lineas.map(function (l) { return l.cuenta_codigo; }).join(' · ') + '</span></button>';
+          }).join('');
+          Array.prototype.forEach.call(misGrid.querySelectorAll('.plantilla-card'), function (btn) {
+            btn.addEventListener('click', function (e) {
+              var p = MIS_PLANTILLAS[+btn.dataset.i];
+              if (e.target.dataset.del) {
+                e.stopPropagation();
+                UI.confirm({ title: 'Borrar plantilla', msg: '¿Borrar la plantilla "' + p.nombre + '"?', type: 'danger' }).then(function (ok) {
+                  if (!ok) return;
+                  fetch('/plantillas-propias/' + p.id, { method: 'DELETE' }).then(cargarMisPlantillas);
+                });
+                return;
+              }
+              cargarAsientoEnTabla({
+                glosa: p.glosa || p.nombre,
+                lineas: p.lineas.map(function (l) {
+                  return { codigo: l.cuenta_codigo, g: l.glosa_linea, debe: Number(l.debe) || 0, haber: Number(l.haber) || 0 };
+                })
+              });
+              cerrarModal();
+              UI.info('Plantilla cargada. Ajusta los montos y la fecha antes de guardar.', p.nombre);
+            });
+          });
+        }).catch(function () {});
+      }
+      cargarMisPlantillas();
+
+      document.getElementById('btn-guardar-plantilla').addEventListener('click', function () {
+        var lineas = [];
+        Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function (tr) {
+          if (tr.dataset.tipo !== 'mov') return;
+          var c = tr.querySelector('.in-cuenta');
+          if (!c || !c.value.trim()) return;
+          var de = tr.querySelector('.in-debe'), ha = tr.querySelector('.in-haber'), gl = tr.querySelector('.in-glosa');
+          lineas.push({ cuenta_codigo: c.value.trim(), glosa_linea: gl ? gl.value : '',
+                        debe: de ? (parseAmount(de.value) || 0) : 0, haber: ha ? (parseAmount(ha.value) || 0) : 0 });
+        });
+        if (lineas.length < 2) { UI.warning('Agrega al menos 2 lineas de cuenta para guardar una plantilla.', 'Sin lineas'); return; }
+        UI.prompt({ title: 'Guardar como plantilla', type: 'info', icon: 'bookmark_add', msg: 'Nombre de la plantilla (ej: Alquiler mensual del local). Se guardan las cuentas y montos actuales.', minLength: 3 })
+          .then(function (nombre) {
+            if (!nombre) return;
+            fetch('/plantillas-propias', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ nombre: nombre, glosa: glosaEl.value, lineas: lineas })
+            }).then(function (r) { return r.json(); }).then(function (d) {
+              if (d.ok) { UI.success('Plantilla guardada. La encontraras en "Usar plantilla".', 'Listo'); cargarMisPlantillas(); }
+              else UI.error(d.error || 'Error', 'No se pudo guardar');
+            });
+          });
+      });
+
       document.getElementById('btn-plantillas').addEventListener('click', abrirModal);
       document.getElementById('modal-close').addEventListener('click', cerrarModal);
       modal.addEventListener('click', function (e) { if (e.target === modal) cerrarModal(); });
@@ -2773,9 +2774,6 @@
       document.getElementById('btn-tpl-volver2').addEventListener('click', volverAPlantillas);
       modalForm.addEventListener('click', function (e) { if (e.target === modalForm) cerrarModalForm(); });
       document.getElementById('btn-tpl-aplicar').addEventListener('click', aplicarPlantilla);
-      Array.prototype.forEach.call(modalGrid.querySelectorAll('.plantilla-card'), function (btn) {
-        btn.addEventListener('click', function () { abrirFormularioPlantilla(btn.dataset.tpl); });
-      });
       document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
         if (!modalForm.hidden) cerrarModalForm();
@@ -2877,7 +2875,7 @@
                 .then(function (d) {
                   var ex = (d.resultados || []).find(function (r) { return r.codigo === l.codigo; });
                   if (ex) {
-                    tr.dataset.nivel = String(ex.nivel);
+                    tr.dataset.nivel = String(ex.nivel); tr.dataset.mov = ex.movimiento ? '1' : '0';
                     var descEl = tr.querySelector('.desc-cuenta');
                     if (descEl) { descEl.textContent = ex.descripcion; descEl.title = ex.descripcion; }
                   }
@@ -2934,6 +2932,7 @@
         });
       }
 
+      setTimeout(syncSunatUI, 0);
       if (EDITAR) {
         // Modo edicion: cargar datos existentes
         fechaEl.value = EDITAR.fecha;
@@ -2946,6 +2945,16 @@
         documentoEl.value = EDITAR.numero_documento;
         rucEl.value = EDITAR.ruc_tercero || '';
         razonSocialTercero = EDITAR.razon_social_tercero || '';
+        if (EDITAR.sunat) {
+          SUNAT_IDS.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el && EDITAR.sunat[id] !== undefined && EDITAR.sunat[id] !== null) el.value = EDITAR.sunat[id];
+          });
+          document.getElementById('sujeto_retencion').checked = !!EDITAR.sunat.sujeto_retencion;
+          if (EDITAR.sunat.detraccion_monto || EDITAR.sunat.percepcion_monto || EDITAR.sunat.sujeto_retencion) {
+            document.getElementById('det-tributos').open = true;
+          }
+        }
         if (rucEl.value && razonSocialTercero) {
           pintarSunat({ ok: true, fuente: 'cache', data: { razon_social: razonSocialTercero, estado: 'ACTIVO', condicion: 'HABIDO' } });
         }
@@ -2975,7 +2984,7 @@
                 var exacto = (d.resultados || []).find(function (r) { return r.codigo === l.cuenta_codigo; });
                 if (exacto) {
                   tr.dataset.codigo = exacto.codigo;
-                  tr.dataset.nivel = String(exacto.nivel);
+                  tr.dataset.nivel = String(exacto.nivel); tr.dataset.mov = exacto.movimiento ? '1' : '0';
                   tr.dataset.validado = '1';
                   var descEl = tr.querySelector('.desc-cuenta');
                   if (descEl) { descEl.textContent = exacto.descripcion; descEl.title = exacto.descripcion; }

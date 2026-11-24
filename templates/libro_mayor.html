@@ -59,20 +59,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div style="display:flex;align-items:center;gap:.6rem;">
-      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
-      <h1><span class="ic">menu_book</span> Libro Mayor</h1>
-    </div>
-    <nav>
-      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
-      <a href="/"><span class="ic sm">home</span> Inicio</a>
-      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
-      <button type="button" class="theme-toggle">dark_mode</button>
-    </nav>
-  </header>
-
-  <main class="wrap">
+  {% set active = 'libro_mayor' %}
+  {% set breadcrumb = [('Reportes',''), ('Libro mayor','')] %}
+  {% include 'partials/shell_open.html' %}
     <form method="get" class="filters-card">
       <div>
         <label>Filtrar por cuenta (codigo o prefijo)</label>
@@ -153,6 +142,6 @@
       <a href="/reportes/libro-mayor" class="empty-cta"><span class="ic sm">refresh</span> Limpiar filtros</a>
     </div>
     {% endif %}
-  </main>
+  {% include 'partials/shell_close.html' %}
 </body>
 </html>

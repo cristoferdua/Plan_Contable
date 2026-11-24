@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <title>Configuracion de la empresa</title>
+  {% include 'partials/page_head.html' %}
+</head>
+<body>
+  {% set active = 'configuracion' %}
+  {% set breadcrumb = [('Mantenimiento',''), ('Configuracion','')] %}
+  {% include 'partials/shell_open.html' %}
+  <div class="card">
+    <h2><span class="ic sm">business</span> Empresa</h2>
+    <p class="sub">El RUC se usa para nombrar los archivos del PLE (LE + RUC + periodo + libro...).</p>
+    <div class="row">
+      <div class="fld"><label>RUC</label><input id="ruc" maxlength="11" inputmode="numeric" value="{{ emp.ruc }}" class="mono"></div>
+      <div class="fld" style="flex:1;"><label>Razon social</label><input id="razon" value="{{ emp.razon_social }}" style="width:100%;"></div>
+      <div class="fld"><label>Tasa de IGV</label>
+        <select id="tasa_igv">
+          <option value="18" {% if emp.tasa_igv == '18' %}selected{% endif %}>18 % (general)</option>
+          <option value="10.5" {% if emp.tasa_igv == '10.5' %}selected{% endif %}>10.5 % (MYPE restaurantes, hoteles)</option>
+        </select>
+      </div>
+    </div>
+    <p class="note">La tasa reducida aplica solo a las MYPE de restaurantes, hoteles y alojamientos turisticos que cumplen los requisitos de la ley; confirmalo con tu contador.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic sm">alt_route</span> Cuentas de la clase 9 (asientos de destino)</h2>
+    <p class="sub">Si la empresa registra gastos por funcion, cada gasto 62-68 se destina a la clase 9 (Debe) contra la 79 (Haber).
+      El asiento de destino se genera por mes desde <a href="/ejercicio">Destino y cierre anual</a>, repartiendo segun estos porcentajes.</p>
+    <label style="display:flex;gap:.5rem;align-items:center;margin-bottom:.8rem;">
+      <input type="checkbox" id="usa9" {% if emp.usa_clase9 %}checked{% endif %}> La empresa usa cuentas de la clase 9
+    </label>
+    <table class="t" style="max-width:520px;">
+      <thead><tr><th>Cuenta (9xxx)</th><th class="num">%</th><th></th></tr></thead>
+      <tbody id="dist"></tbody>
+    </table>
+    <button class="btn" style="margin-top:.6rem;" onclick="agregar('', '')"><span class="ic sm">add</span> Agregar cuenta</button>
+    <p class="note">Ejemplos: 9411 Gastos administrativos, 9511 Gastos de ventas, 9711 Gastos financieros.</p>
+  </div>
+
+  <button class="btn primary" onclick="guardar()"><span class="ic sm">save</span> Guardar configuracion</button>
+  {% include 'partials/shell_close.html' %}
+  <script>
+    var DIST = {{ emp.destino|tojson }};
+    var tbody = document.getElementById('dist');
+    function agregar(cta, pct) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td><input class="d-cta mono" maxlength="5" style="width:110px;padding:.4rem;border-radius:6px;border:1px solid #cbd5e1;"></td>' +
+        '<td class="num"><input class="d-pct" inputmode="decimal" style="width:80px;text-align:right;padding:.4rem;border-radius:6px;border:1px solid #cbd5e1;"></td>' +
+        '<td><button class="btn" type="button">&times;</button></td>';
+      tr.querySelector('.d-cta').value = cta;
+      tr.querySelector('.d-pct').value = pct;
+      tr.querySelector('button').onclick = function () { tr.remove(); };
+      tbody.appendChild(tr);
+    }
+    DIST.forEach(function (d) { agregar(d.cuenta, d.pct); });
+    if (!DIST.length) agregar('9411', 100);
+    function guardar() {
+      var destino = Array.prototype.map.call(tbody.querySelectorAll('tr'), function (tr) {
+        return { cuenta: tr.querySelector('.d-cta').value.trim(), pct: tr.querySelector('.d-pct').value.trim() };
+      });
+      fetch('/configuracion', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ruc: document.getElementById('ruc').value.trim(),
+          razon_social: document.getElementById('razon').value.trim(),
+          usa_clase9: document.getElementById('usa9').checked,
+          tasa_igv: document.getElementById('tasa_igv').value,
+          destino: destino
+        })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok) UI.success('Configuracion guardada.', 'Listo');
+        else UI.error(d.error || 'Error', 'No se pudo guardar');
+      });
+    }
+  </script>
+</body>
+</html>

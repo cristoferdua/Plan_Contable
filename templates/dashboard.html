@@ -7,307 +7,262 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='ui.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
   <script src="{{ url_for('static', filename='ui.js') }}"></script>
   <script src="{{ url_for('static', filename='polish.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>
   <style>
     * { box-sizing: border-box; }
     body { margin:0; background:#f2f5f9; color:#1f2937; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; font-size:14px; }
-    .topbar { background:#1e3a5f; color:#fff; padding:.8rem 1.25rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
-    .topbar h1 { font-size:1rem; margin:0; font-weight:600; display:flex; align-items:center; gap:.5rem; }
-    .topbar nav { display:flex; gap:.4rem; align-items:center; }
-    .topbar a { color:#fff; text-decoration:none; font-size:.82rem; padding:.35rem .6rem; border-radius:8px; background:rgba(255,255,255,.12); display:inline-flex; align-items:center; gap:.3rem; }
-    .topbar a:hover { background:rgba(255,255,255,.24); }
-    .topbar a.cta { background:#e67e22; font-weight:600; }
-    .wrap { max-width:1200px; margin:0 auto; padding:1.4rem; }
-
-    .dash-hero {
-      background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
-      color: #fff;
-      border-radius: 14px;
-      padding: 1.8rem;
-      margin-bottom: 1.4rem;
-      box-shadow: 0 10px 30px rgba(30, 58, 95, .18);
-    }
-    .dash-hero h2 { margin:0 0 .3rem; font-size: 1.4rem; }
-    .dash-hero p { margin:0; opacity: .9; font-size: .9rem; }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-      margin-bottom: 1.4rem;
-    }
-    @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 500px) { .stats-grid { grid-template-columns: 1fr; } }
-
-    .stat-card {
-      background: #fff;
-      border-radius: 14px;
-      padding: 1.4rem;
-      box-shadow: 0 2px 10px rgba(15,23,42,.06);
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      transition: all .22s cubic-bezier(.2,.9,.3,1);
-    }
-    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(15,23,42,.1); }
-    .stat-icon {
-      width: 56px; height: 56px;
-      border-radius: 14px;
-      display:flex; align-items:center; justify-content:center;
-      font-family:'Material Symbols Rounded'; font-size: 1.8rem;
-      flex-shrink: 0;
-    }
-    .stat-icon.c-blue { background: #eaf1fb; color: #2c5282; }
-    .stat-icon.c-green { background: #e8f6ee; color: #1e8449; }
-    .stat-icon.c-orange { background: #fff5e6; color: #e67e22; }
-    .stat-icon.c-purple { background: #f0e6f6; color: #6b4c93; }
-    .stat-body { flex: 1; }
-    .stat-label { font-size: .75rem; color: #6b7785; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: .2rem; }
-    .stat-value { font-size: 1.5rem; font-weight: 800; color: #1f2937; line-height: 1.1; }
-    .stat-sub { font-size: .75rem; color: #6b7785; margin-top: .15rem; }
-
-    .quick-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-    }
-    @media (max-width: 760px) { .quick-grid { grid-template-columns: 1fr; } }
-
-    .quick-link {
-      background: #fff;
-      border-radius: 14px;
-      padding: 1.2rem;
-      text-decoration: none;
-      color: #1f2937;
-      box-shadow: 0 2px 10px rgba(15,23,42,.05);
-      transition: all .22s cubic-bezier(.2,.9,.3,1);
-      display: flex;
-      align-items: center;
-      gap: .8rem;
-    }
-    .quick-link:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(44, 82, 130, .15); border-color: #2c5282; }
-    .quick-link .ic { font-size: 1.8rem; color: #2c5282; }
-    .quick-link strong { display: block; font-size: .95rem; color: #1e3a5f; margin-bottom: .1rem; }
-    .quick-link span.ds { font-size: .78rem; color: #6b7785; }
-
-    .section-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin: 1.6rem 0 .8rem;
-    }
-    .section-head h3 { margin:0; font-size: 1rem; color: #4a5568; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div style="display:flex;align-items:center;gap:.6rem;">
-      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
-      <h1><span class="ic">dashboard</span> Dashboard</h1>
-    </div>
-    <nav>
-      <a href="/"><span class="ic sm">home</span> Inicio</a>
-      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
-      <a href="/reportes/libro-diario"><span class="ic sm">auto_stories</span> Libro Diario</a>
-      <a href="/reportes/libro-mayor"><span class="ic sm">menu_book</span> Libro Mayor</a>
-      <a href="/reportes/balance"><span class="ic sm">balance</span> Balance</a>
-      <a href="/entidades"><span class="ic sm">business</span> Entidades</a>
-      <a href="/importar"><span class="ic sm">upload_file</span> Importar</a>
-      <a href="/cierres"><span class="ic sm">lock</span> Cierres</a>
-      <a href="/asientos/nuevo" class="cta"><span class="ic sm">add</span> Nuevo</a>
-      <button type="button" class="theme-toggle">dark_mode</button>
-    </nav>
-  </header>
+  {% set active = 'dashboard' %}
+  {% set breadcrumb = [('Dashboard','')] %}
+  {% set k = data.kpis %}
+  {% include 'partials/shell_open.html' %}
+  <div class="dash" id="dash">
 
-  <main class="wrap">
-    <div class="dash-hero">
-      <h2>Resumen de tu contabilidad</h2>
-      <p>Vista general de las operaciones del mes de {{ hoy.strftime('%B de %Y') }}.</p>
-    </div>
+    {# ===== HERO + FILTROS ===== #}
+    <section class="dash-hero">
+      <div class="dash-hero-text">
+        <div class="dash-eyebrow">
+          <span class="ic">insights</span>
+          Resumen de {{ data.mes_nombre }} {{ data.year }}
+          {% if data.mes_cerrado %}<span class="dash-pill"><span class="ic">lock</span> Mes cerrado</span>{% endif %}
+        </div>
+        <div class="dash-hero-label">Resultado del mes <small>(ventas − compras)</small></div>
+        <div class="dash-hero-value" data-countup="{{ k.margen.valor }}">S/ {{ '{:,.2f}'.format(k.margen.valor) }}</div>
+        <div class="dash-hero-delta" data-delta data-actual="{{ k.margen.valor }}" data-previo="{{ k.margen.previo }}" data-up-good="1"></div>
+      </div>
+      <div class="dash-hero-side">
+        <form class="dash-filters" method="get" action="/dashboard" id="dashFilters">
+          <label>
+            <span>Mes</span>
+            <select name="month" onchange="this.form.submit()">
+              {% for m in meses %}
+              <option value="{{ loop.index }}" {% if loop.index == data.month %}selected{% endif %}>{{ m|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Año</span>
+            <select name="year" onchange="this.form.submit()">
+              {% for y in years %}
+              <option value="{{ y }}" {% if y == data.year %}selected{% endif %}>{{ y }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% if data.year != hoy.year or data.month != hoy.month %}
+          <a class="dash-btn-ghost" href="/dashboard" title="Volver al mes actual"><span class="ic">today</span> Hoy</a>
+          {% endif %}
+        </form>
+        <a href="/asientos/nuevo" class="dash-btn-cta"><span class="ic">add</span> Nuevo asiento</a>
+      </div>
+    </section>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon c-blue">receipt_long</div>
-        <div class="stat-body">
-          <div class="stat-label">Total asientos</div>
-          <div class="stat-value">{{ total_asientos }}</div>
-          <div class="stat-sub">registrados en total</div>
+    {# ===== KPIs ===== #}
+    <section class="dash-kpis">
+      <article class="kpi">
+        <div class="kpi-head"><span class="kpi-ic c-ventas ic">trending_up</span> Ventas del mes</div>
+        <div class="kpi-value">S/ {{ '{:,.2f}'.format(k.ventas.valor) }}</div>
+        <div class="kpi-foot">
+          <span data-delta data-actual="{{ k.ventas.valor }}" data-previo="{{ k.ventas.previo }}" data-up-good="1"></span>
+          <svg class="kpi-spark" data-spark="ventas" aria-hidden="true"></svg>
         </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon c-purple">calendar_month</div>
-        <div class="stat-body">
-          <div class="stat-label">Asientos este mes</div>
-          <div class="stat-value">{{ asientos_mes }}</div>
-          <div class="stat-sub">operaciones del mes</div>
+      </article>
+      <article class="kpi">
+        <div class="kpi-head"><span class="kpi-ic c-compras ic">shopping_cart</span> Compras del mes</div>
+        <div class="kpi-value">S/ {{ '{:,.2f}'.format(k.compras.valor) }}</div>
+        <div class="kpi-foot">
+          <span data-delta data-actual="{{ k.compras.valor }}" data-previo="{{ k.compras.previo }}" data-up-good="0"></span>
+          <svg class="kpi-spark" data-spark="compras" aria-hidden="true"></svg>
         </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon c-green">trending_up</div>
-        <div class="stat-body">
-          <div class="stat-label">Ventas del mes</div>
-          <div class="stat-value">S/ {{ '%.0f'|format(ventas_mes) }}</div>
-          <div class="stat-sub">ingresos registrados</div>
+      </article>
+      <article class="kpi">
+        <div class="kpi-head">
+          <span class="kpi-ic c-igv ic">account_balance</span>
+          {% if k.igv.valor >= 0 %}IGV por pagar{% else %}Crédito fiscal a favor{% endif %}
         </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon c-orange">shopping_cart</div>
-        <div class="stat-body">
-          <div class="stat-label">Compras del mes</div>
-          <div class="stat-value">S/ {{ '%.0f'|format(compras_mes) }}</div>
-          <div class="stat-sub">gastos registrados</div>
+        <div class="kpi-value">S/ {{ '{:,.2f}'.format(k.igv.valor|abs) }}</div>
+        <div class="kpi-foot">
+          <span class="kpi-note" title="IGV de ventas (débito) menos IGV de compras (crédito)">
+            Débito {{ '{:,.0f}'.format(k.igv_ventas) }} · Crédito {{ '{:,.0f}'.format(k.igv_compras) }}
+          </span>
+          <svg class="kpi-spark" data-spark="igv" aria-hidden="true"></svg>
         </div>
-      </div>
-    </div>
+      </article>
+      <article class="kpi">
+        <div class="kpi-head"><span class="kpi-ic c-asientos ic">receipt_long</span> Asientos del mes</div>
+        <div class="kpi-value">{{ k.asientos }}</div>
+        <div class="kpi-foot">
+          <span data-delta data-actual="{{ k.asientos }}" data-previo="{{ k.asientos_previo }}" data-up-good="neutral" data-count="1"></span>
+          <svg class="kpi-spark" data-spark="asientos" aria-hidden="true"></svg>
+        </div>
+      </article>
+    </section>
 
-    {% set vmax = ventas_mes if ventas_mes > compras_mes else compras_mes %}
-    {% if vmax and vmax > 0 %}
-    {% set bw_ventas = (ventas_mes / vmax * 595)|float %}
-    {% set bw_compras = (compras_mes / vmax * 595)|float %}
-    <div class="stat-card" style="display:block;padding:1.4rem 1.6rem;margin-bottom:1.4rem;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem;">
-        <div>
-          <div class="stat-label">Ventas vs Compras</div>
-          <div style="font-size:.78rem;color:#6b7785;">Comparativa del mes actual</div>
-        </div>
-        <a href="/reportes/libro-mayor" style="font-size:.78rem;color:#2c5282;text-decoration:none;font-weight:600;">Ver detalle →</a>
-      </div>
-      <svg viewBox="0 0 600 110" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
-        <!-- Ventas -->
-        <text x="0" y="18" font-size="12" font-weight="600" fill="#1e8449">Ventas</text>
-        <text x="595" y="18" font-size="12" text-anchor="end" fill="#1f2937" font-weight="700">S/ {{ '%.2f'|format(ventas_mes) }}</text>
-        <rect x="0" y="24" width="595" height="18" rx="9" fill="#e8f6ee"/>
-        <rect x="0" y="24" width="{{ '%.2f'|format(bw_ventas) }}" height="18" rx="9" fill="#1e8449"/>
-        <!-- Compras -->
-        <text x="0" y="72" font-size="12" font-weight="600" fill="#e67e22">Compras</text>
-        <text x="595" y="72" font-size="12" text-anchor="end" fill="#1f2937" font-weight="700">S/ {{ '%.2f'|format(compras_mes) }}</text>
-        <rect x="0" y="78" width="595" height="18" rx="9" fill="#fff5e6"/>
-        <rect x="0" y="78" width="{{ '%.2f'|format(bw_compras) }}" height="18" rx="9" fill="#e67e22"/>
-      </svg>
-      {% set margen = ventas_mes - compras_mes %}
-      <div style="margin-top:.7rem;font-size:.82rem;color:#6b7785;text-align:right;">
-        Margen bruto:
-        <strong style="color:{% if margen >= 0 %}#1e8449{% else %}#c0392b{% endif %};">
-          S/ {{ '%.2f'|format(margen) }}
-        </strong>
-      </div>
-    </div>
-    {% endif %}
-
-    {# ====== PANEL IGV DEL MES ====== #}
-    <div class="stat-card" style="display:block;padding:1.4rem 1.6rem;margin-bottom:1.4rem;border-left:4px solid #2c5282;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
-        <div>
-          <div class="stat-label" style="display:flex;align-items:center;gap:.4rem;">
-            <span class="ic" style="color:#2c5282;">receipt_long</span> IGV del mes
+    {# ===== VENTAS VS COMPRAS + LIQUIDEZ ===== #}
+    <section class="dash-grid g-2-1">
+      <article class="card-viz">
+        <header class="viz-head">
+          <div>
+            <h3>Ventas vs compras</h3>
+            <p>Mes a mes, {{ data.year }} · importes netos en S/</p>
           </div>
-          <div style="font-size:.78rem;color:#6b7785;">Debito vs credito fiscal — {{ hoy.strftime('%B %Y') }}</div>
+          <div class="viz-tools">
+            <div class="viz-legend">
+              <span><i class="sw sw-rect" style="background:var(--s-ventas)"></i>Ventas</span>
+              <span><i class="sw sw-rect" style="background:var(--s-compras)"></i>Compras</span>
+            </div>
+            <button type="button" class="viz-toggle" data-table-toggle="tbl-vc" aria-pressed="false" title="Ver como tabla"><span class="ic">table_rows</span></button>
+          </div>
+        </header>
+        <div class="viz-body" id="chartVentasCompras" role="img" aria-label="Gráfico de columnas de ventas y compras por mes"></div>
+        <div class="viz-table" id="tbl-vc" hidden></div>
+      </article>
+
+      <article class="card-viz">
+        <header class="viz-head">
+          <div>
+            <h3>Liquidez</h3>
+            <p>Saldos acumulados al cierre de {{ data.mes_nombre }}</p>
+          </div>
+        </header>
+        <div class="liq-list">
+          <a class="liq" href="/reportes/libro-mayor">
+            <span class="liq-ic ic">account_balance_wallet</span>
+            <span class="liq-body"><span class="liq-label">Efectivo y bancos <small>(10)</small></span>
+              <span class="liq-value">S/ {{ '{:,.2f}'.format(data.saldos.efectivo) }}</span></span>
+          </a>
+          <a class="liq" href="/reportes/libro-mayor">
+            <span class="liq-ic ic">call_received</span>
+            <span class="liq-body"><span class="liq-label">Por cobrar a clientes <small>(12)</small></span>
+              <span class="liq-value">S/ {{ '{:,.2f}'.format(data.saldos.por_cobrar) }}</span></span>
+          </a>
+          <a class="liq" href="/reportes/libro-mayor">
+            <span class="liq-ic ic">call_made</span>
+            <span class="liq-body"><span class="liq-label">Por pagar a proveedores <small>(42)</small></span>
+              <span class="liq-value">S/ {{ '{:,.2f}'.format(data.saldos.por_pagar) }}</span></span>
+          </a>
+          {% set capital_trabajo = data.saldos.efectivo + data.saldos.por_cobrar - data.saldos.por_pagar %}
+          <div class="liq-total">
+            <span>Posición neta</span>
+            <strong class="{{ 'is-good' if capital_trabajo >= 0 else 'is-bad' }}">
+              <span class="ic">{{ 'arrow_upward' if capital_trabajo >= 0 else 'arrow_downward' }}</span>
+              S/ {{ '{:,.2f}'.format(capital_trabajo) }}
+            </strong>
+          </div>
         </div>
-        <a href="/reportes/registros?year={{ hoy.year }}&month={{ hoy.month }}" style="font-size:.78rem;color:#2c5282;text-decoration:none;font-weight:600;background:#eef5ff;padding:.4rem .8rem;border-radius:8px;">Ver registros →</a>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:.8rem;">
-        <div style="background:#e8f6ee;border-radius:10px;padding:.9rem 1rem;border-left:3px solid #1e8449;">
-          <div style="font-size:.72rem;color:#1e8449;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">IGV Ventas (debito)</div>
-          <div style="font-size:1.4rem;font-weight:800;color:#1f2937;font-variant-numeric:tabular-nums;margin-top:.2rem;">S/ {{ '%.2f'|format(igv_ventas_mes) }}</div>
-          <div style="font-size:.72rem;color:#6b7785;margin-top:.2rem;">IGV que cobraste</div>
-        </div>
-        <div style="background:#fff5e6;border-radius:10px;padding:.9rem 1rem;border-left:3px solid #e67e22;">
-          <div style="font-size:.72rem;color:#e67e22;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">IGV Compras (credito)</div>
-          <div style="font-size:1.4rem;font-weight:800;color:#1f2937;font-variant-numeric:tabular-nums;margin-top:.2rem;">S/ {{ '%.2f'|format(igv_compras_mes) }}</div>
-          <div style="font-size:.72rem;color:#6b7785;margin-top:.2rem;">IGV que pagaste</div>
-        </div>
-        {% if igv_por_pagar >= 0 %}
-        <div style="background:#fdecea;border-radius:10px;padding:.9rem 1rem;border-left:3px solid #c0392b;">
-          <div style="font-size:.72rem;color:#c0392b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">IGV por pagar</div>
-          <div style="font-size:1.4rem;font-weight:800;color:#c0392b;font-variant-numeric:tabular-nums;margin-top:.2rem;">S/ {{ '%.2f'|format(igv_por_pagar) }}</div>
-          <div style="font-size:.72rem;color:#6b7785;margin-top:.2rem;">Ventas − Compras</div>
-        </div>
+      </article>
+    </section>
+
+    {# ===== RESULTADO MENSUAL + GASTOS ===== #}
+    <section class="dash-grid g-1-1">
+      <article class="card-viz">
+        <header class="viz-head">
+          <div>
+            <h3>Resultado mensual</h3>
+            <p>Ventas − compras por mes, {{ data.year }}</p>
+          </div>
+          <div class="viz-tools">
+            <button type="button" class="viz-toggle" data-table-toggle="tbl-mg" aria-pressed="false" title="Ver como tabla"><span class="ic">table_rows</span></button>
+          </div>
+        </header>
+        <div class="viz-body" id="chartMargen" role="img" aria-label="Gráfico de línea del resultado mensual"></div>
+        <div class="viz-table" id="tbl-mg" hidden></div>
+      </article>
+
+      <article class="card-viz">
+        <header class="viz-head">
+          <div>
+            <h3>¿En qué se gasta?</h3>
+            <p>Gastos por naturaleza (elemento 6), {{ data.year }}</p>
+          </div>
+        </header>
+        <div class="viz-body hbars" id="chartGastos"></div>
+      </article>
+    </section>
+
+    {# ===== TOP CLIENTES / PROVEEDORES ===== #}
+    <section class="dash-grid g-1-1">
+      <article class="card-viz">
+        <header class="viz-head">
+          <div>
+            <h3>Top clientes</h3>
+            <p>Mayores ventas por RUC, {{ data.year }}</p>
+          </div>
+          <a class="viz-link" href="/reportes/por-ruc">Ver todos <span class="ic">chevron_right</span></a>
+        </header>
+        <div class="viz-body hbars" id="chartClientes"></div>
+      </article>
+      <article class="card-viz">
+        <header class="viz-head">
+          <div>
+            <h3>Top proveedores</h3>
+            <p>Mayores compras por RUC, {{ data.year }}</p>
+          </div>
+          <a class="viz-link" href="/reportes/por-ruc">Ver todos <span class="ic">chevron_right</span></a>
+        </header>
+        <div class="viz-body hbars" id="chartProveedores"></div>
+      </article>
+    </section>
+
+    {# ===== ULTIMAS OPERACIONES + ACCESOS ===== #}
+    <section class="dash-grid g-2-1">
+      <article class="card-viz">
+        <header class="viz-head">
+          <div>
+            <h3>Últimas operaciones</h3>
+            <p>Los asientos más recientes</p>
+          </div>
+          <a class="viz-link" href="/asientos">Ver historial <span class="ic">chevron_right</span></a>
+        </header>
+        {% if data.recientes %}
+        <ul class="recent">
+          {% for r in data.recientes %}
+          <li>
+            <a href="/asientos/{{ r.id }}">
+              <span class="recent-date">
+                <b>{{ r.fecha[8:10] }}</b>
+                <small>{{ ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][r.fecha[5:7]|int - 1] }}</small>
+              </span>
+              <span class="recent-body">
+                <span class="recent-glosa">{{ r.glosa }}{% if r.reversa %} <em class="tag-rev">reversa</em>{% endif %}</span>
+                <span class="recent-meta">{{ r.numero }}{% if r.tercero %} · {{ r.tercero }}{% endif %}</span>
+              </span>
+              <span class="recent-total">S/ {{ '{:,.2f}'.format(r.total) }}</span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
         {% else %}
-        <div style="background:#eef5ff;border-radius:10px;padding:.9rem 1rem;border-left:3px solid #2c5282;">
-          <div style="font-size:.72rem;color:#2c5282;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Credito a favor</div>
-          <div style="font-size:1.4rem;font-weight:800;color:#2c5282;font-variant-numeric:tabular-nums;margin-top:.2rem;">S/ {{ '%.2f'|format(-igv_por_pagar) }}</div>
-          <div style="font-size:.72rem;color:#6b7785;margin-top:.2rem;">Se arrastra al mes siguiente</div>
+        <div class="viz-empty">
+          <span class="ic">inbox</span>
+          <p>Aún no registras operaciones.</p>
+          <a href="/asientos/nuevo" class="dash-btn-cta sm"><span class="ic">add</span> Crear el primer asiento</a>
         </div>
         {% endif %}
-      </div>
-    </div>
+      </article>
 
-    {% if ultima_op %}
-    <div class="stat-card" style="background: linear-gradient(90deg, #fbfcfe 0%, #f4f8fd 100%);">
-      <div class="stat-icon c-blue">bolt</div>
-      <div class="stat-body">
-        <div class="stat-label">Ultima operacion</div>
-        <div class="stat-value" style="font-size:1.05rem;">{{ ultima_glosa }}</div>
-        <div class="stat-sub">{{ ultima_op.fecha }} &middot; {{ ultima_op.numero }}</div>
-      </div>
-      <a href="/asientos/{{ ultima_op.id }}" class="op-btn" style="background:#2c5282;color:#fff;padding:.5rem 1.1rem;border-radius:8px;text-decoration:none;font-weight:600;font-size:.85rem;display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap;"><span class="ic sm" style="font-size:1rem;">visibility</span> Ver</a>
-    </div>
-    {% endif %}
+      <article class="card-viz">
+        <header class="viz-head"><div><h3>Accesos rápidos</h3><p>Lo que más usas</p></div></header>
+        <nav class="quick">
+          <a href="/reportes/registros?year={{ data.year }}&month={{ data.month }}"><span class="ic">event_note</span>Registros del mes</a>
+          <a href="/reportes/libro-diario"><span class="ic">book</span>Libro diario</a>
+          <a href="/reportes/libro-mayor"><span class="ic">menu_book</span>Libro mayor</a>
+          <a href="/reportes/balance"><span class="ic">balance</span>Balance</a>
+          <a href="/reportes/anual?year={{ data.year }}"><span class="ic">calendar_month</span>Reporte anual</a>
+          <a href="/cierres"><span class="ic">lock</span>Cierres de mes</a>
+          <a href="/importar"><span class="ic">upload_file</span>Importar Excel</a>
+          <a href="/"><span class="ic">manage_search</span>Buscar cuenta</a>
+        </nav>
+      </article>
+    </section>
+  </div>
 
-    <div class="section-head"><h3>Accesos rapidos</h3></div>
-    <div class="quick-grid">
-      <a href="/asientos/nuevo" class="quick-link">
-        <span class="ic">edit_note</span>
-        <div>
-          <strong>Crear nuevo asiento</strong>
-          <span class="ds">Registra una operacion</span>
-        </div>
-      </a>
-      <a href="/asientos" class="quick-link">
-        <span class="ic">receipt_long</span>
-        <div>
-          <strong>Ver operaciones</strong>
-          <span class="ds">Historial completo</span>
-        </div>
-      </a>
-      <a href="/" class="quick-link">
-        <span class="ic">manage_search</span>
-        <div>
-          <strong>Buscar cuenta PCGE</strong>
-          <span class="ds">Catalogo contable</span>
-        </div>
-      </a>
-    </div>
-
-    <div class="section-head"><h3>Reportes contables</h3></div>
-    <div class="quick-grid">
-      <a href="/reportes/libro-diario" class="quick-link">
-        <span class="ic" style="color:#2c5282;">auto_stories</span>
-        <div>
-          <strong>Libro Diario</strong>
-          <span class="ds">Asientos en orden cronologico</span>
-        </div>
-      </a>
-      <a href="/reportes/libro-mayor" class="quick-link">
-        <span class="ic" style="color:#1e8449;">menu_book</span>
-        <div>
-          <strong>Libro Mayor</strong>
-          <span class="ds">Movimientos por cuenta</span>
-        </div>
-      </a>
-      <a href="/reportes/balance" class="quick-link">
-        <span class="ic" style="color:#e67e22;">balance</span>
-        <div>
-          <strong>Balance de comprobacion</strong>
-          <span class="ds">Verifica que todo cuadre</span>
-        </div>
-      </a>
-      <a href="/reportes/por-ruc" class="quick-link">
-        <span class="ic" style="color:#2c5282;">groups</span>
-        <div>
-          <strong>Compras / Ventas por RUC</strong>
-          <span class="ds">Agrupacion por tercero (base DAOT)</span>
-        </div>
-      </a>
-      <a href="/reportes/anual" class="quick-link">
-        <span class="ic" style="color:#8e44ad;">calendar_month</span>
-        <div>
-          <strong>Reporte anual</strong>
-          <span class="ds">Cuadre global con desglose mensual</span>
-        </div>
-      </a>
-    </div>
-  </main>
+  <div class="viz-tooltip" id="vizTooltip" role="status" aria-live="polite" hidden></div>
+  <script type="application/json" id="dashData">{{ data|tojson }}</script>
+  {% include 'partials/shell_close.html' %}
 </body>
 </html>

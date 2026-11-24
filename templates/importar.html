@@ -53,19 +53,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div style="display:flex;align-items:center;gap:.6rem;">
-      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
-      <h1><span class="ic">upload_file</span> Importar desde Excel</h1>
-    </div>
-    <nav>
-      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
-      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
-      <button type="button" class="theme-toggle">dark_mode</button>
-    </nav>
-  </header>
-
-  <main class="wrap">
+  {% set active = 'importar' %}
+  {% set breadcrumb = [('Mantenimiento',''), ('Importar Excel','')] %}
+  {% include 'partials/shell_open.html' %}
     <div class="card">
       <h2>1. Descarga la plantilla</h2>
       <p style="color:#6b7785;font-size:.88rem;margin:-.3rem 0 .7rem;">
@@ -99,7 +89,7 @@
         </div>
       </div>
     </div>
-  </main>
+  {% include 'partials/shell_close.html' %}
 
   <script>
     var currentFile = null;

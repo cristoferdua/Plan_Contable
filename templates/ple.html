@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <title>Libros electronicos (PLE)</title>
+  {% include 'partials/page_head.html' %}
+</head>
+<body>
+  {% set active = 'ple' %}
+  {% set breadcrumb = [('SUNAT',''), ('Libros electronicos (PLE)','')] %}
+  {% set meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+  {% include 'partials/shell_open.html' %}
+  <form class="card row" method="get">
+    <div class="fld"><label>Anio</label><input name="year" type="number" value="{{ year }}" min="2000" max="2100" style="width:110px;min-width:0;"></div>
+    <div class="fld"><label>Mes</label>
+      <select name="month">{% for m in meses %}<option value="{{ loop.index }}" {% if loop.index == month %}selected{% endif %}>{{ m }}</option>{% endfor %}</select>
+    </div>
+    <button class="btn primary"><span class="ic sm">refresh</span> Ver periodo</button>
+    <div class="note" style="margin-left:auto;">Empresa: <strong>{{ emp.razon_social or 'sin configurar' }}</strong> &middot; RUC <span class="mono">{{ emp.ruc or '—' }}</span></div>
+  </form>
+
+  {% if obs %}
+  <div class="card">
+    <h2><span class="ic sm">rule</span> Validaciones del periodo</h2>
+    <ul class="obs">
+      {% for o in obs %}<li class="{{ o.nivel }}"><span class="ic sm">{{ 'error' if o.nivel == 'error' else 'warning' }}</span> {{ o.msg }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2><span class="ic sm">description</span> Archivos del periodo {{ meses[month-1] }} {{ year }}</h2>
+    <p class="sub">{{ n_asientos }} asiento(s) en el periodo. Descarga los .txt y validalos/envialos con el <strong>PLE de SUNAT</strong>.
+      Si el periodo no tiene operaciones, el archivo se genera vacio con indicador de contenido 0.</p>
+    <table class="t">
+      <thead><tr><th>Formato</th><th>Libro</th><th class="num">Registros</th><th>Nombre del archivo</th><th></th></tr></thead>
+      <tbody>
+      {% for a in archivos %}
+        <tr>
+          <td class="mono"><strong>{{ a.formato }}</strong></td>
+          <td>{{ a.nombre }}</td>
+          <td class="num">{{ a.registros }}</td>
+          <td class="mono" style="font-size:.78rem;">{{ a.archivo }}</td>
+          <td><a class="btn" href="/ple/descargar?formato={{ a.formato }}&year={{ year }}&month={{ month }}"><span class="ic sm">download</span> .txt</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic sm">info</span> Registro de Compras y de Ventas</h2>
+    <p class="sub">Desde la implementacion del <strong>SIRE</strong>, los registros de compras (RCE) y ventas (RVIE) se generan en SUNAT a partir de una propuesta.
+      Usa <a href="/reportes/registros?year={{ year }}&month={{ month }}">Registros por mes</a> para comparar tu contabilidad con esa propuesta antes de aceptarla o complementarla.</p>
+    <p class="note">Las estructuras de los formatos 5.1, 5.3 y 6.1 siguen los anexos del PLE. SUNAT los actualiza periodicamente: valida siempre los archivos con el programa PLE vigente antes de enviarlos.</p>
+  </div>
+  {% include 'partials/shell_close.html' %}
+</body>
+</html>

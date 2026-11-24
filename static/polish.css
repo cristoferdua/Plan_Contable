@@ -498,17 +498,15 @@ select option { text-decoration: none; font-family: inherit; padding: .4rem .6re
   box-shadow: 0 0 0 4px rgba(44, 82, 130, .15), 0 2px 8px rgba(44, 82, 130, .1);
 }
 .custom-select-list {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
+  position: fixed;
+  max-width: min(520px, calc(100vw - 16px));
   background: #fff;
   border: 1px solid #e3e8ef;
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, .14), 0 4px 10px rgba(15, 23, 42, .06);
   max-height: 320px;
   overflow-y: auto;
-  z-index: 1000;
+  z-index: 10050;
   padding: .35rem;
   animation: dropDown .18s cubic-bezier(.2,.9,.3,1);
 }
@@ -538,3 +536,63 @@ input:disabled, select:disabled, textarea:disabled {
   color: #9aa5b1 !important;
   cursor: not-allowed;
 }
+
+/* Grupos y buscador dentro del dropdown custom */
+.custom-select-group {
+  padding: .55rem .75rem .25rem;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #6b7a8c;
+}
+.custom-select-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: .3rem;
+  padding: .5rem .7rem;
+  border: 1.5px solid #d8dee7;
+  border-radius: 8px;
+  font: inherit;
+  font-size: .85rem;
+  background: #fff;
+}
+.custom-select-search:focus { outline: none; border-color: #2c5282; }
+.custom-select-empty { padding: .6rem .75rem; color: #6b7a8c; font-size: .85rem; font-style: italic; }
+
+/* Buscador de cuentas del PCGE (plantillas) */
+.tpl-cuenta-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 1000;
+  background: #fff; border: 1px solid #e3e8ef; border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(15,23,42,.14); max-height: 260px; overflow-y: auto; padding: .3rem;
+}
+.tpl-cuenta-list[hidden] { display: none; }
+.tpl-cuenta-opt { padding: .45rem .6rem; border-radius: 7px; cursor: pointer; font-size: .85rem; }
+.tpl-cuenta-opt b { font-family: ui-monospace, Consolas, monospace; margin-right: .35rem; color: #2c5282; }
+.tpl-cuenta-opt.active, .tpl-cuenta-opt:hover { background: #eaf1fb; }
+.tpl-cuenta-vacio { padding: .5rem .6rem; color: #6b7a8c; font-size: .85rem; font-style: italic; }
+.tpl-cuenta-desc { font-size: .75rem; margin-top: .25rem; color: #6b7a8c; min-height: 1em; }
+.tpl-cuenta-desc.ok { color: #1e8449; }
+.tpl-cuenta-desc.err { color: #c0392b; }
+
+/* ===== Desplegable: estados extra ===== */
+.custom-select-trigger:focus-visible { outline: none; border-color: #2c5282; box-shadow: 0 0 0 4px rgba(44,82,130,.18); }
+.custom-select.disabled .custom-select-trigger,
+.custom-select-trigger:disabled { background: #f1f4f8; color: #9aa5b1; cursor: not-allowed; box-shadow: none; }
+.custom-select-opt.focus:not(.active) { background: #eaf1fb; color: #1e3a5f; }
+.custom-select-opt.disabled { opacity: .45; cursor: not-allowed; }
+.custom-select-list.arriba { animation: dropUp .18s cubic-bezier(.2,.9,.3,1); }
+@keyframes dropUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.custom-select-opts { display: flex; flex-direction: column; gap: 2px; }
+
+/* Variante sobre fondo oscuro (filtros del dashboard) */
+.custom-select.on-dark .custom-select-trigger {
+  background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.25);
+  font-weight: 600; font-size: .88rem; padding: .45rem 2rem .45rem .8rem; box-shadow: none;
+}
+.custom-select.on-dark .custom-select-trigger:hover { background: rgba(255,255,255,.22); }
+.custom-select.on-dark .custom-select-trigger::after { filter: brightness(0) invert(1); }
+.custom-select.on-dark.open .custom-select-trigger { border-color: rgba(255,255,255,.6); box-shadow: 0 0 0 4px rgba(255,255,255,.15); }

@@ -312,18 +312,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <h1 style="display:flex;align-items:center;gap:.5rem;"><span class="ic">menu_book</span> Plan Contable General Empresarial &mdash; PCGE 2026</h1>
-    <nav>
-      <a href="/dashboard" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">dashboard</span> Dashboard</a>
-      <a href="/" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">search</span> Buscador</a>
-      <a href="/asientos" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">receipt_long</span> Operaciones</a>
-      <a href="/asientos/nuevo" class="cta" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">add</span> Nuevo asiento</a>
-      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
-    </nav>
-  </header>
-
-  <main class="wrap">
+  {% set active = 'buscador' %}
+  {% set breadcrumb = [('Buscar cuentas','')] %}
+  {% include 'partials/shell_open.html' %}
     <section class="hero">
       <h2>Bienvenido al PCGE Peru</h2>
       <p>Consulta las cuentas contables oficiales y registra tus operaciones del libro diario.</p>
@@ -462,7 +453,7 @@
         {% endif %}
       </div>
     </section>
-  </main>
+  {% include 'partials/shell_close.html' %}
 
   <script>
     const qInput = document.getElementById('q');

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <title>Auditoria</title>
+  {% include 'partials/page_head.html' %}
+  <style>
+    details pre { white-space:pre-wrap; word-break:break-word; font-size:.74rem; max-height:280px; overflow:auto; background:rgba(127,127,127,.08); padding:.5rem; border-radius:6px; }
+    .acc { font-weight:700; text-transform:uppercase; font-size:.72rem; letter-spacing:.03em; }
+    .acc.anular, .acc.reabrir_mes { color:#b42318; }
+    .acc.editar { color:#9a5b00; }
+    .acc.crear, .acc.cerrar_mes { color:#1e7a3c; }
+  </style>
+</head>
+<body>
+  {% set active = 'auditoria' %}
+  {% set breadcrumb = [('Mantenimiento',''), ('Auditoria','')] %}
+  {% include 'partials/shell_open.html' %}
+  <form class="card row" method="get">
+    <div class="fld"><label>Entidad</label>
+      <select name="entidad">
+        <option value="">Todas</option>
+        {% for e in ['asiento', 'cierre_mes', 'usuario', 'config', 'periodo'] %}
+        <option value="{{ e }}" {% if e == entidad %}selected{% endif %}>{{ e }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="fld"><label>ID</label><input name="id" value="{{ entidad_id }}" style="min-width:80px;width:90px;"></div>
+    <div class="fld"><label>Usuario</label><input name="usuario" value="{{ usuario_f }}"></div>
+    <button class="btn primary"><span class="ic sm">search</span> Filtrar</button>
+  </form>
+  <div class="card">
+    <h2><span class="ic sm">history</span> Bitacora de cambios</h2>
+    <p class="sub">Registro de solo insercion: cada alta, edicion, anulacion, cierre, reapertura y exportacion PLE, con el usuario, la fecha (UTC) y los datos antes y despues. Se muestran los ultimos 500 eventos.</p>
+    <table class="t">
+      <thead><tr><th>Fecha (UTC)</th><th>Usuario</th><th>Accion</th><th>Entidad</th><th>Motivo</th><th>Detalle</th></tr></thead>
+      <tbody>
+      {% for e in eventos %}
+        <tr>
+          <td class="mono" style="white-space:nowrap;">{{ e.fecha.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td>{{ e.usuario or '—' }}</td>
+          <td><span class="acc {{ e.accion }}">{{ e.accion }}</span></td>
+          <td>{% if e.entidad == 'asiento' and e.entidad_id %}<a href="/asientos/{{ e.entidad_id }}">asiento #{{ e.entidad_id }}</a>{% else %}{{ e.entidad }}{% if e.entidad_id %} #{{ e.entidad_id }}{% endif %}{% endif %}</td>
+          <td>{{ e.motivo }}</td>
+          <td>
+            {% if e.antes or e.despues %}
+            <details><summary>ver</summary>
+              {% if e.antes %}<div class="note">Antes</div><pre>{{ e.antes }}</pre>{% endif %}
+              {% if e.despues %}<div class="note">Despues</div><pre>{{ e.despues }}</pre>{% endif %}
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="note">Sin eventos.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'partials/shell_close.html' %}
+</body>
+</html>

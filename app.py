@@ -2,6 +2,7 @@ import io
 import json
 import os
 import unicodedata
+import uuid
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -10,13 +11,24 @@ from rapidfuzz import fuzz
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from db import SessionLocal
-from models import Asiento, AsientoLinea, CierreMes, Entidad
+import sunat
+from db import SessionLocal, engine
+from models import Asiento, AsientoLinea, Base, CierreMes, Entidad
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "pcge_data.json")
 
+# En SQLite local las tablas se crean solas; en Postgres se usan las migraciones de Alembic.
+if engine.dialect.name == "sqlite":
+    Base.metadata.create_all(engine)
+
 app = Flask(__name__)
+
+import auth  # noqa: E402
+from auth import (ROLES_CIERRE, config_get, registrar, requiere_rol,  # noqa: E402
+                  snapshot_asiento, usuario_actual)
+
+auth.init_app(app)
 
 ELEMENTOS = [
     (1, "Activo Disponible y Exigible"),
@@ -377,13 +389,28 @@ for c in CUENTAS:
 CUENTAS.sort(key=lambda c: c["codigo"])
 CUENTAS_POR_CODIGO = {c["codigo"]: c for c in CUENTAS}
 
+# Una cuenta "hoja" no tiene subcuentas en el catalogo. El PCGE define varias
+# cuentas solo hasta 3 digitos (417 AFP, 424 Honorarios, 422 Anticipos...):
+# esas tambien deben aceptar montos.
+_CODIGOS = set(CUENTAS_POR_CODIGO)
+for _c in CUENTAS:
+    _c["hoja"] = not any(o != _c["codigo"] and o.startswith(_c["codigo"]) for o in _CODIGOS)
+
+
+def es_cuenta_movimiento(cuenta) -> bool:
+    """Acepta montos: nivel 4 o 5, o cualquier cuenta hoja de nivel 3."""
+    return cuenta["nivel"] in NIVELES_MOVIMIENTO or (cuenta["hoja"] and cuenta["nivel"] >= 3)
+
 
 def buscar_cuentas(q, elemento, niveles=None):
     base = CUENTAS
     if elemento:
         base = [c for c in base if str(c["elemento"]) == elemento]
     if niveles:
-        base = [c for c in base if c["nivel"] in niveles]
+        if niveles & NIVELES_MOVIMIENTO:
+            base = [c for c in base if c["nivel"] in niveles or es_cuenta_movimiento(c)]
+        else:
+            base = [c for c in base if c["nivel"] in niveles]
 
     if not q:
         return base[:LIMIT]
@@ -453,6 +480,8 @@ def to_json(c, favoritas=None):
         "nivel": c["nivel"],
         "elemento": c["elemento"],
         "elemento_nombre": c["elemento_nombre"],
+        "hoja": c["hoja"],
+        "movimiento": es_cuenta_movimiento(c),
     }
     if favoritas is not None:
         out["es_favorita"] = c["codigo"] in favoritas
@@ -502,7 +531,7 @@ def buscar():
             niveles = None
     resultados = buscar_cuentas(q, elemento, niveles)
     if solo_mov and not niveles:
-        resultados = [c for c in resultados if c["nivel"] in NIVELES_MOVIMIENTO]
+        resultados = [c for c in resultados if es_cuenta_movimiento(c)]
 
     # Priorizar cuentas favoritas al inicio (si hay)
     try:
@@ -583,7 +612,7 @@ def _validar_y_construir_lineas(data_lineas):
             errores.append(f"Linea {i}: cuenta {codigo} no existe en PCGE.")
             continue
 
-        es_movimiento = cuenta["nivel"] in NIVELES_MOVIMIENTO
+        es_movimiento = es_cuenta_movimiento(cuenta)
         tiene_monto = debe > 0 or haber > 0
 
         if not es_movimiento:
@@ -623,11 +652,181 @@ def _validar_y_construir_lineas(data_lineas):
         })
 
     if lineas_movimiento < 2:
-        errores.append("El asiento debe tener al menos 2 lineas de movimiento (nivel 4 o 5).")
+        errores.append("El asiento debe tener al menos 2 lineas de movimiento (cuentas de nivel 4-5 o sin subcuentas).")
     if not errores and abs(total_debe - total_haber) > TOLERANCIA:
         errores.append(f"El asiento no cuadra: debe={total_debe} haber={total_haber} diferencia={total_debe - total_haber}.")
 
     return lineas, errores
+
+
+def _convertir_moneda(lineas, moneda, tipo_cambio):
+    """Si el asiento es en moneda extranjera, los montos ingresados estan en esa
+    moneda: se guardan en `importe_me` y debe/haber se convierten a soles.
+    La diferencia de redondeo se ajusta en la linea de mayor importe para que
+    el asiento siga cuadrando en soles."""
+    if moneda == "PEN":
+        for l in lineas:
+            l["importe_me"] = None
+        return lineas
+    mov = [l for l in lineas if not l["es_titulo"]]
+    for l in mov:
+        orig = l["debe"] if l["debe"] > 0 else l["haber"]
+        l["importe_me"] = orig
+        pen = (orig * tipo_cambio).quantize(Decimal("0.01"))
+        if l["debe"] > 0:
+            l["debe"] = pen
+        else:
+            l["haber"] = pen
+    dif = sum((l["debe"] for l in mov), Decimal("0")) - sum((l["haber"] for l in mov), Decimal("0"))
+    if dif != 0 and mov:
+        lado = "haber" if dif > 0 else "debe"
+        candidatas = [l for l in mov if l[lado] > 0]
+        if candidatas:
+            mayor = max(candidatas, key=lambda l: l[lado])
+            mayor[lado] += abs(dif)
+    for l in lineas:
+        l.setdefault("importe_me", None)
+    return lineas
+
+
+def _parse_fecha_opcional(valor, etiqueta, errores):
+    v = (valor or "").strip() if isinstance(valor, str) else valor
+    if not v:
+        return None
+    try:
+        return datetime.strptime(v, "%Y-%m-%d").date()
+    except ValueError:
+        errores.append(f"{etiqueta}: fecha invalida (YYYY-MM-DD).")
+        return None
+
+
+def _leer_campos_sunat(payload, fecha_contable, numero_documento, doc_tercero):
+    """Lee y valida los campos SUNAT del payload. Devuelve (campos, errores)."""
+    errores = []
+    c = {}
+
+    tipo = (payload.get("tipo_comprobante") or "").strip()
+    if tipo and tipo not in sunat.TABLA_10:
+        errores.append(f"Tipo de comprobante {tipo!r} no esta en la Tabla 10.")
+    if not tipo and numero_documento:
+        tipo = sunat.tipo_comprobante_desde_documento(numero_documento)
+    c["tipo_comprobante"] = tipo or None
+
+    serie = (payload.get("serie_comprobante") or "").strip().upper()
+    numero = (payload.get("numero_comprobante") or "").strip()
+    if numero_documento and not (serie or numero):
+        serie, numero = sunat.separar_serie_numero(numero_documento)
+    c["serie_comprobante"] = serie or None
+    c["numero_comprobante"] = numero or None
+
+    tipo_doc = (payload.get("tipo_doc_tercero") or "").strip().upper()
+    if tipo_doc and tipo_doc not in sunat.TABLA_2:
+        errores.append(f"Tipo de documento de identidad {tipo_doc!r} no esta en la Tabla 2.")
+    if not tipo_doc and doc_tercero:
+        tipo_doc = sunat.tipo_doc_desde_numero(doc_tercero)
+    c["tipo_doc_tercero"] = tipo_doc or None
+
+    c["fecha_emision"] = _parse_fecha_opcional(payload.get("fecha_emision"), "Fecha de emision", errores)
+    c["fecha_vencimiento"] = _parse_fecha_opcional(payload.get("fecha_vencimiento"), "Fecha de vencimiento", errores)
+    if c["fecha_emision"] and fecha_contable and c["fecha_emision"] > fecha_contable:
+        errores.append("La fecha de emision del comprobante no puede ser posterior a la fecha contable.")
+    if c["fecha_emision"] and c["fecha_vencimiento"] and c["fecha_vencimiento"] < c["fecha_emision"]:
+        errores.append("La fecha de vencimiento no puede ser anterior a la de emision.")
+
+    c["ref_tipo_comprobante"] = (payload.get("ref_tipo_comprobante") or "").strip() or None
+    c["ref_serie"] = (payload.get("ref_serie") or "").strip().upper() or None
+    c["ref_numero"] = (payload.get("ref_numero") or "").strip() or None
+    c["ref_fecha"] = _parse_fecha_opcional(payload.get("ref_fecha"), "Fecha del comprobante modificado", errores)
+    if tipo in ("07", "08") and not (c["ref_serie"] and c["ref_numero"]):
+        errores.append("Una nota de credito/debito debe indicar la serie y numero del comprobante que modifica.")
+    if c["ref_tipo_comprobante"] and c["ref_tipo_comprobante"] not in sunat.TABLA_10:
+        errores.append("Tipo de comprobante modificado no esta en la Tabla 10.")
+
+    for campo in ("detraccion_monto", "percepcion_monto"):
+        raw = payload.get(campo)
+        try:
+            v = _parse_decimal(raw) if raw not in (None, "") else None
+        except ValueError as e:
+            errores.append(str(e))
+            v = None
+        if v is not None and v < 0:
+            errores.append(f"{campo.replace('_', ' ').capitalize()} no puede ser negativo.")
+        c[campo] = v if v else None
+    c["detraccion_constancia"] = (payload.get("detraccion_constancia") or "").strip() or None
+    c["detraccion_fecha"] = _parse_fecha_opcional(payload.get("detraccion_fecha"), "Fecha de detraccion", errores)
+    c["sujeto_retencion"] = bool(payload.get("sujeto_retencion"))
+
+    estado = (payload.get("estado_ple") or "1").strip()
+    if estado not in sunat.ESTADOS_PLE:
+        errores.append("Estado PLE invalido (1, 8 o 9).")
+        estado = "1"
+    c["estado_ple"] = estado
+    return c, errores
+
+
+def _validar_doc_tercero(doc, tipo_doc):
+    """RUC con digito verificador; DNI de 8 digitos; otros tipos se aceptan."""
+    if not doc:
+        return True
+    if tipo_doc == "1":
+        return doc.isdigit() and len(doc) == 8
+    if tipo_doc in ("4", "7", "A", "0"):
+        return 1 <= len(doc) <= 15
+    return _validar_ruc(doc)
+
+
+def _anular_asiento(session, original, motivo=None):
+    """Anula un asiento creando su reversa (nunca se borra). La reversa va en la
+    fecha del original si su mes sigue abierto; si no, en la fecha de hoy.
+    Devuelve (reversa, error)."""
+    if original.anulado_por_id:
+        return None, "El asiento ya esta anulado."
+    if original.reversa_de_id:
+        return None, "Un asiento de reversa no se puede anular."
+    fecha_rev = original.fecha
+    if _mes_cerrado(session, fecha_rev):
+        fecha_rev = date.today()
+        if _mes_cerrado(session, fecha_rev):
+            return None, f"El mes actual {fecha_rev.year}-{fecha_rev.month:02d} esta cerrado. No se puede generar la reversa."
+    numero = _generar_numero(session, fecha_rev)
+    reversa = Asiento(
+        numero=numero,
+        operacion_id=original.operacion_id,
+        fecha=fecha_rev,
+        glosa=f"REVERSA de {original.numero}: {original.glosa}"[:500],
+        moneda=original.moneda,
+        tipo_cambio=original.tipo_cambio,
+        codigo_libro=original.codigo_libro,
+        numero_documento=original.numero_documento,
+        ruc_tercero=original.ruc_tercero,
+        razon_social_tercero=original.razon_social_tercero,
+        tipo_comprobante=original.tipo_comprobante,
+        serie_comprobante=original.serie_comprobante,
+        numero_comprobante=original.numero_comprobante,
+        fecha_emision=original.fecha_emision,
+        tipo_doc_tercero=original.tipo_doc_tercero,
+        estado_ple="1" if fecha_rev.month == original.fecha.month and fecha_rev.year == original.fecha.year else "9",
+        reversa_de_id=original.id,
+        creado_por=usuario_actual(),
+    )
+    for l in original.lineas:
+        reversa.lineas.append(AsientoLinea(
+            orden=l.orden,
+            cuenta_codigo=l.cuenta_codigo,
+            glosa_linea=l.glosa_linea,
+            debe=l.haber,
+            haber=l.debe,
+            es_titulo=l.es_titulo,
+            importe_me=l.importe_me,
+        ))
+    session.add(reversa)
+    session.flush()
+    original.anulado_por_id = reversa.id
+    registrar(session, "anular", "asiento", original.id, motivo=motivo,
+              despues={"reversa_id": reversa.id, "reversa_numero": reversa.numero})
+    registrar(session, "crear", "asiento", reversa.id, despues=snapshot_asiento(reversa),
+              motivo=f"Reversa de {original.numero}")
+    return reversa, None
 
 
 @app.route("/asientos")
@@ -670,6 +869,9 @@ def asientos_listado():
         # o mismo documento, o misma glosa base (sin prefijo N) y sin sufijo [MIXTO: ...])
         import re
         def grupo_key(a):
+            # 0) Identificador explicito de operacion (asientos guardados juntos)
+            if a.operacion_id:
+                return ("op", a.operacion_id)
             # 1) Correlativo con sufijo -N: ej "2026-11-0008-1", "2026-11-0008-2" -> base "2026-11-0008"
             corr = (a.numero_correlativo or "").strip()
             if corr:
@@ -755,6 +957,7 @@ def asientos_listado():
                         "saldo_pendiente": f"{saldo_pendiente:.2f}" if tipo_op else None,
                         "cancelado": f"{cancelado:.2f}",
                         "correlativo_base": re.sub(r"-\d+$", "", (asientos[0].numero_correlativo or "")) if asientos[0].numero_correlativo else "",
+                        "operacion_id": asientos[0].operacion_id or "",
                         "ruc": asientos[0].ruc_tercero or "",
                         "razon_social": asientos[0].razon_social_tercero or "",
                         "fecha": asientos[0].fecha.isoformat(),
@@ -799,7 +1002,8 @@ def asientos_nuevo():
     if editar_id:
         with SessionLocal() as session:
             a = session.get(Asiento, editar_id)
-            if a and not a.anulado_por_id and not a.reversa_de_id:
+            if a and not a.anulado_por_id and not a.reversa_de_id and not a.origen:
+                me = a.moneda != "PEN"
                 asiento_edit = {
                     "id": a.id,
                     "numero": a.numero,
@@ -812,12 +1016,14 @@ def asientos_nuevo():
                     "numero_documento": a.numero_documento or "",
                     "ruc_tercero": a.ruc_tercero or "",
                     "razon_social_tercero": a.razon_social_tercero or "",
+                    "sunat": _campos_sunat_json(a),
                     "lineas": [
                         {
                             "cuenta_codigo": l.cuenta_codigo,
                             "glosa_linea": l.glosa_linea or "",
-                            "debe": float(l.debe),
-                            "haber": float(l.haber),
+                            # En moneda extranjera se edita el importe original
+                            "debe": float(l.importe_me if (me and l.debe > 0 and l.importe_me is not None) else l.debe),
+                            "haber": float(l.importe_me if (me and l.haber > 0 and l.importe_me is not None) else l.haber),
                             "es_titulo": l.es_titulo,
                         } for l in a.lineas
                     ],
@@ -827,12 +1033,40 @@ def asientos_nuevo():
         hoy=date.today().isoformat(),
         elementos=ELEMENTOS,
         asiento_edit=asiento_edit,
+        tabla_10=sunat.TABLA_10,
+        tabla_2=sunat.TABLA_2,
+        emp_cfg={
+            "tasa_igv": float(tasa_igv() * 100),
+            "usa_clase9": config_get("usa_clase9", "0") == "1",
+        },
     )
 
 
-@app.route("/asientos", methods=["POST"])
-def asientos_crear():
-    payload = request.get_json(silent=True) or {}
+def _campos_sunat_json(a):
+    def f(d):
+        return d.isoformat() if d else ""
+    return {
+        "tipo_comprobante": a.tipo_comprobante or "",
+        "serie_comprobante": a.serie_comprobante or "",
+        "numero_comprobante": a.numero_comprobante or "",
+        "fecha_emision": f(a.fecha_emision),
+        "fecha_vencimiento": f(a.fecha_vencimiento),
+        "tipo_doc_tercero": a.tipo_doc_tercero or "",
+        "ref_tipo_comprobante": a.ref_tipo_comprobante or "",
+        "ref_serie": a.ref_serie or "",
+        "ref_numero": a.ref_numero or "",
+        "ref_fecha": f(a.ref_fecha),
+        "detraccion_monto": str(a.detraccion_monto) if a.detraccion_monto else "",
+        "detraccion_constancia": a.detraccion_constancia or "",
+        "detraccion_fecha": f(a.detraccion_fecha),
+        "sujeto_retencion": bool(a.sujeto_retencion),
+        "percepcion_monto": str(a.percepcion_monto) if a.percepcion_monto else "",
+        "estado_ple": a.estado_ple or "1",
+    }
+
+
+def _preparar_asiento(payload):
+    """Valida el payload de un asiento. Devuelve (datos, errores)."""
     fecha_str = (payload.get("fecha") or "").strip()
     glosa = (payload.get("glosa") or "").strip()
     moneda = (payload.get("moneda") or "PEN").strip().upper()
@@ -842,53 +1076,167 @@ def asientos_crear():
     numero_documento = (payload.get("numero_documento") or "").strip() or None
     ruc_tercero = (payload.get("ruc_tercero") or "").strip() or None
     razon_social_tercero = (payload.get("razon_social_tercero") or "").strip() or None
-    if ruc_tercero and not _validar_ruc(ruc_tercero):
-        return {"ok": False, "errores": ["RUC del tercero invalido (11 digitos + check digit)."]}, 400
     data_lineas = payload.get("lineas") or []
 
     errores = []
     try:
         fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
     except ValueError:
-        return {"ok": False, "errores": ["Fecha invalida (formato YYYY-MM-DD)."]}, 400
+        return None, ["Fecha invalida (formato YYYY-MM-DD)."]
     if fecha_obj > date.today():
         errores.append("La fecha no puede ser futura.")
+    if moneda not in sunat.TABLA_4:
+        errores.append(f"Moneda {moneda!r} no soportada (Tabla 4: PEN, USD).")
 
     try:
-        tipo_cambio = _parse_decimal(tipo_cambio_raw)
+        tipo_cambio = Decimal(str(tipo_cambio_raw)).quantize(Decimal("0.0001"))
         if tipo_cambio <= 0:
             errores.append("Tipo de cambio debe ser positivo.")
-    except ValueError as e:
-        errores.append(str(e))
+    except InvalidOperation:
+        errores.append(f"Tipo de cambio invalido: {tipo_cambio_raw!r}")
         tipo_cambio = Decimal("1")
+    if moneda == "PEN":
+        tipo_cambio = Decimal("1")
+
+    campos_sunat, errs = _leer_campos_sunat(payload, fecha_obj, numero_documento, ruc_tercero)
+    errores.extend(errs)
+    if numero_documento is None and (campos_sunat["serie_comprobante"] or campos_sunat["numero_comprobante"]):
+        numero_documento = "-".join(x for x in (campos_sunat["serie_comprobante"], campos_sunat["numero_comprobante"]) if x)
+    if ruc_tercero and not _validar_doc_tercero(ruc_tercero, campos_sunat["tipo_doc_tercero"]):
+        errores.append("Documento del tercero invalido (RUC: 11 digitos con digito verificador; DNI: 8 digitos).")
 
     lineas, errs = _validar_y_construir_lineas(data_lineas)
     errores.extend(errs)
     if errores:
+        return None, errores
+    lineas = _convertir_moneda(lineas, moneda, tipo_cambio)
+    campos = dict(
+        fecha=fecha_obj,
+        glosa=glosa,
+        moneda=moneda,
+        tipo_cambio=tipo_cambio,
+        codigo_libro=codigo_libro,
+        numero_correlativo=numero_correlativo,
+        numero_documento=numero_documento,
+        ruc_tercero=ruc_tercero,
+        razon_social_tercero=razon_social_tercero,
+        **campos_sunat,
+    )
+    return {"campos": campos, "lineas": lineas}, []
+
+
+def _insertar_asiento(session, datos, operacion_id):
+    """Inserta un asiento ya validado dentro de la transaccion abierta."""
+    campos = datos["campos"]
+    asiento = Asiento(
+        numero=_generar_numero(session, campos["fecha"]),
+        operacion_id=operacion_id,
+        creado_por=usuario_actual(),
+        **campos,
+    )
+    for l in datos["lineas"]:
+        asiento.lineas.append(AsientoLinea(**l))
+    session.add(asiento)
+    session.flush()
+    registrar(session, "crear", "asiento", asiento.id, despues=snapshot_asiento(asiento))
+    return asiento
+
+
+def _operacion_existente(session, operacion_id):
+    """Devuelve el operacion_id si existe en BD; si no, None."""
+    operacion_id = (operacion_id or "").strip()
+    if not operacion_id:
+        return None
+    hay = session.execute(
+        select(Asiento.id).where(Asiento.operacion_id == operacion_id).limit(1)
+    ).first()
+    return operacion_id if hay else None
+
+
+def _documento_duplicado(session, datos):
+    """Busca un asiento vigente con el mismo comprobante y tercero (posible doble registro)."""
+    c = datos["campos"]
+    if not c.get("numero_documento"):
+        return None
+    stmt = select(Asiento).where(
+        Asiento.numero_documento == c["numero_documento"],
+        Asiento.anulado_por_id.is_(None),
+        Asiento.reversa_de_id.is_(None),
+    )
+    if c.get("ruc_tercero"):
+        stmt = stmt.where(Asiento.ruc_tercero == c["ruc_tercero"])
+    return session.execute(stmt.order_by(Asiento.id).limit(1)).scalars().first()
+
+
+def _respuesta_duplicado(dup):
+    texto = (f"El comprobante {dup.numero_documento}"
+             + (f" del RUC {dup.ruc_tercero}" if dup.ruc_tercero else "")
+             + f" ya esta registrado en el asiento {dup.numero} ({dup.fecha.isoformat()}).")
+    return {"ok": False, "duplicado": True, "errores": [texto],
+            "asiento_existente": {"id": dup.id, "numero": dup.numero}}
+
+
+@app.route("/asientos", methods=["POST"])
+def asientos_crear():
+    payload = request.get_json(silent=True) or {}
+    datos, errores = _preparar_asiento(payload)
+    if errores:
         return {"ok": False, "errores": errores}, 400
+    fecha_obj = datos["campos"]["fecha"]
 
     with SessionLocal() as session:
         with session.begin():
             if _mes_cerrado(session, fecha_obj):
                 return {"ok": False, "errores": [f"El mes {fecha_obj.year}-{fecha_obj.month:02d} esta cerrado. No se puede crear asientos en ese periodo."]}, 400
-            numero = _generar_numero(session, fecha_obj)
-            asiento = Asiento(
-                numero=numero,
-                fecha=fecha_obj,
-                glosa=glosa,
-                moneda=moneda,
-                tipo_cambio=tipo_cambio,
-                codigo_libro=codigo_libro,
-                numero_correlativo=numero_correlativo,
-                numero_documento=numero_documento,
-                ruc_tercero=ruc_tercero,
-                razon_social_tercero=razon_social_tercero,
-            )
-            for l in lineas:
-                asiento.lineas.append(AsientoLinea(**l))
-            session.add(asiento)
+            # Un asiento suelto es su propia operacion, salvo que se enlace a una existente.
+            operacion_id = _operacion_existente(session, payload.get("operacion_id"))
+            if payload.get("verificar_duplicado") and not payload.get("confirmar_duplicado") and not operacion_id:
+                dup = _documento_duplicado(session, datos)
+                if dup:
+                    return _respuesta_duplicado(dup), 409
+            operacion_id = operacion_id or str(uuid.uuid4())
+            asiento = _insertar_asiento(session, datos, operacion_id)
         session.refresh(asiento)
-        return {"ok": True, "id": asiento.id, "numero": asiento.numero}
+        return {"ok": True, "id": asiento.id, "numero": asiento.numero, "operacion_id": operacion_id}
+
+
+@app.route("/asientos/lote", methods=["POST"])
+def asientos_crear_lote():
+    """Crea los N asientos de una operacion (plantilla multi-asiento) de forma atomica.
+
+    Payload: {"asientos": [<payload de asiento>, ...], "confirmar_duplicado": bool}
+    Todos quedan con el mismo operacion_id; si uno falla no se guarda ninguno.
+    """
+    payload = request.get_json(silent=True) or {}
+    items = payload.get("asientos") or []
+    if not isinstance(items, list) or not items:
+        return {"ok": False, "errores": ["No se recibieron asientos."]}, 400
+    if len(items) > 20:
+        return {"ok": False, "errores": ["Demasiados asientos en una sola operacion (max 20)."]}, 400
+
+    preparados = []
+    errores = []
+    for i, it in enumerate(items, start=1):
+        datos, errs = _preparar_asiento(it if isinstance(it, dict) else {})
+        errores.extend(f"Asiento {i}: {e}" for e in errs)
+        preparados.append(datos)
+    if errores:
+        return {"ok": False, "errores": errores}, 400
+
+    with SessionLocal() as session:
+        with session.begin():
+            for d in preparados:
+                f = d["campos"]["fecha"]
+                if _mes_cerrado(session, f):
+                    return {"ok": False, "errores": [f"El mes {f.year}-{f.month:02d} esta cerrado. No se puede crear asientos en ese periodo."]}, 400
+            if not payload.get("confirmar_duplicado"):
+                dup = _documento_duplicado(session, preparados[0])
+                if dup:
+                    return _respuesta_duplicado(dup), 409
+            operacion_id = str(uuid.uuid4())
+            creados = [_insertar_asiento(session, d, operacion_id) for d in preparados]
+            resp = [{"id": a.id, "numero": a.numero} for a in creados]
+        return {"ok": True, "operacion_id": operacion_id, "asientos": resp, "ids": [a["id"] for a in resp]}
 
 
 @app.route("/asientos/<int:asiento_id>")
@@ -922,51 +1270,62 @@ def asientos_detalle(asiento_id):
 
 @app.route("/asientos/<int:asiento_id>", methods=["DELETE"])
 def asientos_eliminar(asiento_id):
+    """Los asientos registrados NO se borran: se anulan con un asiento de reversa
+    para conservar la trazabilidad y la correlatividad que exige SUNAT."""
+    payload = request.get_json(silent=True) or {}
+    motivo = (payload.get("motivo") or "").strip()
+    if len(motivo) < 5:
+        return {"ok": False, "error": "Indica el motivo de la anulacion (minimo 5 caracteres)."}, 400
     with SessionLocal() as session:
         with session.begin():
             a = session.get(Asiento, asiento_id)
             if not a:
                 return {"ok": False, "error": "Asiento no encontrado."}, 404
-            if a.anulado_por_id:
-                return {"ok": False, "error": "El asiento ya tiene una reversa; no se puede eliminar."}, 400
-            if _mes_cerrado(session, a.fecha):
-                return {"ok": False, "error": f"El mes {a.fecha.year}-{a.fecha.month:02d} esta cerrado. No se puede eliminar asientos de ese periodo."}, 400
-            for l in list(a.lineas):
-                session.delete(l)
-            session.delete(a)
-        return {"ok": True}
+            reversa, err = _anular_asiento(session, a, motivo)
+            if err:
+                return {"ok": False, "error": err}, 400
+            out = {"ok": True, "anulado": True, "reversa_id": reversa.id, "reversa_numero": reversa.numero}
+        return out
 
 
 @app.route("/operaciones/eliminar", methods=["POST"])
 def operaciones_eliminar():
-    """Elimina varios asientos a la vez (una operacion completa)."""
+    """Anula (con reversa) todos los asientos de una operacion."""
     payload = request.get_json(silent=True) or {}
     ids = payload.get("ids") or []
+    motivo = (payload.get("motivo") or "").strip()
     if not isinstance(ids, list) or not ids:
         return {"ok": False, "error": "Lista de ids vacia."}, 400
+    if len(motivo) < 5:
+        return {"ok": False, "error": "Indica el motivo de la anulacion (minimo 5 caracteres)."}, 400
     try:
         ids = [int(x) for x in ids]
     except (ValueError, TypeError):
         return {"ok": False, "error": "ids invalidos."}, 400
 
-    with SessionLocal() as session:
-        with session.begin():
-            eliminados = 0
-            bloqueados = 0
-            for aid in ids:
-                a = session.get(Asiento, aid)
-                if not a or a.anulado_por_id:
-                    continue
-                if _mes_cerrado(session, a.fecha):
-                    bloqueados += 1
-                    continue
-                for l in list(a.lineas):
-                    session.delete(l)
-                session.delete(a)
-                eliminados += 1
-        if bloqueados and not eliminados:
-            return {"ok": False, "error": f"{bloqueados} asiento(s) estan en un mes cerrado y no se pueden eliminar."}, 400
-        return {"ok": True, "eliminados": eliminados, "bloqueados": bloqueados}
+    anulados = 0
+    try:
+        with SessionLocal() as session:
+            with session.begin():
+                errores = []
+                for aid in ids:
+                    a = session.get(Asiento, aid)
+                    if not a or a.anulado_por_id or a.reversa_de_id:
+                        continue
+                    _, err = _anular_asiento(session, a, motivo)
+                    if err:
+                        errores.append(f"{a.numero}: {err}")
+                    else:
+                        anulados += 1
+                if errores:
+                    raise _Abortar("No se anulo nada. " + " ".join(errores))
+    except _Abortar as e:
+        return {"ok": False, "error": str(e)}, 400
+    return {"ok": True, "anulados": anulados, "eliminados": anulados}
+
+
+class _Abortar(Exception):
+    """Aborta (rollback) una transaccion con un mensaje para el usuario."""
 
 
 @app.route("/asientos/<int:asiento_id>", methods=["PUT"])
@@ -979,6 +1338,9 @@ def asientos_editar(asiento_id):
         if a.anulado_por_id or a.reversa_de_id:
             return {"ok": False, "error": "No se puede editar un asiento anulado o de reversa."}, 400
 
+        if a.origen:
+            return {"ok": False, "errores": ["Los asientos generados por el sistema (destino, cierre, apertura) no se editan; se regeneran."]}, 400
+
         fecha_str = (payload.get("fecha") or "").strip()
         try:
             fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
@@ -986,83 +1348,78 @@ def asientos_editar(asiento_id):
             return {"ok": False, "errores": ["Fecha invalida (YYYY-MM-DD)."]}, 400
         if fecha_obj > date.today():
             return {"ok": False, "errores": ["La fecha no puede ser futura."]}, 400
+        if (fecha_obj.year, fecha_obj.month) != (a.fecha.year, a.fecha.month):
+            return {"ok": False, "errores": ["No se puede mover un asiento a otro periodo: anulalo y registralo en el periodo correcto."]}, 400
 
+        moneda = (payload.get("moneda") or "PEN").strip().upper()
+        if moneda not in sunat.TABLA_4:
+            return {"ok": False, "errores": [f"Moneda {moneda!r} no soportada."]}, 400
         try:
-            tipo_cambio = _parse_decimal(payload.get("tipo_cambio") or "1")
+            tipo_cambio = Decimal(str(payload.get("tipo_cambio") or "1")).quantize(Decimal("0.0001"))
             if tipo_cambio <= 0:
                 return {"ok": False, "errores": ["Tipo de cambio debe ser positivo."]}, 400
-        except ValueError as e:
-            return {"ok": False, "errores": [str(e)]}, 400
+        except InvalidOperation:
+            return {"ok": False, "errores": ["Tipo de cambio invalido."]}, 400
+        if moneda == "PEN":
+            tipo_cambio = Decimal("1")
 
-        lineas, errs = _validar_y_construir_lineas(payload.get("lineas") or [])
+        numero_documento = (payload.get("numero_documento") or "").strip() or None
+        nuevo_ruc = (payload.get("ruc_tercero") or "").strip() or None
+        campos_sunat, errs = _leer_campos_sunat(payload, fecha_obj, numero_documento, nuevo_ruc)
+        if nuevo_ruc and not _validar_doc_tercero(nuevo_ruc, campos_sunat["tipo_doc_tercero"]):
+            errs.append("Documento del tercero invalido.")
+        lineas, errs2 = _validar_y_construir_lineas(payload.get("lineas") or [])
+        errs.extend(errs2)
         if errs:
             return {"ok": False, "errores": errs}, 400
+        lineas = _convertir_moneda(lineas, moneda, tipo_cambio)
 
         if _mes_cerrado(session, a.fecha):
             return {"ok": False, "errores": [f"El mes {a.fecha.year}-{a.fecha.month:02d} esta cerrado. No se puede editar asientos de ese periodo."]}, 400
-        if _mes_cerrado(session, fecha_obj):
-            return {"ok": False, "errores": [f"El mes destino {fecha_obj.year}-{fecha_obj.month:02d} esta cerrado."]}, 400
 
+        antes = snapshot_asiento(a)
         session.rollback()
         with session.begin():
+            a = session.get(Asiento, asiento_id)
             a.fecha = fecha_obj
             a.glosa = (payload.get("glosa") or "").strip()
-            a.moneda = (payload.get("moneda") or "PEN").strip().upper()
+            a.moneda = moneda
             a.tipo_cambio = tipo_cambio
             a.codigo_libro = (payload.get("codigo_libro") or "").strip() or None
             a.numero_correlativo = (payload.get("numero_correlativo") or "").strip() or None
-            a.numero_documento = (payload.get("numero_documento") or "").strip() or None
-            nuevo_ruc = (payload.get("ruc_tercero") or "").strip() or None
-            if nuevo_ruc and not _validar_ruc(nuevo_ruc):
-                raise ValueError("RUC del tercero invalido.")
+            a.numero_documento = numero_documento
             a.ruc_tercero = nuevo_ruc
             a.razon_social_tercero = (payload.get("razon_social_tercero") or "").strip() or None
+            for k, v in campos_sunat.items():
+                setattr(a, k, v)
+            a.modificado_por = usuario_actual()
+            a.modificado_at = datetime.utcnow()
             for l in list(a.lineas):
                 session.delete(l)
             session.flush()
             for l in lineas:
                 a.lineas.append(AsientoLinea(**l))
+            session.flush()
+            registrar(session, "editar", "asiento", a.id, antes=antes, despues=snapshot_asiento(a),
+                      motivo=(payload.get("motivo") or "").strip() or None)
         session.refresh(a)
         return {"ok": True, "id": a.id, "numero": a.numero}
 
 
 @app.route("/asientos/<int:asiento_id>/reversa", methods=["POST"])
 def asientos_reversa(asiento_id):
+    payload = request.get_json(silent=True) or {}
+    motivo = (payload.get("motivo") or "").strip() or None
     with SessionLocal() as session:
         with session.begin():
             original = session.get(Asiento, asiento_id)
             if not original:
                 abort(404)
-            if original.anulado_por_id:
-                return {"ok": False, "error": "El asiento ya tiene una reversa."}, 400
-            if original.reversa_de_id:
-                return {"ok": False, "error": "Un asiento de reversa no se puede reversar."}, 400
-            if _mes_cerrado(session, date.today()):
-                return {"ok": False, "error": f"El mes actual {date.today().year}-{date.today().month:02d} esta cerrado. No se puede generar reversas."}, 400
-
-            numero = _generar_numero(session, date.today())
-            reversa = Asiento(
-                numero=numero,
-                fecha=date.today(),
-                glosa=f"REVERSA de {original.numero}: {original.glosa}",
-                moneda=original.moneda,
-                tipo_cambio=original.tipo_cambio,
-                reversa_de_id=original.id,
-            )
-            for l in original.lineas:
-                reversa.lineas.append(AsientoLinea(
-                    orden=l.orden,
-                    cuenta_codigo=l.cuenta_codigo,
-                    glosa_linea=l.glosa_linea,
-                    debe=l.haber,
-                    haber=l.debe,
-                    es_titulo=l.es_titulo,
-                ))
-            session.add(reversa)
-            session.flush()
-            original.anulado_por_id = reversa.id
-        session.refresh(reversa)
-        return {"ok": True, "id": reversa.id, "numero": reversa.numero}
+            reversa, err = _anular_asiento(session, original, motivo)
+            if err:
+                return {"ok": False, "error": err}, 400
+            out = {"ok": True, "id": reversa.id, "numero": reversa.numero}
+        return out
 
 
 @app.route("/operaciones/cancelar-saldo", methods=["POST"])
@@ -1085,6 +1442,7 @@ def operaciones_cancelar_saldo():
     glosa_base = (payload.get("glosa_base") or "").strip() or "Operacion"
     ruc = (payload.get("ruc") or "").strip()
     razon_social = (payload.get("razon_social") or "").strip()
+    operacion_in = (payload.get("operacion_id") or "").strip()
 
     if cuenta_credito not in ("4212", "1212"):
         return {"ok": False, "error": "Cuenta de credito invalida."}, 400
@@ -1132,11 +1490,13 @@ def operaciones_cancelar_saldo():
                         pass
             correlativo_final = f"{correlativo_base}-{maxsuf + 1}"
 
+        operacion_id = _operacion_existente(session, operacion_in) or str(uuid.uuid4())
         session.rollback()
         with session.begin():
             numero = _generar_numero(session, fecha_obj)
             asiento = Asiento(
                 numero=numero,
+                operacion_id=operacion_id,
                 fecha=fecha_obj,
                 glosa=glosa_asiento,
                 moneda="PEN",
@@ -1145,6 +1505,8 @@ def operaciones_cancelar_saldo():
                 numero_correlativo=correlativo_final,
                 ruc_tercero=ruc or None,
                 razon_social_tercero=razon_social or None,
+                tipo_doc_tercero=sunat.tipo_doc_desde_numero(ruc) or None,
+                creado_por=usuario_actual(),
             )
             if tipo_op == "compra":
                 # Pago a proveedor: 4212 Debe (bajo cuenta por pagar) / 1011|1041 Haber
@@ -1172,70 +1534,220 @@ def operaciones_cancelar_saldo():
                 ))
             session.add(asiento)
             session.flush()
+            registrar(session, "crear", "asiento", asiento.id, despues=snapshot_asiento(asiento))
             asiento_id = asiento.id
             asiento_numero = asiento.numero
         return {"ok": True, "id": asiento_id, "numero": asiento_numero}
 
 
+MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+def _es_cuenta_venta(codigo: str) -> bool:
+    return codigo.startswith("70") or codigo.startswith("75")
+
+
+def _es_cuenta_compra(codigo: str) -> bool:
+    return codigo.startswith("60") or codigo.startswith("63")
+
+
+def _dashboard_data(session: Session, year: int, month: int) -> dict:
+    """Arma todos los datos del dashboard para el periodo (year, month).
+
+    Los importes son netos (haber - debe en ingresos, debe - haber en gastos),
+    asi una reversa cancela al asiento original en vez de duplicarlo.
+    """
+    from calendar import monthrange
+
+    inicio_rango = date(year - 1, 12, 1)  # incluye dic. anterior para comparar enero
+    fin_rango = date(year, 12, 31)
+    asientos = session.execute(
+        select(Asiento)
+        .where(Asiento.fecha >= inicio_rango, Asiento.fecha <= fin_rango)
+        .order_by(Asiento.fecha, Asiento.id)
+    ).scalars().all()
+
+    # indice 0 = diciembre del anio anterior, 1..12 = meses del anio
+    def _vacio():
+        return {"ventas": Decimal("0"), "compras": Decimal("0"),
+                "igv_ventas": Decimal("0"), "igv_compras": Decimal("0"), "n": 0}
+
+    periodos = [_vacio() for _ in range(13)]
+    clientes = {}
+    proveedores = {}
+    gastos = {}
+
+    for a in asientos:
+        idx = 0 if a.fecha.year < year else a.fecha.month
+        p = periodos[idx]
+        p["n"] += 1
+        es_venta = any(_es_cuenta_venta(l.cuenta_codigo) for l in a.lineas)
+        es_compra = any(_es_cuenta_compra(l.cuenta_codigo) for l in a.lineas)
+        venta_asiento = Decimal("0")
+        compra_asiento = Decimal("0")
+        for l in a.lineas:
+            if l.es_titulo:
+                continue
+            cod = l.cuenta_codigo
+            if _es_cuenta_venta(cod):
+                venta_asiento += l.haber - l.debe
+            elif _es_cuenta_compra(cod):
+                compra_asiento += l.debe - l.haber
+            if cod.startswith("4011"):
+                if es_venta:
+                    p["igv_ventas"] += l.haber - l.debe
+                elif es_compra:
+                    p["igv_compras"] += l.debe - l.haber
+            if idx > 0 and cod.startswith("6") and not cod.startswith("61"):
+                k = cod[:2]
+                gastos[k] = gastos.get(k, Decimal("0")) + (l.debe - l.haber)
+        p["ventas"] += venta_asiento
+        p["compras"] += compra_asiento
+
+        if idx > 0 and a.ruc_tercero:
+            nombre = a.razon_social_tercero or a.ruc_tercero
+            if venta_asiento:
+                c = clientes.setdefault(a.ruc_tercero, {"ruc": a.ruc_tercero, "nombre": nombre, "total": Decimal("0")})
+                c["total"] += venta_asiento
+            if compra_asiento:
+                c = proveedores.setdefault(a.ruc_tercero, {"ruc": a.ruc_tercero, "nombre": nombre, "total": Decimal("0")})
+                c["total"] += compra_asiento
+
+    def f(d):
+        return float(round(d, 2))
+
+    serie = []
+    for m in range(1, 13):
+        p = periodos[m]
+        serie.append({
+            "mes": m,
+            "label": MESES_CORTOS[m - 1],
+            "ventas": f(p["ventas"]),
+            "compras": f(p["compras"]),
+            "margen": f(p["ventas"] - p["compras"]),
+            "igv": f(p["igv_ventas"] - p["igv_compras"]),
+            "asientos": p["n"],
+        })
+
+    actual = periodos[month]
+    previo = periodos[month - 1]
+
+    def kpi(clave_actual, clave_previo):
+        return {"valor": f(clave_actual), "previo": f(clave_previo)}
+
+    kpis = {
+        "ventas": kpi(actual["ventas"], previo["ventas"]),
+        "compras": kpi(actual["compras"], previo["compras"]),
+        "margen": kpi(actual["ventas"] - actual["compras"], previo["ventas"] - previo["compras"]),
+        "igv": kpi(actual["igv_ventas"] - actual["igv_compras"], previo["igv_ventas"] - previo["igv_compras"]),
+        "igv_ventas": f(actual["igv_ventas"]),
+        "igv_compras": f(actual["igv_compras"]),
+        "asientos": actual["n"],
+        "asientos_previo": previo["n"],
+    }
+
+    def top(d, n=5):
+        filas = sorted((x for x in d.values() if x["total"] > 0), key=lambda x: -x["total"])
+        return [{"ruc": x["ruc"], "nombre": x["nombre"], "total": f(x["total"])} for x in filas[:n]]
+
+    gastos_ord = sorted(((k, v) for k, v in gastos.items() if v > 0), key=lambda kv: -kv[1])
+    gastos_lista = []
+    for k, v in gastos_ord[:6]:
+        info = CUENTAS_POR_CODIGO.get(k, {})
+        gastos_lista.append({"codigo": k, "nombre": (info.get("descripcion") or f"Cuenta {k}").capitalize(), "total": f(v)})
+    resto = sum((v for _, v in gastos_ord[6:]), Decimal("0"))
+    if resto > 0:
+        gastos_lista.append({"codigo": "", "nombre": "Otros gastos", "total": f(resto)})
+
+    # Saldos acumulados al cierre del mes seleccionado
+    fin_mes = date(year, month, monthrange(year, month)[1])
+    prefijo = func.substr(AsientoLinea.cuenta_codigo, 1, 2)
+    filas_saldo = session.execute(
+        select(prefijo, func.sum(AsientoLinea.debe), func.sum(AsientoLinea.haber))
+        .join(Asiento, Asiento.id == AsientoLinea.asiento_id)
+        .where(Asiento.fecha <= fin_mes, prefijo.in_(["10", "12", "42"]))
+        .group_by(prefijo)
+    ).all()
+    saldos = {"10": Decimal("0"), "12": Decimal("0"), "42": Decimal("0")}
+    for pre, debe, haber in filas_saldo:
+        debe = Decimal(debe or 0)
+        haber = Decimal(haber or 0)
+        saldos[pre] = (haber - debe) if pre == "42" else (debe - haber)
+
+    recientes = session.execute(
+        select(Asiento).order_by(Asiento.fecha.desc(), Asiento.id.desc()).limit(6)
+    ).scalars().all()
+    import re
+    recientes_lista = []
+    for a in recientes:
+        total = sum((l.debe for l in a.lineas if not l.es_titulo), Decimal("0"))
+        recientes_lista.append({
+            "id": a.id,
+            "numero": a.numero,
+            "fecha": a.fecha.isoformat(),
+            "glosa": re.sub(r"^\d+\)\s*[A-Za-z]+\s*-\s*", "", a.glosa or "") or "Operacion",
+            "tercero": a.razon_social_tercero or "",
+            "total": f(total),
+            "reversa": bool(a.reversa_de_id),
+        })
+
+    return {
+        "year": year,
+        "month": month,
+        "mes_nombre": MESES_LARGOS[month - 1],
+        "serie": serie,
+        "kpis": kpis,
+        "clientes": top(clientes),
+        "proveedores": top(proveedores),
+        "gastos": gastos_lista,
+        "saldos": {"efectivo": f(saldos["10"]), "por_cobrar": f(saldos["12"]), "por_pagar": f(saldos["42"])},
+        "recientes": recientes_lista,
+        "mes_cerrado": _mes_cerrado(session, date(year, month, 1)),
+    }
+
+
+def _dashboard_periodo():
+    hoy = date.today()
+    try:
+        year = int(request.args.get("year", hoy.year))
+        month = int(request.args.get("month", hoy.month))
+    except ValueError:
+        year, month = hoy.year, hoy.month
+    if not (2000 <= year <= 2100):
+        year = hoy.year
+    if not (1 <= month <= 12):
+        month = hoy.month
+    return year, month
+
+
 @app.route("/dashboard")
 def dashboard():
-    """Dashboard con estadisticas simples del mes."""
+    """Dashboard con KPIs, graficos mensuales y rankings del periodo."""
+    year, month = _dashboard_periodo()
     with SessionLocal() as session:
-        hoy = date.today()
-        inicio_mes = hoy.replace(day=1)
-        asientos = session.execute(
-            select(Asiento).order_by(Asiento.fecha.desc(), Asiento.id.desc())
-        ).scalars().all()
-
-        total_asientos = len(asientos)
-        asientos_mes = [a for a in asientos if a.fecha >= inicio_mes and not a.reversa_de_id]
-        total_movido_mes = Decimal("0")
-        for a in asientos_mes:
-            total_movido_mes += sum((l.debe for l in a.lineas), Decimal("0"))
-
-        ultima_op = asientos[0] if asientos else None
-        if ultima_op:
-            import re
-            ultima_glosa = re.sub(r"^\d+\)\s*[A-Za-z]+\s*-\s*", "", ultima_op.glosa or "") or "Operacion"
-        else:
-            ultima_glosa = None
-
-        # Totales por tipo (venta/compra/otro) via heuristica: cuentas 70 = venta, 60/63 = compra
-        ventas_mes = Decimal("0")
-        compras_mes = Decimal("0")
-        igv_ventas_mes = Decimal("0")
-        igv_compras_mes = Decimal("0")
-        for a in asientos_mes:
-            es_venta = any(l.cuenta_codigo.startswith("70") or l.cuenta_codigo.startswith("75") for l in a.lineas)
-            es_compra = any(l.cuenta_codigo.startswith("60") or l.cuenta_codigo.startswith("63") for l in a.lineas)
-            for l in a.lineas:
-                if l.cuenta_codigo.startswith("70") or l.cuenta_codigo.startswith("75"):
-                    ventas_mes += l.haber
-                elif l.cuenta_codigo.startswith("60") or l.cuenta_codigo.startswith("63"):
-                    compras_mes += l.debe
-                # IGV: cuenta 4011* (debito en ventas al haber, credito en compras al debe)
-                if l.cuenta_codigo.startswith("4011"):
-                    if es_venta and l.haber > 0:
-                        igv_ventas_mes += l.haber
-                    if es_compra and l.debe > 0:
-                        igv_compras_mes += l.debe
-
-        igv_por_pagar = igv_ventas_mes - igv_compras_mes
-
+        data = _dashboard_data(session, year, month)
+        rango = session.execute(select(func.min(Asiento.fecha), func.max(Asiento.fecha))).one()
+    hoy = date.today()
+    y_min = rango[0].year if rango[0] else hoy.year
+    y_max = max(rango[1].year if rango[1] else hoy.year, hoy.year, year)
+    years = list(range(y_max, min(y_min, year) - 1, -1))
     return render_template(
         "dashboard.html",
-        total_asientos=total_asientos,
-        asientos_mes=len(asientos_mes),
-        total_movido_mes=total_movido_mes,
-        ultima_op=ultima_op,
-        ultima_glosa=ultima_glosa,
-        ventas_mes=ventas_mes,
-        compras_mes=compras_mes,
-        igv_ventas_mes=igv_ventas_mes,
-        igv_compras_mes=igv_compras_mes,
-        igv_por_pagar=igv_por_pagar,
+        data=data,
+        years=years,
+        meses=MESES_LARGOS,
         hoy=hoy,
     )
+
+
+@app.route("/dashboard/data")
+def dashboard_data_json():
+    """Mismos datos que el dashboard, en JSON (para refrescar sin recargar)."""
+    year, month = _dashboard_periodo()
+    with SessionLocal() as session:
+        return _dashboard_data(session, year, month)
 
 
 @app.route("/reportes/libro-diario")
@@ -1409,12 +1921,13 @@ def reporte_por_ruc():
                 por_ruc[k]["ultima_fecha"] = a.fecha
             if not por_ruc[k]["razon_social"] and a.razon_social_tercero:
                 por_ruc[k]["razon_social"] = a.razon_social_tercero
-            # Heuristica: 60xx/63xx en debe = compra, 70xx en haber = venta
-            for l in a.lineas:
-                if l.cuenta_codigo.startswith("60") or l.cuenta_codigo.startswith("63"):
-                    por_ruc[k]["compras"] += l.debe
-                elif l.cuenta_codigo.startswith("70"):
-                    por_ruc[k]["ventas"] += l.haber
+            if a.origen:
+                continue
+            tipo_op, base, _igv = _clasificar_operacion(a)
+            if tipo_op == "compra":
+                por_ruc[k]["compras"] += base
+            elif tipo_op == "venta":
+                por_ruc[k]["ventas"] += base
         filas = sorted(por_ruc.values(), key=lambda x: -(x["compras"] + x["ventas"]))
         total_compras = sum((f["compras"] for f in filas), Decimal("0"))
         total_ventas = sum((f["ventas"] for f in filas), Decimal("0"))
@@ -1441,7 +1954,10 @@ def balance_comprobacion():
         ).scalars().all()
 
         por_cuenta = {}
+        incluir_cierre = request.args.get("incluir_cierre") == "1"
         for a in asientos:
+            if not incluir_cierre and (a.origen or "").startswith("cierre"):
+                continue
             if fecha_desde:
                 try:
                     if a.fecha < datetime.strptime(fecha_desde, "%Y-%m-%d").date():
@@ -2465,6 +2981,10 @@ def importar_ejecutar():
                         moneda="PEN",
                         tipo_cambio=Decimal("1"),
                         numero_documento=a["documento"],
+                        tipo_comprobante=sunat.tipo_comprobante_desde_documento(a["documento"] or "") or None,
+                        serie_comprobante=sunat.separar_serie_numero(a["documento"] or "")[0] or None,
+                        numero_comprobante=sunat.separar_serie_numero(a["documento"] or "")[1] or None,
+                        creado_por=usuario_actual(),
                     )
                     for i, l in enumerate(a["lineas"], start=1):
                         asiento.lineas.append(AsientoLinea(
@@ -2476,6 +2996,9 @@ def importar_ejecutar():
                             es_titulo=False,
                         ))
                     session.add(asiento)
+                    session.flush()
+                    registrar(session, "crear", "asiento", asiento.id, despues=snapshot_asiento(asiento),
+                              motivo="Importacion desde Excel")
                     creados += 1
         except Exception as e:
             return {"ok": False, "error": f"Error al importar: {e}"}, 500
@@ -2505,6 +3028,7 @@ def cierres_list():
 
 
 @app.route("/cierres", methods=["POST"])
+@requiere_rol(*ROLES_CIERRE)
 def cierres_crear():
     data = request.get_json(silent=True) or {}
     try:
@@ -2515,7 +3039,7 @@ def cierres_crear():
     if not (1 <= month <= 12):
         return {"ok": False, "error": "month fuera de rango."}, 400
     nota = (data.get("nota") or "").strip() or None
-    cerrado_por = (data.get("cerrado_por") or "").strip() or None
+    cerrado_por = usuario_actual()
 
     primer_dia = date(year, month, 1)
     if primer_dia > date.today().replace(day=1):
@@ -2530,16 +3054,29 @@ def cierres_crear():
                 return {"ok": False, "error": "Ese mes ya esta cerrado."}, 400
             c = CierreMes(year=year, month=month, cerrado_por=cerrado_por, nota=nota)
             session.add(c)
+            session.flush()
+            registrar(session, "cerrar_mes", "cierre_mes", c.id,
+                      despues={"periodo": f"{year}-{month:02d}", "nota": nota})
         return {"ok": True}
 
 
 @app.route("/cierres/<int:cierre_id>", methods=["DELETE"])
+@requiere_rol("admin")
 def cierres_reabrir(cierre_id):
+    """Reabrir un periodo cerrado: solo administrador, con motivo obligatorio,
+    y queda registrado en la bitacora de auditoria."""
+    data = request.get_json(silent=True) or {}
+    motivo = (data.get("motivo") or "").strip()
+    if len(motivo) < 10:
+        return {"ok": False, "error": "Indica el motivo de la reapertura (minimo 10 caracteres)."}, 400
     with SessionLocal() as session:
         with session.begin():
             c = session.get(CierreMes, cierre_id)
             if not c:
                 return {"ok": False, "error": "Cierre no encontrado."}, 404
+            registrar(session, "reabrir_mes", "cierre_mes", c.id, motivo=motivo,
+                      antes={"periodo": f"{c.year}-{c.month:02d}", "cerrado_por": c.cerrado_por,
+                             "cerrado_at": c.cerrado_at, "nota": c.nota})
             session.delete(c)
         return {"ok": True}
 
@@ -2746,36 +3283,67 @@ def asientos_excel(asiento_id):
         )
 
 
-def _tipo_doc_sunat(numero_documento: str) -> str:
-    """Devuelve el codigo SUNAT Tabla 10 segun el prefijo serie del numero de documento.
-    F = 01 Factura, B = 03 Boleta, 07 NC, 08 ND, sino 00."""
-    if not numero_documento:
-        return ""
-    s = numero_documento.strip().upper()
-    if s.startswith("F"):
-        return "01"
-    if s.startswith("B"):
-        return "03"
-    if s.startswith("FC") or s.startswith("BC") or "NC" in s[:3]:
-        return "07"
-    if s.startswith("FD") or s.startswith("BD") or "ND" in s[:3]:
-        return "08"
-    return "00"
+# Cuentas que NO forman parte de la base imponible: efectivo, cuentas por cobrar,
+# tributos y cuentas por pagar (son la contrapartida de la operacion).
+_PREF_NO_BASE = ("10", "12", "13", "14", "16", "17", "40", "41", "42", "43", "44", "45", "46", "47")
+_PREF_VENTA = ("70", "73", "74", "75")
+_CUENTAS_IGV = {"4011", "40111", "40112"}
 
 
-def _parse_serie_numero(numero_documento: str):
-    """Separa 'F001-2559' -> ('F001', '2559'). Si no hay guion, todo va a 'numero'."""
-    if not numero_documento:
-        return ("", "")
-    s = numero_documento.strip()
-    if "-" in s:
-        serie, num = s.split("-", 1)
-        return (serie.strip(), num.strip())
-    return ("", s)
+def tasa_igv() -> Decimal:
+    """Tasa de IGV configurada (18 % general; 10.5 % MYPE de restaurantes y hoteles)."""
+    try:
+        return Decimal(config_get("tasa_igv", "18") or "18") / 100
+    except InvalidOperation:
+        return Decimal("0.18")
+
+
+def _es_no_base(codigo):
+    return codigo.startswith(_PREF_NO_BASE)
+
+
+def _clasificar_operacion(a):
+    """Devuelve 'venta', 'compra' o None, y los importes (base, igv) en soles.
+
+    - Venta: el asiento usa cuentas de ingreso (70, 73, 74, 75).
+    - Compra: tiene comprobante y alguna cuenta de activo/gasto distinta de
+      efectivo, cobrar, tributos y pagar (33, 34, 60, 63, 65, ...).
+    Los importes son netos (las notas de credito salen en negativo).
+    """
+    movs = [l for l in a.lineas if not l.es_titulo]
+    if not movs:
+        return None, Decimal("0"), Decimal("0")
+    es_venta = any(l.cuenta_codigo.startswith(_PREF_VENTA) for l in movs)
+    igv = Decimal("0")
+    base = Decimal("0")
+    for l in movs:
+        c = l.cuenta_codigo
+        if c in _CUENTAS_IGV:
+            igv += (l.haber - l.debe) if es_venta else (l.debe - l.haber)
+        elif not _es_no_base(c):
+            base += (l.haber - l.debe) if es_venta else (l.debe - l.haber)
+    if es_venta:
+        return "venta", base, igv
+    tiene_doc = bool(a.numero_documento or a.tipo_comprobante or a.numero_comprobante)
+    if tiene_doc and (base != 0 or igv != 0):
+        return "compra", base, igv
+    return None, base, igv
+
+
+def _separar_gravado(base, igv):
+    """Separa base gravada y no gravada (exonerada/inafecta). Si el IGV no
+    coincide con el 18% de toda la base, el exceso se toma como no gravado."""
+    if igv == 0:
+        return Decimal("0"), base
+    gravada = (igv / tasa_igv()).quantize(Decimal("0.01"))
+    resto = base - gravada
+    if abs(resto) > Decimal("1.00") and (resto > 0) == (base > 0):
+        return gravada, resto
+    return base, Decimal("0")
 
 
 def _registro_compras_ventas(session, year: int, month: int):
-    """Construye las filas del Registro de Compras (8.1) y Ventas (14.1) del mes."""
+    """Construye las filas del Registro de Compras y de Ventas del mes."""
     from calendar import monthrange
     inicio = date(year, month, 1)
     fin = date(year, month, monthrange(year, month)[1])
@@ -2785,74 +3353,87 @@ def _registro_compras_ventas(session, year: int, month: int):
             Asiento.fecha <= fin,
             Asiento.reversa_de_id.is_(None),
             Asiento.anulado_por_id.is_(None),
+            Asiento.origen.is_(None),
         ).order_by(Asiento.fecha, Asiento.id)
     ).scalars().all()
 
-    # Agrupar por numero_documento + ruc para consolidar los asientos que forman una sola operacion
     compras_grp = {}
     ventas_grp = {}
+    advertencias = []
     for a in rows:
-        base = Decimal("0")
-        igv = Decimal("0")
-        es_compra = False
-        es_venta = False
-        for l in a.lineas:
-            if l.es_titulo:
-                continue
-            c = l.cuenta_codigo
-            if c.startswith("60") or c.startswith("63"):
-                base += l.debe
-                es_compra = True
-            elif c.startswith("70") or c.startswith("75"):
-                base += l.haber
-                es_venta = True
-            if c.startswith("4011") or c.startswith("40111"):
-                # IGV: debe para compras, haber para ventas
-                igv += (l.debe if l.debe > 0 else l.haber)
-
-        if not (es_compra or es_venta):
+        tipo_op, base, igv = _clasificar_operacion(a)
+        if not tipo_op:
             continue
-        key = (a.numero_documento or f"__sindoc_{a.id}", a.ruc_tercero or "")
-        destino = compras_grp if es_compra else ventas_grp
+        tipo, serie, numero = sunat.datos_comprobante(a)
+        key = (tipo, serie, numero or f"__sindoc_{a.id}", a.ruc_tercero or "")
+        destino = compras_grp if tipo_op == "compra" else ventas_grp
         if key not in destino:
-            serie, num = _parse_serie_numero(a.numero_documento or "")
             destino[key] = {
-                "fecha": a.fecha,
-                "fecha_venc": None,
-                "tipo_doc": _tipo_doc_sunat(a.numero_documento or ""),
+                "asiento_id": a.id,
+                "asiento_numero": a.numero,
+                "fecha": a.fecha_emision or a.fecha,
+                "fecha_contable": a.fecha,
+                "fecha_venc": a.fecha_vencimiento,
+                "tipo_doc": tipo,
+                "tipo_doc_nombre": sunat.TABLA_10.get(tipo, ""),
                 "serie": serie,
-                "numero": num,
+                "numero": numero,
                 "numero_documento": a.numero_documento or "",
+                "tipo_doc_tercero": a.tipo_doc_tercero or sunat.tipo_doc_desde_numero(a.ruc_tercero or ""),
                 "ruc": a.ruc_tercero or "",
                 "razon_social": a.razon_social_tercero or "",
-                "base": Decimal("0"),
+                "moneda": a.moneda,
+                "tipo_cambio": a.tipo_cambio,
+                "ref": "-".join(x for x in (a.ref_tipo_comprobante, a.ref_serie, a.ref_numero) if x),
+                "detraccion_constancia": a.detraccion_constancia or "",
+                "detraccion_fecha": a.detraccion_fecha,
+                "detraccion_monto": a.detraccion_monto or Decimal("0"),
+                "sujeto_retencion": bool(a.sujeto_retencion),
+                "percepcion": a.percepcion_monto or Decimal("0"),
+                "glosa": a.glosa or "",
+                "base_total": Decimal("0"),
                 "igv": Decimal("0"),
-                "exonerado": Decimal("0"),
             }
-        destino[key]["base"] += base
+        destino[key]["base_total"] += base
         destino[key]["igv"] += igv
 
-    def _finalize(d):
+    def _finalize(d, etiqueta):
         filas = []
-        for i, v in enumerate(sorted(d.values(), key=lambda x: (x["fecha"], x["numero_documento"])), 1):
+        for i, v in enumerate(sorted(d.values(), key=lambda x: (x["fecha_contable"], x["numero_documento"])), 1):
             v["n"] = i
-            v["importe_total"] = v["base"] + v["igv"]
+            v["base"], v["exonerado"] = _separar_gravado(v["base_total"], v["igv"])
+            v["importe_total"] = v["base_total"] + v["igv"]
+            faltan = []
+            if not v["tipo_doc"] or v["tipo_doc"] == "00":
+                faltan.append("tipo de comprobante")
+            if not v["numero"]:
+                faltan.append("numero de comprobante")
+            if v["tipo_doc"] == "01" and not v["ruc"]:
+                faltan.append("RUC del tercero")
+            if v["tipo_doc"] in ("07", "08") and not v["ref"]:
+                faltan.append("comprobante que modifica")
+            v["faltan"] = faltan
+            if faltan:
+                advertencias.append(f"{etiqueta} {v['asiento_numero']}: falta {', '.join(faltan)}.")
             filas.append(v)
         totales = {
             "base": sum((f["base"] for f in filas), Decimal("0")),
             "igv": sum((f["igv"] for f in filas), Decimal("0")),
             "exonerado": sum((f["exonerado"] for f in filas), Decimal("0")),
             "total": sum((f["importe_total"] for f in filas), Decimal("0")),
+            "detraccion": sum((f["detraccion_monto"] for f in filas), Decimal("0")),
+            "percepcion": sum((f["percepcion"] for f in filas), Decimal("0")),
         }
         return filas, totales
 
-    compras, totales_c = _finalize(compras_grp)
-    ventas, totales_v = _finalize(ventas_grp)
+    compras, totales_c = _finalize(compras_grp, "Compra")
+    ventas, totales_v = _finalize(ventas_grp, "Venta")
     return {
         "compras": compras,
         "ventas": ventas,
         "totales_compras": totales_c,
         "totales_ventas": totales_v,
+        "advertencias": advertencias,
     }
 
 
@@ -2911,9 +3492,9 @@ def reporte_registros_excel():
     # ===== HOJA 1: COMPRAS 8.1 =====
     ws = wb.active
     ws.title = "8.1 Compras"
-    ws["A1"] = f"FORMATO 8.1: REGISTRO DE COMPRAS"
+    ws["A1"] = "REGISTRO DE COMPRAS (para conciliar con la propuesta SIRE - RCE)"
     ws["A1"].font = title_font
-    ws.merge_cells("A1:N1")
+    ws.merge_cells("A1:U1")
     ws["A2"] = f"PERIODO: {meses_nombres[month-1]} {year}"
     ws["A2"].font = Font(bold=True, size=10)
     ws.merge_cells("A2:N2")
@@ -2922,8 +3503,9 @@ def reporte_registros_excel():
         "N° CORR.", "FECHA EMISION", "FECHA VENC/PAGO",
         "TIPO DOC (T.10)", "N° SERIE", "N° COMPROBANTE",
         "TIPO DOC (T.2)", "N° DOCUMENTO", "RAZON SOCIAL",
-        "BASE IMPONIBLE", "IGV", "COMPRAS EXONERADAS",
-        "IMPORTE TOTAL", "GLOSA"
+        "BASE IMPONIBLE GRAVADA", "IGV", "NO GRAVADAS / EXONERADAS",
+        "IMPORTE TOTAL", "MONEDA", "T.C.", "DOC. MODIFICADO",
+        "CONST. DETRACCION", "FECHA DETRACCION", "MONTO DETRACCION", "RETENCION", "GLOSA"
     ]
     for col, h in enumerate(headers_c, 1):
         c = ws.cell(row=4, column=col, value=h)
@@ -2938,14 +3520,18 @@ def reporte_registros_excel():
             f["n"], f["fecha"].strftime("%d/%m/%Y"),
             f["fecha_venc"].strftime("%d/%m/%Y") if f["fecha_venc"] else "",
             f["tipo_doc"], f["serie"], f["numero"],
-            "6" if f["ruc"] else "", f["ruc"], f["razon_social"],
+            f["tipo_doc_tercero"], f["ruc"], f["razon_social"],
             float(f["base"]), float(f["igv"]), float(f["exonerado"]),
-            float(f["importe_total"]), ""
+            float(f["importe_total"]), f["moneda"], float(f["tipo_cambio"]), f["ref"],
+            f["detraccion_constancia"],
+            f["detraccion_fecha"].strftime("%d/%m/%Y") if f["detraccion_fecha"] else "",
+            float(f["detraccion_monto"]) if f["detraccion_monto"] else "",
+            "SI" if f["sujeto_retencion"] else "", f["glosa"],
         ]
         for col, v in enumerate(vals, 1):
             c = ws.cell(row=row, column=col, value=v)
             c.border = border
-            if col in (10, 11, 12, 13):
+            if col in (10, 11, 12, 13, 19):
                 c.number_format = "#,##0.00"
                 c.alignment = Alignment(horizontal="right")
             elif col in (1, 2, 3, 4, 5, 6, 7, 8):
@@ -2964,13 +3550,13 @@ def reporte_registros_excel():
             c.border = border
             c.alignment = Alignment(horizontal="right")
 
-    widths_c = [8, 13, 13, 10, 10, 15, 10, 15, 35, 15, 12, 15, 15, 25]
+    widths_c = [8, 13, 13, 10, 10, 15, 10, 15, 35, 15, 12, 15, 15, 8, 8, 18, 16, 13, 13, 10, 30]
     for i, w in enumerate(widths_c, 1):
         ws.column_dimensions[chr(64 + i) if i <= 26 else "A" + chr(64 + i - 26)].width = w
 
     # ===== HOJA 2: VENTAS 14.1 =====
     ws2 = wb.create_sheet("14.1 Ventas")
-    ws2["A1"] = f"FORMATO 14.1: REGISTRO DE VENTAS E INGRESOS"
+    ws2["A1"] = "REGISTRO DE VENTAS E INGRESOS (para conciliar con la propuesta SIRE - RVIE)"
     ws2["A1"].font = title_font
     ws2.merge_cells("A1:M1")
     ws2["A2"] = f"PERIODO: {meses_nombres[month-1]} {year}"
@@ -2981,8 +3567,8 @@ def reporte_registros_excel():
         "N° CORR.", "FECHA EMISION", "FECHA VENC/PAGO",
         "TIPO DOC (T.10)", "N° SERIE", "NUMERO",
         "TIPO DOC (T.2)", "N° DOCUMENTO", "RAZON SOCIAL",
-        "BASE IMPONIBLE", "IGV Y/O IPM",
-        "IMPORTE TOTAL", "GLOSA"
+        "BASE IMPONIBLE GRAVADA", "IGV Y/O IPM", "EXONERADA / INAFECTA",
+        "IMPORTE TOTAL", "MONEDA", "T.C.", "DOC. MODIFICADO", "PERCEPCION", "GLOSA"
     ]
     for col, h in enumerate(headers_v, 1):
         c = ws2.cell(row=4, column=col, value=h)
@@ -2997,15 +3583,15 @@ def reporte_registros_excel():
             f["n"], f["fecha"].strftime("%d/%m/%Y"),
             f["fecha_venc"].strftime("%d/%m/%Y") if f["fecha_venc"] else "",
             f["tipo_doc"], f["serie"], f["numero"],
-            "6" if (f["ruc"] and len(f["ruc"]) == 11) else ("1" if f["ruc"] else ""),
-            f["ruc"], f["razon_social"],
-            float(f["base"]), float(f["igv"]),
-            float(f["importe_total"]), ""
+            f["tipo_doc_tercero"], f["ruc"], f["razon_social"],
+            float(f["base"]), float(f["igv"]), float(f["exonerado"]),
+            float(f["importe_total"]), f["moneda"], float(f["tipo_cambio"]), f["ref"],
+            float(f["percepcion"]) if f["percepcion"] else "", f["glosa"],
         ]
         for col, v in enumerate(vals, 1):
             c = ws2.cell(row=row, column=col, value=v)
             c.border = border
-            if col in (10, 11, 12):
+            if col in (10, 11, 12, 13, 17):
                 c.number_format = "#,##0.00"
                 c.alignment = Alignment(horizontal="right")
             elif col in (1, 2, 3, 4, 5, 6, 7, 8):
@@ -3015,7 +3601,7 @@ def reporte_registros_excel():
     if data["ventas"]:
         ws2.cell(row=row, column=9, value="TOTALES:").font = totals_font
         ws2.cell(row=row, column=9).alignment = Alignment(horizontal="right")
-        for col, key in [(10, "base"), (11, "igv"), (12, "total")]:
+        for col, key in [(10, "base"), (11, "igv"), (12, "exonerado"), (13, "total")]:
             c = ws2.cell(row=row, column=col, value=float(data["totales_ventas"][key]))
             c.font = totals_font
             c.fill = totals_fill
@@ -3023,7 +3609,7 @@ def reporte_registros_excel():
             c.border = border
             c.alignment = Alignment(horizontal="right")
 
-    widths_v = [8, 13, 13, 10, 10, 15, 10, 15, 35, 15, 12, 15, 25]
+    widths_v = [8, 13, 13, 10, 10, 15, 10, 15, 35, 15, 12, 15, 15, 8, 8, 18, 12, 30]
     for i, w in enumerate(widths_v, 1):
         ws2.column_dimensions[chr(64 + i) if i <= 26 else "A" + chr(64 + i - 26)].width = w
 
@@ -3067,6 +3653,97 @@ def reporte_registros_excel():
         download_name=f"Registros_{year}_{month:02d}_{meses_nombres[month-1]}.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+def _descripcion_con_padre(c):
+    """'Costo' -> 'Vehiculos motorizados > Costo': las subcuentas genericas necesitan el nombre del padre."""
+    padre = CUENTAS_POR_CODIGO.get(c["codigo"][:-1])
+    if c["nivel"] >= 4 and padre and len(c["descripcion"]) < 25 and padre["descripcion"] != c["descripcion"]:
+        return f'{padre["descripcion"]} › {c["descripcion"]}'
+    return c["descripcion"]
+
+
+@app.route("/cuentas/info")
+def cuentas_info():
+    """Nombre y tipo de varias cuentas (vista previa de plantillas)."""
+    codigos = [c.strip() for c in (request.args.get("codigos") or "").split(",") if c.strip()][:200]
+    out = {}
+    for cod in codigos:
+        c = CUENTAS_POR_CODIGO.get(cod)
+        out[cod] = (
+            {"existe": True, "descripcion": _descripcion_con_padre(c), "nivel": c["nivel"], "movimiento": es_cuenta_movimiento(c)}
+            if c else {"existe": False}
+        )
+    return out
+
+
+# ---------------------------------------------------------------- Plantillas propias
+
+def _plantillas_propias():
+    try:
+        return json.loads(config_get("plantillas_propias", "[]") or "[]")
+    except json.JSONDecodeError:
+        return []
+
+
+@app.route("/plantillas-propias")
+def plantillas_propias_listar():
+    return {"ok": True, "plantillas": _plantillas_propias()}
+
+
+@app.route("/plantillas-propias", methods=["POST"])
+def plantillas_propias_crear():
+    """Guarda las lineas del asiento actual como plantilla reutilizable de la empresa."""
+    from auth import config_set
+    d = request.get_json(silent=True) or {}
+    nombre = (d.get("nombre") or "").strip()[:80]
+    if len(nombre) < 3:
+        return {"ok": False, "error": "El nombre debe tener al menos 3 caracteres."}, 400
+    lineas = []
+    for raw in d.get("lineas") or []:
+        cod = (raw.get("cuenta_codigo") or "").strip()
+        c = CUENTAS_POR_CODIGO.get(cod)
+        if not c:
+            return {"ok": False, "error": f"La cuenta {cod!r} no existe."}, 400
+        try:
+            debe = _parse_decimal(raw.get("debe"))
+            haber = _parse_decimal(raw.get("haber"))
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}, 400
+        lineas.append({"cuenta_codigo": cod, "glosa_linea": (raw.get("glosa_linea") or "")[:200],
+                       "debe": str(debe), "haber": str(haber)})
+    if len(lineas) < 2:
+        return {"ok": False, "error": "La plantilla necesita al menos 2 lineas."}, 400
+    with SessionLocal() as s:
+        with s.begin():
+            lista = _plantillas_propias()
+            nuevo_id = max([p.get("id", 0) for p in lista] + [0]) + 1
+            item = {"id": nuevo_id, "nombre": nombre, "glosa": (d.get("glosa") or "")[:300],
+                    "lineas": lineas, "creado_por": usuario_actual()}
+            lista.append(item)
+            config_set(s, "plantillas_propias", json.dumps(lista, ensure_ascii=False))
+            registrar(s, "crear", "plantilla", nuevo_id, despues=item)
+    return {"ok": True, "id": nuevo_id}
+
+
+@app.route("/plantillas-propias/<int:pid>", methods=["DELETE"])
+def plantillas_propias_borrar(pid):
+    from auth import config_set
+    with SessionLocal() as s:
+        with s.begin():
+            lista = _plantillas_propias()
+            item = next((p for p in lista if p.get("id") == pid), None)
+            if not item:
+                return {"ok": False, "error": "No existe."}, 404
+            lista = [p for p in lista if p.get("id") != pid]
+            config_set(s, "plantillas_propias", json.dumps(lista, ensure_ascii=False))
+            registrar(s, "borrar", "plantilla", pid, antes=item)
+    return {"ok": True}
+
+
+import contabilidad  # noqa: E402
+
+contabilidad.init_app(app, CUENTAS_POR_CODIGO, _mes_cerrado, _generar_numero, _validar_ruc)
 
 
 if __name__ == "__main__":

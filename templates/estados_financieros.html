@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <title>Estados financieros {{ year }}</title>
+  {% include 'partials/page_head.html' %}
+  <style>
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media (max-width: 900px) { .grid2 { grid-template-columns:1fr; } }
+    .cta { color:var(--muted, #6b7785); font-size:.72rem; }
+    @media print { .app-sidebar, .app-topbar, .no-print { display:none !important; } .app-main { margin:0 !important; padding:0 !important; } }
+  </style>
+</head>
+<body>
+  {% set active = 'eeff' %}
+  {% set breadcrumb = [('Reportes',''), ('Estados financieros','')] %}
+  {% include 'partials/shell_open.html' %}
+  <form class="card row no-print" method="get">
+    <div class="fld"><label>Ejercicio</label><input name="year" type="number" value="{{ year }}" min="2000" max="2100" style="width:110px;min-width:0;"></div>
+    <div class="fld"><label>Al</label><input name="hasta" type="date" value="{{ hasta.isoformat() }}"></div>
+    <button class="btn primary"><span class="ic sm">refresh</span> Ver</button>
+    <button type="button" class="btn" onclick="window.print()"><span class="ic sm">print</span> Imprimir / PDF</button>
+  </form>
+
+  <div class="card">
+    <h2><span class="ic sm">account_balance</span> Estado de Situacion Financiera al {{ hasta.strftime('%d/%m/%Y') }}</h2>
+    <p class="sub">{{ emp.razon_social or 'Empresa' }}{% if emp.ruc %} &middot; RUC {{ emp.ruc }}{% endif %} &middot; Expresado en soles.
+      {% if cuadra %}<span class="pill ok">Activo = Pasivo + Patrimonio</span>{% else %}<span class="pill bad">Descuadre: {{ '{:,.2f}'.format(total_activo - total_pp) }}</span>{% endif %}</p>
+    <div class="grid2">
+      <table class="t">
+        <thead><tr><th>Activo</th><th class="num">S/</th></tr></thead>
+        <tbody>
+        {% for sec in activo %}
+          <tr class="sub"><td>{{ sec.titulo }}</td><td class="num">{{ '{:,.2f}'.format(sec.total) }}</td></tr>
+          {% for f in sec.filas %}<tr><td>{{ f.nombre }} <span class="cta">({{ f.cuentas }})</span></td><td class="num">{{ '{:,.2f}'.format(f.monto) }}</td></tr>{% endfor %}
+        {% endfor %}
+        <tr class="total"><td>TOTAL ACTIVO</td><td class="num">{{ '{:,.2f}'.format(total_activo) }}</td></tr>
+        </tbody>
+      </table>
+      <table class="t">
+        <thead><tr><th>Pasivo y patrimonio</th><th class="num">S/</th></tr></thead>
+        <tbody>
+        {% for sec in pasivo_pat %}
+          <tr class="sub"><td>{{ sec.titulo }}</td><td class="num">{{ '{:,.2f}'.format(sec.total) }}</td></tr>
+          {% for f in sec.filas %}<tr><td>{{ f.nombre }} <span class="cta">({{ f.cuentas }})</span></td><td class="num">{{ '{:,.2f}'.format(f.monto) }}</td></tr>{% endfor %}
+        {% endfor %}
+        <tr class="total"><td>TOTAL PASIVO Y PATRIMONIO</td><td class="num">{{ '{:,.2f}'.format(total_pp) }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2><span class="ic sm">trending_up</span> Estado de Resultados por naturaleza</h2>
+      <p class="sub">Del 01/01/{{ year }} al {{ hasta.strftime('%d/%m/%Y') }}. Ingresos en positivo, gastos en negativo.</p>
+      <table class="t">
+        <tbody>
+        {% for f in er %}<tr><td>{{ f.nombre }} <span class="cta">({{ f.cuentas }})</span></td><td class="num">{{ '{:,.2f}'.format(f.monto) }}</td></tr>{% endfor %}
+        <tr class="sub"><td>Resultado antes de participaciones e impuestos</td><td class="num">{{ '{:,.2f}'.format(antes_imp) }}</td></tr>
+        <tr><td>Participaciones e impuesto a la renta</td><td class="num">{{ '{:,.2f}'.format(impuestos) }}</td></tr>
+        <tr class="total"><td>RESULTADO DEL EJERCICIO</td><td class="num">{{ '{:,.2f}'.format(resultado) }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2><span class="ic sm">category</span> Estado de Resultados por funcion</h2>
+      {% if usa_funcion %}
+      <p class="sub">Usa el costo de ventas (69) y las cuentas de destino (94 administracion, 95 ventas, 97 financieros). Requiere los asientos de destino al dia.</p>
+      <table class="t">
+        <tbody>
+        {% for f in erf %}
+          {% if f.subtotal %}<tr class="sub"><td>{{ f.nombre }}</td><td class="num">{{ '{:,.2f}'.format(f.monto) }}</td></tr>
+          {% else %}<tr><td>{{ f.nombre }} <span class="cta">({{ f.cuentas }})</span></td><td class="num">{{ '{:,.2f}'.format(f.monto) }}</td></tr>{% endif %}
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="sub">No hay movimientos en costo de ventas (69) ni en las cuentas de destino (94, 95, 97) en este periodo. Activa la clase 9 en <a href="/configuracion">Configuracion</a> y genera los destinos para obtener este estado.</p>
+      {% endif %}
+    </div>
+  </div>
+  <p class="note">Presentacion simplificada agrupada por cuentas del PCGE. No reemplaza los formatos del Libro de Inventarios y Balances (3.x) ni las notas a los estados financieros.</p>
+  {% include 'partials/shell_close.html' %}
+</body>
+</html>

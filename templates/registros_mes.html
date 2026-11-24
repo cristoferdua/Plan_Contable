@@ -39,20 +39,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div style="display:flex;align-items:center;gap:.6rem;">
-      <a href="/reportes/anual?year={{ year }}" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
-      <h1><span class="ic">menu_book</span> Registros</h1>
-    </div>
-    <nav>
-      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
-      <a href="/reportes/anual?year={{ year }}"><span class="ic sm">calendar_month</span> Anual</a>
-      <a href="/asientos?year={{ year }}&month={{ month }}"><span class="ic sm">receipt_long</span> Asientos</a>
-      <button type="button" class="theme-toggle">dark_mode</button>
-    </nav>
-  </header>
-
-  <main class="wrap">
+  {% set active = 'registros_mes' %}
+  {% set breadcrumb = [('Reportes',''), ('Registros por mes','')] %}
+  {% include 'partials/shell_open.html' %}
     <section class="hero">
       <div>
         <h2>Registros — {{ mes_nombre }} {{ year }}</h2>
@@ -75,9 +64,23 @@
       </div>
     </section>
 
+    {% if advertencias %}
+    <div class="card" style="border-left:4px solid #b7791f;padding:.9rem 1.1rem;">
+      <strong style="display:flex;align-items:center;gap:.35rem;color:#9a5b00;"><span class="ic sm">warning</span> Datos SUNAT incompletos ({{ advertencias|length }})</strong>
+      <ul style="margin:.4rem 0 0;padding-left:1.2rem;font-size:.84rem;line-height:1.5;">
+        {% for a in advertencias %}<li>{{ a }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    <div class="card" style="padding:.7rem 1.1rem;font-size:.82rem;color:#4a5568;">
+      <span class="ic sm" style="vertical-align:middle;">info</span>
+      Los registros de compras (RCE) y ventas (RVIE) se presentan por el <strong>SIRE</strong>: compara estos totales con la propuesta de SUNAT antes de aceptarla.
+      Las notas de credito aparecen en negativo. "No gravadas" = exoneradas/inafectas (sin IGV).
+    </div>
+
     <!-- REGISTRO DE COMPRAS 8.1 -->
     <div class="section-head">
-      <h3><span class="ic">shopping_cart</span> FORMATO 8.1: Registro de Compras <span class="pill">{{ compras|length }} comprobante{{ 's' if compras|length != 1 else '' }}</span></h3>
+      <h3><span class="ic">shopping_cart</span> Registro de Compras <span class="pill">{{ compras|length }} comprobante{{ 's' if compras|length != 1 else '' }}</span></h3>
     </div>
     <div class="card">
       <table class="reg">
@@ -101,7 +104,7 @@
             <th>&nbsp;</th>
             <th>Base imp.</th>
             <th>IGV</th>
-            <th>Exoneradas</th>
+            <th>No gravadas</th>
           </tr>
         </thead>
         <tbody>
@@ -114,10 +117,10 @@
               <td class="c">{{ c.tipo_doc }}</td>
               <td class="c">{{ c.serie }}</td>
               <td class="c">{{ c.numero }}</td>
-              <td class="c">6</td>
+              <td class="c">{{ c.tipo_doc_tercero }}</td>
               <td class="c">{{ c.ruc }}</td>
               <td>{{ c.razon_social }}</td>
-              <td></td>
+              <td style="font-size:.72rem;">{% if c.ref %}Modifica {{ c.ref }}<br>{% endif %}{% if c.detraccion_constancia %}Detr. {{ c.detraccion_constancia }}<br>{% endif %}{% if c.faltan %}<span style="color:#b42318;">Falta: {{ c.faltan|join(', ') }}</span>{% endif %}<a href="/asientos/{{ c.asiento_id }}" style="display:block;">{{ c.asiento_numero }}</a></td>
               <td class="num">{{ '%.2f'|format(c.base) }}</td>
               <td class="num">{{ '%.2f'|format(c.igv) }}</td>
               <td class="num">{{ '%.2f'|format(c.exonerado) if c.exonerado else '' }}</td>
@@ -144,7 +147,7 @@
 
     <!-- REGISTRO DE VENTAS 14.1 -->
     <div class="section-head">
-      <h3><span class="ic">point_of_sale</span> FORMATO 14.1: Registro de Ventas e Ingresos <span class="pill">{{ ventas|length }} comprobante{{ 's' if ventas|length != 1 else '' }}</span></h3>
+      <h3><span class="ic">point_of_sale</span> Registro de Ventas e Ingresos <span class="pill">{{ ventas|length }} comprobante{{ 's' if ventas|length != 1 else '' }}</span></h3>
     </div>
     <div class="card">
       <table class="reg">
@@ -157,6 +160,7 @@
             <th colspan="4" class="grp">Información del cliente</th>
             <th rowspan="2">Base imponible<br>operación gravada</th>
             <th rowspan="2">IGV<br>y/o IPM</th>
+            <th rowspan="2">Exonerada /<br>inafecta</th>
             <th rowspan="2">Importe total<br>del comprobante</th>
           </tr>
           <tr>
@@ -179,17 +183,18 @@
               <td class="c">{{ v.tipo_doc }}</td>
               <td class="c">{{ v.serie }}</td>
               <td class="c">{{ v.numero }}</td>
-              <td class="c">6</td>
+              <td class="c">{{ v.tipo_doc_tercero }}</td>
               <td class="c">{{ v.ruc }}</td>
               <td>{{ v.razon_social }}</td>
-              <td></td>
+              <td style="font-size:.72rem;">{% if v.ref %}Modifica {{ v.ref }}<br>{% endif %}{% if v.faltan %}<span style="color:#b42318;">Falta: {{ v.faltan|join(', ') }}</span>{% endif %}<a href="/asientos/{{ v.asiento_id }}" style="display:block;">{{ v.asiento_numero }}</a></td>
               <td class="num">{{ '%.2f'|format(v.base) }}</td>
               <td class="num">{{ '%.2f'|format(v.igv) }}</td>
+              <td class="num">{{ '%.2f'|format(v.exonerado) if v.exonerado else '' }}</td>
               <td class="num"><strong>{{ '%.2f'|format(v.importe_total) }}</strong></td>
             </tr>
             {% endfor %}
           {% else %}
-            <tr><td colspan="13" class="vacio">Sin ventas registradas en el período</td></tr>
+            <tr><td colspan="14" class="vacio">Sin ventas registradas en el período</td></tr>
           {% endif %}
         </tbody>
         {% if ventas %}
@@ -198,12 +203,13 @@
             <td colspan="10" style="text-align:right;">TOTALES:</td>
             <td class="num">{{ '%.2f'|format(totales_ventas.base) }}</td>
             <td class="num">{{ '%.2f'|format(totales_ventas.igv) }}</td>
+            <td class="num">{{ '%.2f'|format(totales_ventas.exonerado) }}</td>
             <td class="num">{{ '%.2f'|format(totales_ventas.total) }}</td>
           </tr>
         </tfoot>
         {% endif %}
       </table>
     </div>
-  </main>
+  {% include 'partials/shell_close.html' %}
 </body>
 </html>

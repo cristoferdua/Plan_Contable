@@ -650,3 +650,10 @@ html[data-theme="dark"] .ms-modal .btn-cancel:hover { background: #2c3b4e !impor
   h1, h2, h3 { color: #000 !important; break-after: avoid; }
   .totales { background: #f8f8f8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+html[data-theme="dark"] .custom-select-search, html[data-theme="dark"] .tpl-cuenta-list { background: #141b23 !important; color: var(--text) !important; border-color: var(--border) !important; }
+html[data-theme="dark"] .custom-select-group { color: #8b9bb0 !important; background: #141b23 !important; }
+html[data-theme="dark"] .tpl-cuenta-opt.active, html[data-theme="dark"] .tpl-cuenta-opt:hover { background: #253040 !important; }
+html[data-theme="dark"] .tpl-cuenta-opt b { color: #8fb4e8 !important; }
+html[data-theme="dark"] .custom-select.on-dark .custom-select-trigger { background: rgba(255,255,255,.14) !important; color: #fff !important; border-color: rgba(255,255,255,.25) !important; }
+html[data-theme="dark"] .custom-select-trigger:disabled { background: #10161d !important; color: #5d6b7c !important; }
+html[data-theme="dark"] .custom-select-opt.focus:not(.active) { background: #253040 !important; color: #e5eaf0 !important; }

@@ -255,23 +255,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div style="display:flex;align-items:center;gap:.6rem;">
-      <a href="javascript:history.back()" title="Volver atras" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;color:#fff;text-decoration:none;font-size:.82rem;font-weight:600;display:inline-flex;align-items:center;gap:.25rem;"><span class="ic sm">arrow_back</span> Volver</a>
-      <h1 style="margin:0;display:flex;align-items:center;gap:.5rem;"><span class="ic">receipt_long</span> Operaciones contables</h1>
-    </div>
-    <nav>
-      <a href="/" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">home</span> Inicio</a>
-      <a href="/dashboard" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">dashboard</span> Dashboard</a>
-      <a href="/asientos" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">receipt_long</span> Operaciones</a>
-      <a href="/reportes/libro-mayor" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">menu_book</span> Libro Mayor</a>
-      <a href="/reportes/balance" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">balance</span> Balance</a>
-      <a href="/asientos/nuevo" class="cta" style="display:inline-flex;align-items:center;gap:.3rem;"><span class="ic sm">add</span> Nueva operacion</a>
-      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
-    </nav>
-  </header>
-
-  <main class="wrap">
+  {% set active = 'asientos' %}
+  {% set breadcrumb = [('Operaciones',''), ('Lista de asientos','')] %}
+  {% include 'partials/shell_open.html' %}
     {% if filtro_info %}
     {% set cuadra = (total_debe_filtro - total_haber_filtro)|abs < 0.01 and total_debe_filtro > 0 %}
     <div class="card" style="padding:1rem 1.2rem;background:linear-gradient(135deg,#eef3f8 0%,#f4f8fd 100%);border:1px solid #c9d6e5;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
@@ -370,6 +356,7 @@
                         data-cuenta="{{ op.mixto.cuenta_credito }}"
                         data-saldo="{{ op.mixto.saldo_pendiente }}"
                         data-correlativo="{{ op.mixto.correlativo_base }}"
+                        data-operacion="{{ op.mixto.operacion_id }}"
                         data-glosa="{{ op.mixto.glosa_base }}"
                         data-ruc="{{ op.mixto.ruc }}"
                         data-rs="{{ op.mixto.razon_social }}"
@@ -382,11 +369,11 @@
               {% endif %}
               {% if op.n_asientos > 1 %}
                 <a class="op-btn excel" href="/operaciones/excel?ids={{ op.ids|join(',') }}" title="Descargar Excel de los {{ op.n_asientos }} asientos"><span class="ic sm">download</span> Excel</a>
-                <button type="button" class="op-btn danger" onclick="eliminarOperacion([{{ op.ids|join(',') }}], '{{ op.titulo|replace("'", "\\'") }}')" title="Eliminar los {{ op.n_asientos }} asientos de esta operacion"><span class="ic sm">delete</span> Eliminar</button>
+                <button type="button" class="op-btn danger" onclick="eliminarOperacion([{{ op.ids|join(',') }}], '{{ op.titulo|replace("'", "\\'") }}')" title="Anular (con reversa) los {{ op.n_asientos }} asientos de esta operacion"><span class="ic sm">undo</span> Anular</button>
               {% else %}
                 <a class="op-btn excel" href="/asientos/{{ op.ids[0] }}/excel" title="Descargar Excel"><span class="ic sm">download</span> Excel</a>
                 <a class="op-btn" href="/asientos/nuevo?editar={{ op.ids[0] }}" title="Editar"><span class="ic sm">edit</span> Editar</a>
-                <button type="button" class="op-btn danger" onclick="eliminarAsientoUnico({{ op.ids[0] }})" title="Eliminar"><span class="ic sm">delete</span></button>
+                <button type="button" class="op-btn danger" onclick="eliminarAsientoUnico({{ op.ids[0] }})" title="Anular (crear reversa)"><span class="ic sm">undo</span></button>
               {% endif %}
             </div>
           </div>
@@ -423,7 +410,7 @@
       </div>
       {% endif %}
     </div>
-  </main>
+  {% include 'partials/shell_close.html' %}
 
   <div class="ms-backdrop" id="ms-backdrop" onclick="if(event.target.id==='ms-backdrop')cerrarModalSaldo()">
     <div class="ms-modal">
@@ -491,6 +478,7 @@
           cuenta: btn.dataset.cuenta,
           saldo: btn.dataset.saldo,
           correlativo: btn.dataset.correlativo,
+          operacion_id: btn.dataset.operacion,
           glosa: btn.dataset.glosa,
           ruc: btn.dataset.ruc,
           rs: btn.dataset.rs,
@@ -527,6 +515,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             correlativo_base: ctx.correlativo,
+            operacion_id: ctx.operacion_id,
             cuenta_credito: ctx.cuenta,
             monto: monto,
             medio: elMedio.value,
@@ -562,49 +551,46 @@
       item.classList.toggle('open');
     }
     async function eliminarAsientoUnico(id) {
-      var ok = await UI.confirm({
-        type: 'danger',
-        icon: 'delete',
-        title: 'Eliminar asiento',
-        msg: 'Esta accion no se puede deshacer. El asiento se borrara permanentemente.',
-        confirmText: 'Si, eliminar',
-        cancelText: 'Cancelar'
+      var motivo = await UI.prompt({
+        type: 'danger', icon: 'undo', title: 'Anular asiento',
+        msg: 'El asiento no se borra: se registra un asiento de reversa y el original queda anulado (trazabilidad SUNAT). Indica el motivo.',
+        placeholder: 'Ej: comprobante registrado dos veces', minLength: 5, confirmText: 'Anular'
       });
-      if (!ok) return;
-      fetch('/asientos/' + id, { method: 'DELETE' })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d.ok) {
-            UI.success('Asiento eliminado correctamente.', 'Listo');
-            setTimeout(function () { location.reload(); }, 700);
-          } else {
-            UI.error(d.error || 'Error desconocido', 'No se pudo eliminar');
-          }
-        })
-        .catch(function () { UI.error('Error de red al eliminar.', 'Sin conexion'); });
-    }
-    async function eliminarOperacion(ids, titulo) {
-      var ok = await UI.confirm({
-        type: 'danger',
-        icon: 'delete_sweep',
-        title: 'Eliminar operacion completa',
-        msg: 'Se borraran los ' + ids.length + ' asientos de "' + titulo + '".\nEsta accion no se puede deshacer.',
-        confirmText: 'Si, eliminar todo',
-        cancelText: 'Cancelar'
-      });
-      if (!ok) return;
-      fetch('/operaciones/eliminar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: ids })
+      if (!motivo) return;
+      fetch('/asientos/' + id, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: motivo })
       })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d.ok) {
-            UI.success(d.eliminados + ' asientos eliminados.', 'Operacion borrada');
+            UI.success('Asiento anulado con la reversa ' + d.reversa_numero + '.', 'Listo');
             setTimeout(function () { location.reload(); }, 700);
           } else {
-            UI.error(d.error || 'Error desconocido', 'No se pudo eliminar');
+            UI.error(d.error || 'Error desconocido', 'No se pudo anular');
+          }
+        })
+        .catch(function () { UI.error('Error de red.', 'Sin conexion'); });
+    }
+    async function eliminarOperacion(ids, titulo) {
+      var motivo = await UI.prompt({
+        type: 'danger', icon: 'undo', title: 'Anular operacion completa',
+        msg: 'Se registrara una reversa por cada uno de los ' + ids.length + ' asientos de "' + titulo + '". Nada se borra. Indica el motivo.',
+        placeholder: 'Motivo de la anulacion', minLength: 5, confirmText: 'Anular todo'
+      });
+      if (!motivo) return;
+      fetch('/operaciones/eliminar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids, motivo: motivo })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) {
+            UI.success(d.anulados + ' asiento(s) anulados con reversa.', 'Operacion anulada');
+            setTimeout(function () { location.reload(); }, 700);
+          } else {
+            UI.error(d.error || 'Error desconocido', 'No se pudo anular');
           }
         })
         .catch(function () { UI.error('Error de red.', 'Sin conexion'); });

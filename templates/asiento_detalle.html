@@ -156,28 +156,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-left">
-      <a href="javascript:history.back()" class="tb-back"><span class="ic sm">arrow_back</span> Volver</a>
-      <h1>
-        <span class="ic">receipt_long</span> Asiento {{ asiento.numero }}
-        {% if asiento.reversa_de_id %}<span class="status reversa">REVERSA</span>
-        {% elif asiento.anulado_por_id %}<span class="status anulado">ANULADO</span>
-        {% else %}<span class="status vigente">VIGENTE</span>{% endif %}
-      </h1>
-    </div>
-    <nav>
-      <a href="/"><span class="ic sm">home</span> Inicio</a>
-      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
-      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
-      <a href="/reportes/libro-mayor"><span class="ic sm">menu_book</span> Libro Mayor</a>
-      <a href="/reportes/balance"><span class="ic sm">balance</span> Balance</a>
-      <a href="/asientos/nuevo" class="cta"><span class="ic sm">add</span> Nueva operacion</a>
-      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
-    </nav>
-  </header>
-
-  <main class="wrap">
+  {% set active = 'asientos' %}
+  {% set breadcrumb = [('Operaciones','/asientos'), ('Detalle asiento','')] %}
+  {% include 'partials/shell_open.html' %}
     <div class="card">
       <div class="detail-hero">
         <div>
@@ -225,6 +206,44 @@
             <div class="val mono">{{ asiento.numero_documento }}</div>
           </div>
           {% endif %}
+          {% if asiento.tipo_comprobante %}
+          <div class="meta-item">
+            <div class="lbl">Comprobante (T.10)</div>
+            <div class="val mono">{{ asiento.tipo_comprobante }} &middot; {{ asiento.serie_comprobante or '' }}-{{ asiento.numero_comprobante or '' }}</div>
+          </div>
+          {% endif %}
+          {% if asiento.ruc_tercero %}
+          <div class="meta-item">
+            <div class="lbl">Tercero (T.2: {{ asiento.tipo_doc_tercero or '-' }})</div>
+            <div class="val mono">{{ asiento.ruc_tercero }}{% if asiento.razon_social_tercero %} <span style="font-family:inherit;font-weight:500;">{{ asiento.razon_social_tercero }}</span>{% endif %}</div>
+          </div>
+          {% endif %}
+          {% if asiento.fecha_emision %}
+          <div class="meta-item">
+            <div class="lbl">Emision / Vencimiento</div>
+            <div class="val">{{ asiento.fecha_emision }}{% if asiento.fecha_vencimiento %} / {{ asiento.fecha_vencimiento }}{% endif %}</div>
+          </div>
+          {% endif %}
+          {% if asiento.ref_serie %}
+          <div class="meta-item">
+            <div class="lbl">Modifica a</div>
+            <div class="val mono">{{ asiento.ref_tipo_comprobante or '' }} {{ asiento.ref_serie }}-{{ asiento.ref_numero }}</div>
+          </div>
+          {% endif %}
+          {% if asiento.detraccion_monto %}
+          <div class="meta-item">
+            <div class="lbl">Detraccion</div>
+            <div class="val">{{ '%.2f'|format(asiento.detraccion_monto) }}{% if asiento.detraccion_constancia %} &middot; const. {{ asiento.detraccion_constancia }}{% endif %}</div>
+          </div>
+          {% endif %}
+          <div class="meta-item">
+            <div class="lbl">Tipo PLE / Estado</div>
+            <div class="val mono">{{ asiento.tipo_asiento }} / {{ asiento.estado_ple }}{% if asiento.origen %} <span style="font-family:inherit;font-weight:500;">({{ asiento.origen }})</span>{% endif %}</div>
+          </div>
+          <div class="meta-item">
+            <div class="lbl">Registrado por</div>
+            <div class="val">{{ asiento.creado_por or '—' }}{% if asiento.modificado_por %} <span style="color:var(--muted);font-weight:500;">&middot; editado por {{ asiento.modificado_por }}</span>{% endif %}</div>
+          </div>
           {% if asiento.reversa_de_id %}
           <div class="meta-item">
             <div class="lbl">Reversa de</div>
@@ -241,10 +260,14 @@
 
         <div class="actions">
           <a href="/asientos/{{ asiento.id }}/excel" class="act excel"><span class="ic sm">download</span> Exportar Excel</a>
-          {% if not asiento.reversa_de_id and not asiento.anulado_por_id %}
+          {% if usuario_actual and usuario_actual.rol in ('admin','contador') %}
+          <a href="/auditoria?entidad=asiento&id={{ asiento.id }}" class="act excel"><span class="ic sm">history</span> Historial</a>
+          {% endif %}
+          {% if not asiento.reversa_de_id and not asiento.anulado_por_id and usuario_actual and usuario_actual.rol != 'lectura' %}
+            {% if not asiento.origen %}
             <a href="/asientos/nuevo?editar={{ asiento.id }}" class="act edit"><span class="ic sm">edit</span> Editar</a>
-            <button type="button" class="act delete" onclick="eliminarAsiento({{ asiento.id }})"><span class="ic sm">delete</span> Eliminar</button>
-            <button type="button" class="act reverse" onclick="hacerReversa({{ asiento.id }})"><span class="ic sm">undo</span> Anular (crear reversa)</button>
+            {% endif %}
+            <button type="button" class="act delete" onclick="hacerReversa({{ asiento.id }})"><span class="ic sm">undo</span> Anular (crear reversa)</button>
           {% endif %}
         </div>
       </div>
@@ -297,42 +320,24 @@
         </table>
       </div>
     </div>
-  </main>
+  {% include 'partials/shell_close.html' %}
 
   <script>
-    async function eliminarAsiento(id) {
-      var ok = await UI.confirm({
-        type: 'danger',
-        icon: 'delete',
-        title: 'Eliminar asiento',
-        msg: 'Esta accion no se puede deshacer. Los datos se borraran permanentemente.',
-        confirmText: 'Si, eliminar',
-        cancelText: 'Cancelar'
-      });
-      if (!ok) return;
-      fetch('/asientos/' + id, { method: 'DELETE' })
-        .then(r => r.json())
-        .then(d => {
-          if (d.ok) {
-            UI.success('Asiento eliminado correctamente.', 'Listo');
-            setTimeout(() => { window.location.href = '/asientos'; }, 700);
-          } else {
-            UI.error(d.error || 'desconocido', 'Error al eliminar');
-          }
-        })
-        .catch(() => UI.error('Error de red al eliminar.', 'Sin conexion'));
-    }
     async function hacerReversa(id) {
-      var ok = await UI.confirm({
+      var motivo = await UI.prompt({
         type: 'warning',
         icon: 'undo',
-        title: 'Crear asiento de reversa',
-        msg: 'Se creara un nuevo asiento que anula al actual (debe y haber invertidos). El original quedara marcado como anulado.',
-        confirmText: 'Si, crear reversa',
-        cancelText: 'Cancelar'
+        title: 'Anular asiento',
+        msg: 'Los asientos registrados no se borran: se crea un asiento de reversa (debe y haber invertidos) y el original queda marcado como anulado. Indica el motivo; quedara en la auditoria.',
+        placeholder: 'Ej: comprobante registrado dos veces',
+        minLength: 5,
+        confirmText: 'Anular',
       });
-      if (!ok) return;
-      fetch('/asientos/' + id + '/reversa', { method: 'POST' })
+      if (!motivo) return;
+      fetch('/asientos/' + id + '/reversa', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: motivo })
+      })
         .then(r => r.json())
         .then(d => {
           if (d.ok) {

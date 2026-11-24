@@ -177,3 +177,16 @@ Abre `http://localhost:5000`.
   maneje el navegador para flujos tipo "crear cuenta en Neon". Requiere **reiniciar
   Claude Code** para que las herramientas `mcp__playwright__*` queden disponibles.
   La primera invocación descarga Chromium (~150 MB).
+
+## Sesion 2026-11-24: cumplimiento SUNAT / PCGE
+
+- **Usuarios y roles** (`auth.py`): login obligatorio; primer uso en `/setup` crea el admin. Roles: admin, contador, asistente, lectura. `SECRET_KEY` de entorno (si falta se genera y guarda en la tabla `config`). Mutaciones con `Origin` ajeno se rechazan.
+- **Auditoria** (tabla `auditoria`, `/auditoria`): solo insercion; guarda antes/despues (JSON), usuario, motivo, IP.
+- **Sin borrado de asientos**: `DELETE /asientos/<id>` y `/operaciones/eliminar` ahora ANULAN con reversa (motivo obligatorio). La reversa va en la fecha del original si su mes esta abierto (estado PLE 1), si no hoy (estado 9). La edicion no puede mover el asiento de periodo y pide motivo. Reabrir un mes: solo admin y con motivo.
+- **Campos SUNAT en `asiento`**: tipo_asiento (A/M/C), tipo_comprobante (T.10), serie/numero, fecha_emision/vencimiento, tipo_doc_tercero (T.2), comprobante modificado (NC/ND, obligatorio para 07/08), detraccion/retencion/percepcion, estado_ple, origen (asientos del sistema), creado_por/modificado_por. `asiento_linea.importe_me`.
+- **Moneda extranjera**: en USD los montos se ingresan en dolares, se guardan en `importe_me` y se convierten a soles con el TC (4 decimales). Boton "SUNAT" trae el TC venta (`/tipo-cambio`, apis.net.pe).
+- **PLE** (`sunat.py`, `/ple`): 5.1, 5.3 y 6.1 en .txt con nombre LE+RUC+AAAAMM00+libro+00+1+I+1+1. Estructuras armadas segun los anexos conocidos: validar con el PLE vigente.
+- **Registros compras/ventas**: base = neto de cuentas distintas de 10,12-17,40-47; IGV de 4011; separa gravado/no gravado; NC en negativo; columnas de doc. modificado y detraccion. Se presentan via SIRE: sirven para conciliar con la propuesta.
+- **Destino y cierre anual** (`contabilidad.py`, `/ejercicio`): destino mensual por diferencia (62-68 vs 79) segun distribucion de `/configuracion`; cierre del ejercicio genera cierre de resultados -> 89, 89 -> 59, cierre de balance (C) y apertura 01/01 (A). Balance de comprobacion y EEFF excluyen los asientos de cierre.
+- **Estados financieros** (`/reportes/estados-financieros`): ESF, ER por naturaleza y por funcion (simplificados por cuentas).
+- **Migracion** `b1c2d3e4f5a6` (Alembic). En produccion (Postgres): `alembic upgrade head`. En SQLite local `app.py` hace `create_all` para tablas nuevas, pero columnas nuevas en tablas existentes requieren la migracion.

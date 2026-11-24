@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <title>Usuarios</title>
+  {% include 'partials/page_head.html' %}
+</head>
+<body>
+  {% set active = 'usuarios' %}
+  {% set breadcrumb = [('Mantenimiento',''), ('Usuarios','')] %}
+  {% include 'partials/shell_open.html' %}
+  <div class="card">
+    <h2><span class="ic sm">person_add</span> Nuevo usuario</h2>
+    <p class="sub">Cada persona debe tener su propio usuario: asi la auditoria registra quien hizo cada cambio.
+      <strong>Administrador</strong>: todo. <strong>Contador</strong>: registra, cierra meses, ejercicio y PLE.
+      <strong>Asistente</strong>: registra asientos. <strong>Solo lectura</strong>: consulta.</p>
+    <div class="row">
+      <div class="fld"><label>Usuario</label><input id="n-user" maxlength="80"></div>
+      <div class="fld"><label>Nombre</label><input id="n-nombre" maxlength="150"></div>
+      <div class="fld"><label>Contrasena (min. 8)</label><input id="n-pass" type="password" autocomplete="new-password"></div>
+      <div class="fld"><label>Rol</label>
+        <select id="n-rol">{% for k, v in ROLES.items() %}<option value="{{ k }}" {% if k == 'asistente' %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+      </div>
+      <button class="btn primary" onclick="crear()"><span class="ic sm">add</span> Crear</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic sm">group</span> Usuarios</h2>
+    <table class="t">
+      <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Ultimo ingreso</th><th></th></tr></thead>
+      <tbody>
+      {% for u in usuarios %}
+        <tr>
+          <td class="mono">{{ u.username }}</td>
+          <td>{{ u.nombre }}</td>
+          <td>
+            <select onchange="editar({{ u.id }}, {rol: this.value})" {% if u.id == usuario_actual.id %}disabled{% endif %}>
+              {% for k, v in ROLES.items() %}<option value="{{ k }}" {% if k == u.rol %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+          </td>
+          <td>{% if u.activo %}<span class="pill ok">Activo</span>{% else %}<span class="pill bad">Inactivo</span>{% endif %}</td>
+          <td>{{ u.ultimo_login.strftime('%d/%m/%Y %H:%M') if u.ultimo_login else '—' }}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn" onclick="cambiarPass({{ u.id }})"><span class="ic sm">key</span></button>
+            {% if u.id != usuario_actual.id %}
+            <button class="btn" onclick="editar({{ u.id }}, {activo: {{ 'false' if u.activo else 'true' }}})">{{ 'Desactivar' if u.activo else 'Activar' }}</button>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="note">Los usuarios no se eliminan (se desactivan) para conservar la trazabilidad de la auditoria.</p>
+  </div>
+  {% include 'partials/shell_close.html' %}
+  <script>
+    function enviar(url, method, body, okMsg) {
+      return fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) { UI.success(okMsg, 'Listo'); setTimeout(function () { location.reload(); }, 600); }
+          else UI.error(d.error || 'Error', 'No se pudo guardar');
+        });
+    }
+    function crear() {
+      enviar('/usuarios', 'POST', {
+        username: document.getElementById('n-user').value,
+        nombre: document.getElementById('n-nombre').value,
+        password: document.getElementById('n-pass').value,
+        rol: document.getElementById('n-rol').value
+      }, 'Usuario creado.');
+    }
+    function editar(id, cambios) { enviar('/usuarios/' + id, 'PUT', cambios, 'Usuario actualizado.'); }
+    async function cambiarPass(id) {
+      var p = await UI.prompt({ type: 'info', icon: 'key', title: 'Nueva contrasena', msg: 'Minimo 8 caracteres.', minLength: 8, confirmText: 'Guardar' });
+      if (p) editar(id, { password: p });
+    }
+  </script>
+</body>
+</html>

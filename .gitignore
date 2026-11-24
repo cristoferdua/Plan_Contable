@@ -8,3 +8,8 @@ dist/
 .DS_Store
 .env
 .playwright-mcp/
+
+# Base de datos local (datos contables y usuarios)
+*.db
+*.db-journal
+*.sqlite3

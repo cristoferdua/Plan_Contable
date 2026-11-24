@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <title>Destino y cierre del ejercicio</title>
+  {% include 'partials/page_head.html' %}
+</head>
+<body>
+  {% set active = 'ejercicio' %}
+  {% set breadcrumb = [('SUNAT',''), ('Destino y cierre anual','')] %}
+  {% set nombres_mes = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+  {% include 'partials/shell_open.html' %}
+  <form class="card row" method="get">
+    <div class="fld"><label>Ejercicio</label><input name="year" type="number" value="{{ year }}" min="2000" max="2100" style="width:110px;min-width:0;"></div>
+    <button class="btn primary"><span class="ic sm">refresh</span> Ver</button>
+  </form>
+
+  <div class="card">
+    <h2><span class="ic sm">alt_route</span> Asientos de destino {{ year }}</h2>
+    {% if not emp.usa_clase9 %}
+      <p class="sub">La empresa no usa la clase 9. Si registras gastos por funcion, activalo en <a href="/configuracion">Configuracion</a>.</p>
+    {% else %}
+      <p class="sub">Gastos de las cuentas 62 a 68 del mes frente a lo ya destinado (79). "Generar" crea un asiento Debe 9x / Haber 7911 por la diferencia, repartido segun la configuracion:
+        {% for d in emp.destino %}<span class="mono">{{ d.cuenta }}</span> {{ d.pct }}%{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+      <table class="t">
+        <thead><tr><th>Mes</th><th class="num">Gastos 62-68</th><th class="num">Destinado (79)</th><th class="num">Pendiente</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+        {% for r in meses %}
+          <tr>
+            <td>{{ nombres_mes[r.month - 1] }}</td>
+            <td class="num">{{ '{:,.2f}'.format(r.gasto) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(r.destinado) }}</td>
+            <td class="num">{{ '{:,.2f}'.format(r.pendiente) }}</td>
+            <td>
+              {% if r.pendiente == 0 %}<span class="pill ok">Completo</span>{% else %}<span class="pill warn">Pendiente</span>{% endif %}
+              {% if r.cerrado %}<span class="pill bad">Mes cerrado</span>{% endif %}
+            </td>
+            <td>{% if r.pendiente != 0 and not r.cerrado %}<button class="btn" onclick="destino({{ r.month }})"><span class="ic sm">bolt</span> Generar</button>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2><span class="ic sm">event_available</span> Cierre del ejercicio {{ year }}</h2>
+    <p class="sub">Resultado del ejercicio a la fecha: <strong>{{ '{:,.2f}'.format(resultado) }}</strong> ({{ 'utilidad' if resultado >= 0 else 'perdida' }}).</p>
+    {% if cierre %}
+      <p><span class="pill ok">Ejercicio cerrado</span> &mdash; asiento <a href="/asientos/{{ cierre.id }}">{{ cierre.numero }}</a>. Para revertirlo, anula los asientos de cierre y apertura (quedan en la auditoria).</p>
+    {% elif not puede_cerrar %}
+      <p class="note">El ejercicio {{ year }} aun no termina. El cierre se habilita a partir del 01/01/{{ year + 1 }}.</p>
+    {% else %}
+      <p class="note">Antes de cerrar: registra el impuesto a la renta y las participaciones (cuentas 88 / 40 / 41), los ajustes y la depreciacion, y genera los destinos pendientes.
+        El cierre genera al 31/12/{{ year }}: <strong>(1)</strong> cancelacion de las cuentas de resultado (6, 7, 8 y 9) contra 89,
+        <strong>(2)</strong> traslado de 89 a 59 (utilidades o perdidas acumuladas), <strong>(3)</strong> cierre de las cuentas de balance;
+        y al 01/01/{{ year + 1 }} <strong>(4)</strong> el asiento de apertura. Los asientos de cierre usan el correlativo <span class="mono">C</span> y la apertura <span class="mono">A</span> en el PLE.</p>
+      <button class="btn warn" onclick="cerrar()"><span class="ic sm">lock</span> Cerrar ejercicio {{ year }}</button>
+    {% endif %}
+  </div>
+  {% include 'partials/shell_close.html' %}
+  <script>
+    function post(url, body) {
+      return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json(); });
+    }
+    function destino(month) {
+      post('/ejercicio/destino', { year: {{ year }}, month: month }).then(function (d) {
+        if (d.ok) { UI.success(d.mensaje || ('Asiento de destino ' + d.numero + ' generado.'), 'Listo'); setTimeout(function () { location.reload(); }, 700); }
+        else UI.error(d.error || 'Error', 'No se pudo generar');
+      });
+    }
+    async function cerrar() {
+      var ok = await UI.confirm({
+        type: 'warning', icon: 'lock', title: 'Cerrar ejercicio {{ year }}',
+        msg: 'Se generaran los asientos de cierre al 31/12/{{ year }} y la apertura al 01/01/{{ year + 1 }}. ¿Continuar?',
+        confirmText: 'Cerrar ejercicio'
+      });
+      if (!ok) return;
+      post('/ejercicio/cierre', { year: {{ year }} }).then(function (d) {
+        if (d.ok) { UI.success('Ejercicio cerrado. Resultado: ' + d.resultado, 'Listo'); setTimeout(function () { location.reload(); }, 900); }
+        else UI.error(d.error || 'Error', 'No se pudo cerrar');
+      });
+    }
+  </script>
+</body>
+</html>

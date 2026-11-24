@@ -103,6 +103,50 @@
     });
   };
 
+  // ====== PROMPT (texto obligatorio, ej. motivo de anulacion) ======
+  // Devuelve el texto ingresado o null si se cancela.
+  UI.prompt = function (opts) {
+    opts = opts || {};
+    var minLen = opts.minLength || 0;
+    return new Promise(function (resolve) {
+      var type = opts.type || 'warning';
+      var backdrop = document.createElement('div');
+      backdrop.className = 'ui-modal-backdrop';
+      backdrop.innerHTML =
+        '<div class="ui-modal ' + type + '" role="dialog" aria-modal="true">' +
+          '<div class="ui-modal-icon">' + (opts.icon || 'edit_note') + '</div>' +
+          '<h3>' + escapeHtml(opts.title || 'Ingresa un valor') + '</h3>' +
+          '<p>' + escapeHtml(opts.msg || '') + '</p>' +
+          '<textarea class="ui-prompt-input" rows="3" maxlength="500" placeholder="' + escapeHtml(opts.placeholder || '') + '" ' +
+            'style="width:100%;margin:.2rem 0 .3rem;padding:.55rem .65rem;border-radius:8px;border:1px solid #cbd5e1;font:inherit;resize:vertical;"></textarea>' +
+          '<div class="ui-prompt-err" style="color:#c0392b;font-size:.78rem;min-height:1em;"></div>' +
+          '<div class="ui-modal-actions">' +
+            '<button type="button" class="ui-cancel">' + escapeHtml(opts.cancelText || 'Cancelar') + '</button>' +
+            '<button type="button" class="' + (type === 'danger' ? 'danger' : 'primary') + ' ui-ok">' + escapeHtml(opts.confirmText || 'Aceptar') + '</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(backdrop);
+      var input = backdrop.querySelector('.ui-prompt-input');
+      var err = backdrop.querySelector('.ui-prompt-err');
+      function close(result) {
+        backdrop.classList.add('leaving');
+        setTimeout(function () { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); }, 180);
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      }
+      function ok() {
+        var v = input.value.trim();
+        if (v.length < minLen) { err.textContent = 'Minimo ' + minLen + ' caracteres.'; input.focus(); return; }
+        close(v);
+      }
+      function onKey(e) { if (e.key === 'Escape') close(null); }
+      backdrop.querySelector('.ui-ok').addEventListener('click', ok);
+      backdrop.querySelector('.ui-cancel').addEventListener('click', function () { close(null); });
+      document.addEventListener('keydown', onKey);
+      setTimeout(function () { input.focus(); }, 30);
+    });
+  };
+
   // ====== DRAFT (localStorage) ======
   UI.draft = {
     save: function (key, data) {

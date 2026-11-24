@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from decimal import Decimal
 
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Text,
     Date,
     UniqueConstraint,
     Index,
@@ -39,6 +41,36 @@ class Asiento(Base):
     anulado_por_id = Column(Integer, ForeignKey("asiento.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
+    # ---- Campos SUNAT (PLE 5.1 / Registros) ----
+    # Tipo de asiento para el correlativo PLE: A = apertura, M = movimiento, C = cierre
+    tipo_asiento = Column(String(1), nullable=False, default="M")
+    # Asientos generados por el sistema: 'destino', 'cierre_resultados', 'cierre_balance', 'apertura'
+    origen = Column(String(30), nullable=True)
+    tipo_comprobante = Column(String(2), nullable=True)      # Tabla 10
+    serie_comprobante = Column(String(20), nullable=True)
+    numero_comprobante = Column(String(20), nullable=True)
+    fecha_emision = Column(Date, nullable=True)
+    fecha_vencimiento = Column(Date, nullable=True)
+    tipo_doc_tercero = Column(String(1), nullable=True)      # Tabla 2
+    # Comprobante que modifica (notas de credito / debito)
+    ref_tipo_comprobante = Column(String(2), nullable=True)
+    ref_serie = Column(String(20), nullable=True)
+    ref_numero = Column(String(20), nullable=True)
+    ref_fecha = Column(Date, nullable=True)
+    # Detracciones / retenciones / percepciones
+    detraccion_monto = Column(Numeric(15, 2), nullable=True)
+    detraccion_constancia = Column(String(30), nullable=True)
+    detraccion_fecha = Column(Date, nullable=True)
+    sujeto_retencion = Column(Boolean, nullable=False, default=False)
+    percepcion_monto = Column(Numeric(15, 2), nullable=True)
+    # Estado PLE: 1 = del periodo, 8 = de periodo anterior no anotada, 9 = correccion
+    estado_ple = Column(String(1), nullable=False, default="1")
+    creado_por = Column(String(80), nullable=True)
+    modificado_por = Column(String(80), nullable=True)
+    modificado_at = Column(DateTime, nullable=True)
+    # Agrupa los asientos de una misma operacion (provision + destino + cancelacion...).
+    operacion_id = Column(String(36), nullable=True, default=lambda: str(uuid.uuid4()))
+
     lineas = relationship(
         "AsientoLinea",
         back_populates="asiento",
@@ -48,6 +80,7 @@ class Asiento(Base):
 
     __table_args__ = (
         Index("ix_asiento_fecha", "fecha"),
+        Index("ix_asiento_operacion_id", "operacion_id"),
     )
 
 
@@ -91,6 +124,53 @@ class CierreMes(Base):
     )
 
 
+class Usuario(Base):
+    __tablename__ = "usuario"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(80), nullable=False, unique=True)
+    nombre = Column(String(150), nullable=False, default="")
+    password_hash = Column(String(300), nullable=False)
+    # admin: todo | contador: registra, cierra meses y ejercicio | asistente: registra | lectura: solo ver
+    rol = Column(String(20), nullable=False, default="asistente")
+    activo = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    ultimo_login = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("rol IN ('admin','contador','asistente','lectura')", name="ck_usuario_rol"),
+    )
+
+
+class Auditoria(Base):
+    """Bitacora inalterable: la app solo inserta, nunca actualiza ni borra."""
+    __tablename__ = "auditoria"
+
+    id = Column(Integer, primary_key=True)
+    fecha = Column(DateTime, nullable=False, default=datetime.utcnow)
+    usuario = Column(String(80), nullable=True)
+    accion = Column(String(40), nullable=False)
+    entidad = Column(String(40), nullable=False)
+    entidad_id = Column(Integer, nullable=True)
+    motivo = Column(String(500), nullable=True)
+    antes = Column(Text, nullable=True)     # JSON
+    despues = Column(Text, nullable=True)   # JSON
+    ip = Column(String(64), nullable=True)
+
+    __table_args__ = (
+        Index("ix_auditoria_entidad", "entidad", "entidad_id"),
+        Index("ix_auditoria_fecha", "fecha"),
+    )
+
+
+class Config(Base):
+    """Configuracion de la empresa (clave/valor)."""
+    __tablename__ = "config"
+
+    clave = Column(String(60), primary_key=True)
+    valor = Column(Text, nullable=True)
+
+
 class AsientoLinea(Base):
     __tablename__ = "asiento_linea"
 
@@ -102,6 +182,8 @@ class AsientoLinea(Base):
     debe = Column(Numeric(15, 2), nullable=False, default=Decimal("0"))
     haber = Column(Numeric(15, 2), nullable=False, default=Decimal("0"))
     es_titulo = Column(Boolean, nullable=False, default=False)
+    # Importe en moneda extranjera (USD) cuando el asiento no es en PEN.
+    importe_me = Column(Numeric(15, 2), nullable=True)
 
     asiento = relationship("Asiento", back_populates="lineas")
 

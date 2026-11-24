@@ -1,0 +1,148 @@
+{#
+  Shell con sidebar + topbar. Uso:
+
+    {% set active = 'libro_diario' %}
+    {% set breadcrumb = [('Reportes',''), ('Libro diario','')] %}
+    {% include 'partials/shell_open.html' %}
+      ... contenido ...
+    {% include 'partials/shell_close.html' %}
+
+  Valores de 'active':
+    buscador, dashboard, asientos, asientos_nuevo,
+    libro_diario, libro_mayor, balance, reporte_anual, registros_mes, reporte_por_ruc,
+    entidades, cierres, importar
+#}
+<link rel="stylesheet" href="{{ url_for('static', filename='layout.css') }}">
+<div class="app-shell" id="appShell">
+  <div class="app-sidebar-backdrop" onclick="document.getElementById('appShell').classList.remove('sidebar-open')"></div>
+
+  <aside class="app-sidebar">
+    <a href="/" class="app-brand">
+      <span class="ic">menu_book</span>
+      <span>
+        Plan Contable
+        <small>PCGE 2026</small>
+      </span>
+    </a>
+    <nav class="app-nav">
+      <a class="app-nav-link cta" href="/asientos/nuevo">
+        <span class="ic">add</span> Nuevo asiento
+      </a>
+
+      <div class="app-nav-group">
+        <div class="app-nav-group-title">General</div>
+        <a class="app-nav-link {% if active == 'dashboard' %}active{% endif %}" href="/dashboard">
+          <span class="ic">dashboard</span> Dashboard
+        </a>
+        <a class="app-nav-link {% if active == 'buscador' %}active{% endif %}" href="/">
+          <span class="ic">manage_search</span> Buscar cuentas
+        </a>
+      </div>
+
+      <div class="app-nav-group">
+        <div class="app-nav-group-title">Operaciones</div>
+        <a class="app-nav-link {% if active == 'asientos' %}active{% endif %}" href="/asientos">
+          <span class="ic">receipt_long</span> Lista de asientos
+        </a>
+        <a class="app-nav-link {% if active == 'asientos_nuevo' %}active{% endif %}" href="/asientos/nuevo">
+          <span class="ic">edit_note</span> Crear asiento
+        </a>
+      </div>
+
+      <div class="app-nav-group">
+        <div class="app-nav-group-title">Reportes</div>
+        <a class="app-nav-link {% if active == 'libro_diario' %}active{% endif %}" href="/reportes/libro-diario">
+          <span class="ic">book</span> Libro diario
+        </a>
+        <a class="app-nav-link {% if active == 'libro_mayor' %}active{% endif %}" href="/reportes/libro-mayor">
+          <span class="ic">menu_book</span> Libro mayor
+        </a>
+        <a class="app-nav-link {% if active == 'balance' %}active{% endif %}" href="/reportes/balance">
+          <span class="ic">balance</span> Balance
+        </a>
+        <a class="app-nav-link {% if active == 'reporte_anual' %}active{% endif %}" href="/reportes/anual">
+          <span class="ic">calendar_month</span> Reporte anual
+        </a>
+        <a class="app-nav-link {% if active == 'registros_mes' %}active{% endif %}" href="/reportes/registros">
+          <span class="ic">event_note</span> Registros por mes
+        </a>
+        <a class="app-nav-link {% if active == 'reporte_por_ruc' %}active{% endif %}" href="/reportes/por-ruc">
+          <span class="ic">badge</span> Reporte por RUC
+        </a>
+        <a class="app-nav-link {% if active == 'eeff' %}active{% endif %}" href="/reportes/estados-financieros">
+          <span class="ic">account_balance</span> Estados financieros
+        </a>
+      </div>
+
+      {% if usuario_actual and usuario_actual.rol in ('admin', 'contador') %}
+      <div class="app-nav-group">
+        <div class="app-nav-group-title">SUNAT</div>
+        <a class="app-nav-link {% if active == 'ple' %}active{% endif %}" href="/ple">
+          <span class="ic">description</span> Libros electronicos (PLE)
+        </a>
+        <a class="app-nav-link {% if active == 'ejercicio' %}active{% endif %}" href="/ejercicio">
+          <span class="ic">event_available</span> Destino y cierre anual
+        </a>
+      </div>
+      {% endif %}
+
+      <div class="app-nav-group">
+        <div class="app-nav-group-title">Mantenimiento</div>
+        <a class="app-nav-link {% if active == 'entidades' %}active{% endif %}" href="/entidades">
+          <span class="ic">groups</span> Entidades
+        </a>
+        <a class="app-nav-link {% if active == 'cierres' %}active{% endif %}" href="/cierres">
+          <span class="ic">lock</span> Cierres de mes
+        </a>
+        <a class="app-nav-link {% if active == 'importar' %}active{% endif %}" href="/importar">
+          <span class="ic">upload_file</span> Importar Excel
+        </a>
+        {% if usuario_actual and usuario_actual.rol in ('admin', 'contador') %}
+        <a class="app-nav-link {% if active == 'auditoria' %}active{% endif %}" href="/auditoria">
+          <span class="ic">history</span> Auditoria
+        </a>
+        {% endif %}
+        {% if usuario_actual and usuario_actual.rol == 'admin' %}
+        <a class="app-nav-link {% if active == 'usuarios' %}active{% endif %}" href="/usuarios">
+          <span class="ic">manage_accounts</span> Usuarios
+        </a>
+        <a class="app-nav-link {% if active == 'configuracion' %}active{% endif %}" href="/configuracion">
+          <span class="ic">settings</span> Configuracion
+        </a>
+        {% endif %}
+      </div>
+    </nav>
+    <div class="app-sidebar-footer">PCGE Peru &mdash; v2026</div>
+  </aside>
+
+  <header class="app-topbar">
+    <div style="display:flex;align-items:center;gap:.6rem;">
+      <button type="button" class="app-sidebar-toggle" aria-label="Menu"
+              onclick="document.getElementById('appShell').classList.toggle('sidebar-open')">menu</button>
+      <nav class="app-breadcrumb" aria-label="breadcrumb">
+        <a href="/">Inicio</a>
+        {% for label, href in (breadcrumb or []) %}
+          <span class="sep">/</span>
+          {% if href and not loop.last %}
+            <a href="{{ href }}">{{ label }}</a>
+          {% else %}
+            <span class="current">{{ label }}</span>
+          {% endif %}
+        {% endfor %}
+      </nav>
+    </div>
+    <div class="app-topbar-actions">
+      {% if usuario_actual %}
+      <span class="app-user" title="{{ ROLES.get(usuario_actual.rol, '') }}" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;color:var(--muted, #6b7785);">
+        <span class="ic sm">person</span> {{ usuario_actual.nombre }}
+        <small style="opacity:.75;">({{ ROLES.get(usuario_actual.rol, usuario_actual.rol) }})</small>
+      </span>
+      <a href="/logout" class="app-logout" title="Cerrar sesion" style="display:inline-flex;align-items:center;gap:.25rem;font-size:.8rem;text-decoration:none;color:inherit;padding:.3rem .55rem;border-radius:8px;border:1px solid rgba(127,127,127,.3);">
+        <span class="ic sm">logout</span> Salir
+      </a>
+      {% endif %}
+      <button type="button" class="theme-toggle" aria-label="Cambiar tema">dark_mode</button>
+    </div>
+  </header>
+
+  <main class="app-main">

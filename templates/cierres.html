@@ -50,30 +50,20 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div style="display:flex;align-items:center;gap:.6rem;">
-      <a href="javascript:history.back()" style="background:rgba(255,255,255,.18);padding:.35rem .7rem;border-radius:8px;"><span class="ic sm">arrow_back</span> Volver</a>
-      <h1><span class="ic">lock</span> Cierre de meses</h1>
-    </div>
-    <nav>
-      <a href="/dashboard"><span class="ic sm">dashboard</span> Dashboard</a>
-      <a href="/asientos"><span class="ic sm">receipt_long</span> Operaciones</a>
-      <button type="button" class="theme-toggle">dark_mode</button>
-    </nav>
-  </header>
-
-  <main class="wrap">
+  {% set active = 'cierres' %}
+  {% set breadcrumb = [('Mantenimiento',''), ('Cierres de mes','')] %}
+  {% include 'partials/shell_open.html' %}
     <div class="page-hero">
       <div class="hero-icon"><span class="ic">lock</span></div>
       <div>
         <h2>Cierre de meses</h2>
-        <p>Bloquea los asientos de un mes para evitar cambios accidentales. Puedes reabrirlo si necesitas corregir algo.</p>
+        <p>Bloquea los asientos de un mes para evitar cambios accidentales. Solo un administrador puede reabrirlo, indicando el motivo (queda en la auditoria).</p>
       </div>
     </div>
 
     <div class="card">
       <h2>Cerrar un mes</h2>
-      <p class="hint">Al cerrar un mes, los asientos de ese periodo quedan bloqueados: no se podran crear, editar ni eliminar hasta reabrirlo.</p>
+      <p class="hint">Al cerrar un mes, los asientos de ese periodo quedan bloqueados: no se podran crear, editar ni anular hasta reabrirlo.</p>
       <form class="cerrar-form" onsubmit="cerrarMes(event)">
         <div>
           <label>Año</label>
@@ -143,7 +133,7 @@
       </div>
       {% endif %}
     </div>
-  </main>
+  {% include 'partials/shell_close.html' %}
 
   <script>
     async function cerrarMes(ev) {
@@ -177,25 +167,13 @@
       .catch(function () { UI.error('Error de red.', 'Sin conexion'); });
     }
     async function reabrir(id, label) {
-      var ok1 = await UI.confirm({
-        type: 'warning',
-        icon: 'lock_open',
-        title: 'Reabrir ' + label + '?',
-        msg: 'Esto permitira volver a crear, editar y eliminar asientos en ese mes.',
-        confirmText: 'Continuar',
-        cancelText: 'Cancelar'
+      var motivo = await UI.prompt({
+        type: 'danger', icon: 'lock_open', title: 'Reabrir ' + label,
+        msg: 'Reabrir rompe el bloqueo del periodo. Solo un administrador puede hacerlo y el motivo queda registrado en la auditoria. Si el periodo ya se declaro a SUNAT, las correcciones deben registrarse con estado 9 (correccion).',
+        placeholder: 'Motivo de la reapertura (minimo 10 caracteres)', minLength: 10, confirmText: 'Reabrir'
       });
-      if (!ok1) return;
-      var ok2 = await UI.confirm({
-        type: 'danger',
-        icon: 'warning',
-        title: 'Confirmacion final',
-        msg: 'Esta accion rompe el bloqueo de auditoria del mes ' + label + '. ¿Seguro?',
-        confirmText: 'Si, reabrir',
-        cancelText: 'Mejor no'
-      });
-      if (!ok2) return;
-      fetch('/cierres/' + id, { method: 'DELETE' })
+      if (!motivo) return;
+      fetch('/cierres/' + id, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ motivo: motivo }) })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d.ok) {
