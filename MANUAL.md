@@ -61,6 +61,7 @@ Catálogo completo del Plan Contable General Empresarial:
 
 ### Lista de asientos (`/asientos`)
 Muestra los asientos agrupados por **operación**. Por ejemplo, una venta y su cobranza aparecen juntas.
+- Cada operación se identifica internamente, así que dos compras distintas con el **mismo número de comprobante** aparecen separadas. La cancelación de un saldo queda dentro de su operación aunque se registre en otra fecha.
 - **Filtros**: por mes, por rango de fechas o por RUC del tercero.
 - **Operaciones mixtas** (parte al contado y parte al crédito): muestra el **saldo pendiente** y permite registrar la **cancelación del saldo** (pago o cobro) en un clic.
 - **Anular**: crea un asiento de reversa por cada asiento de la operación (ver [Reglas importantes](#8-reglas-importantes-del-sistema)). Pide el motivo.
@@ -88,6 +89,7 @@ Formulario para registrar asientos contables con partida doble.
 - El botón **Guardar** se habilita solo cuando el asiento **cuadra** (Debe = Haber). El atajo "cuadrar en última línea" completa la diferencia.
 - Atajos: `Enter` pasa a la siguiente línea y `Ctrl + Enter` guarda.
 - El formulario guarda un **borrador** automático por si cierras la página.
+- **Comprobante duplicado**: si el N° de documento y el RUC ya están registrados en otro asiento vigente, el sistema avisa antes de guardar. Puedes cancelar o registrarlo igual si es otra operación.
 - **Guardar como plantilla**: guarda las líneas actuales como plantilla de la empresa (por ejemplo "Alquiler mensual del local"). Aparece después en "Usar plantilla", en el grupo *Plantillas de mi empresa*.
 
 **Plantillas ("Usar plantilla")**
@@ -97,28 +99,32 @@ Arman el asiento por ti. Hay tres formas de elegir una plantilla:
 2. **Elegir una tarjeta**, que están agrupadas en Ventas, Compras y gastos, Personal, Bancos y Activos.
 3. **Usar una plantilla de la empresa** guardada antes.
 
-La **vista previa** muestra cada cuenta con su nombre, el motivo por el que se usa y los avisos importantes: detracción, límites tributarios de vehículos, PLAME, etc. Al aplicar la plantilla, los datos SUNAT (tipo de comprobante, documento del tercero, fecha de emisión, comprobante que modifica y detracción) se copian solos al bloque **Comprobante y datos SUNAT**.
+La **vista previa** muestra cada cuenta con su nombre, el motivo por el que se usa y los avisos importantes: detracción, límites tributarios de vehículos, PLAME, etc. Las listas largas (por ejemplo, *¿Qué pagaste?*) están **agrupadas** y tienen un **buscador**: escribe "agua" o "predial" y pulsa `Enter`. Cada opción muestra su **cuenta PCGE**. La opción **Otra cuenta** abre un buscador del plan contable por código o por nombre, y avisa si la cuenta elegida tiene subcuentas.
+
+Las operaciones de varios asientos (por ejemplo, provisión, ingreso a almacén y pago) se guardan **todas juntas o ninguna**: si un asiento tiene un error, no queda nada guardado a medias.
+
+Al aplicar la plantilla, los datos SUNAT (tipo de comprobante, documento del tercero, fecha de emisión, comprobante que modifica y detracción) se copian solos al bloque **Comprobante y datos SUNAT**.
 
 En las ventas, compras y notas de crédito puedes ingresar el monto como **valor sin IGV** o como **total del comprobante**. Con el total, el IGV se calcula por diferencia, así que el asiento coincide exactamente con el comprobante.
 
 | Plantilla | Qué registra |
 |---|---|
-| Venta | Factura o boleta con IGV, sin IGV o de exportación (70121 / 70111). Opcionalmente registra el **costo de ventas** (69121 / 20111). Puede ser al contado, al crédito o mixta |
-| Nota de crédito | Devolución, descuento o anulación de una venta (70911). Pide el comprobante que modifica |
+| Venta | Pregunta **qué vendes**: mercadería (70121 / 70111), productos fabricados (70221 / 70211) o servicios (70321 / 70311). Factura o boleta con IGV, sin IGV o de exportación. Opcionalmente registra el **costo de ventas** (691 / 692 contra 20 / 21). Puede ser al contado, al crédito o mixta |
+| Nota de crédito | Devolución, descuento o anulación de una venta, según lo vendido (709). Pide el comprobante que modifica |
 | Cobranza de factura | Cobro de una venta al crédito |
 | Anticipo de cliente / a proveedor | Factura de anticipo (122) o adelanto entregado (422) |
 | Compra de inventario | Mercadería, materias primas, materiales auxiliares, suministros, repuestos, envases y embalajes. Registra la cuenta 60 y el ingreso al almacén (20/24/25/26 contra 61) |
-| Compra de activo fijo | Vehículo (33411), cómputo (33611), comunicación (33621), maquinaria (33311), muebles (33511), enseres (33521), otros equipos (33691) y software (34311). Avisa la tasa de depreciación y, en vehículos, el límite tributario |
-| Servicio con factura | Más de 20 tipos de servicio, cada uno con su cuenta. Admite detracción (12 %, 10 %, 4 %, 1.5 %, redondeada a enteros) |
-| Pago de servicio | Luz, agua, internet, alquiler, etc., con el IGV separado como crédito fiscal |
-| Recibo por honorarios | Gasto + retención de 4ta categoría del 8 % si supera S/ 1,500 (40172) + honorarios por pagar (424) |
+| Compra de activo fijo | Terreno (33111, no se deprecia), edificación (33211), vehículo motorizado y no motorizado (33411 / 33421), maquinaria (33311), muebles (33511), enseres (33521), cómputo (33611), comunicación (33621), equipo de seguridad (33631), otros equipos (33691), software (34311) y licencias (34121). Avisa la tasa de depreciación y, en vehículos, el límite tributario |
+| Servicio con factura | Más de 60 conceptos agrupados: servicios básicos (636), alquileres (635), transporte y viajes (631), asesorías (632), mantenimiento (634), publicidad (637), personal (62), tributos (64) y otros gastos de gestión (65). Admite detracción (12 %, 10 %, 4 %, 1.5 %, redondeada a enteros) |
+| Pago de servicio | Los mismos conceptos (luz 6361, agua 6363, teléfono 6364, internet 6365, predial 6431, arbitrios 6432…), con el IGV separado como crédito fiscal. Los conceptos que **nunca llevan IGV** (tributos, multas, donaciones, vida ley) se registran sin IGV, y la vista previa avisa si son **no deducibles** |
+| Recibo por honorarios | Gasto según el servicio (13 tipos) + retención de 4ta categoría del 8 % si supera S/ 1,500 (40172) + honorarios por pagar (424) |
 | Importación | Valor CIF, ad valorem, IGV e IPM de aduana, percepción e ingreso al almacén |
 | Pago a proveedor | Pago de una compra al crédito |
 | Planilla / sueldos | Sueldo bruto (6211), ONP 13 % (4032) o AFP (417), renta de 5ta (40173), neto (4111), EsSalud 9 % (6271 / 4031) y el pago |
 | Depósito o retiro | Traslados entre caja y banco |
 | Préstamo recibido / Cuota de préstamo | Desembolso (4511) y cuotas con capital, intereses (67311) y seguros |
 | Diferencia de cambio | Ganancia (7581) o pérdida (6581) al ajustar saldos en dólares |
-| Depreciación mensual | Gasto 68 contra depreciación acumulada 39, según el tipo de activo |
+| Depreciación mensual | Gasto 68 contra depreciación acumulada 39, según el tipo de activo (software: 68613 / 39613) |
 | Aporte de capital | Suscripción (1421) y pago, contra acciones (5011) o participaciones (5012) |
 
 > Las plantillas usan la **tasa de IGV** de *Configuración* (18 % o 10.5 %). Si la empresa usa la clase 9, el destino de los gastos se genera a fin de mes desde *Destino y cierre anual*; las plantillas ya no lo crean por su cuenta.
