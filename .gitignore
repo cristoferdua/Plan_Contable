@@ -13,3 +13,6 @@ dist/
 *.db
 *.db-journal
 *.sqlite3
+
+# Respaldos automaticos de la base de datos
+respaldos/

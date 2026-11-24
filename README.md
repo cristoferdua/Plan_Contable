@@ -13,8 +13,9 @@ Sistema web de contabilidad para empresas peruanas, basado en el **Plan Contable
 
 - [Funcionalidades](#funcionalidades)
 - [Tecnologías](#tecnologías)
+- [Inicio rápido (Windows)](#inicio-rápido-windows)
 - [Requisitos](#requisitos)
-- [Instalación](#instalación)
+- [Instalación manual](#instalación-manual)
 - [Configuración](#configuración)
 - [Ejecución](#ejecución)
 - [Primer uso](#primer-uso)
@@ -75,6 +76,22 @@ Sistema web de contabilidad para empresas peruanas, basado en el **Plan Contable
 
 ---
 
+## Inicio rápido (Windows)
+
+1. Instala **[Python 3.12](https://www.python.org/downloads/)** y marca la casilla **"Add Python to PATH"**.
+2. Descarga el proyecto: botón verde **Code → Download ZIP** en GitHub y descomprímelo, o usa `git clone`.
+3. Haz **doble clic en `iniciar.bat`**.
+
+La primera vez prepara todo solo (tarda unos minutos): crea el entorno de Python, instala los componentes y crea la configuración. Luego abre el navegador en **http://127.0.0.1:5000**. Las siguientes veces arranca en segundos.
+
+> Mantén abierta la ventana negra mientras uses el sistema. Ciérrala para apagarlo.
+
+Cada vez que inicia, el sistema **respalda la base de datos** y **aplica los cambios de estructura** que traigan las actualizaciones. No hace falta ejecutar ningún comando.
+
+Para **actualizar** a una versión nueva: descarga el código nuevo (o `git pull`) y vuelve a abrir `iniciar.bat`. Si cambiaron los componentes, los reinstala solo.
+
+---
+
 ## Requisitos
 
 - **Python 3.12** o superior
@@ -84,7 +101,9 @@ Sistema web de contabilidad para empresas peruanas, basado en el **Plan Contable
 
 ---
 
-## Instalación
+## Instalación manual
+
+Para Linux o macOS, o si prefieres hacerlo paso a paso.
 
 ### 1. Clonar el repositorio
 
@@ -132,6 +151,8 @@ Variables de entorno (archivo `.env` en la raíz del proyecto):
 | `SECRET_KEY` | No | Clave para firmar las sesiones. Si falta, se genera una y se guarda en la base de datos | `una-cadena-larga-y-aleatoria` |
 | `APIS_NET_PE_TOKEN` | No | Token de apis.net.pe. Sin token se usa la API pública, que tiene límites | `apis-token-xxxx` |
 | `PORT` | No | Puerto del servidor de desarrollo (por defecto `5000`) | `5000` |
+| `RESPALDOS_MAX` | No | Cuántos respaldos automáticos conservar (`0` los desactiva). Por defecto `30` | `30` |
+| `AUTO_MIGRAR` | No | `0` desactiva las migraciones automáticas al iniciar. Por defecto activas | `1` |
 
 Ejemplos de `DATABASE_URL`:
 
@@ -184,30 +205,14 @@ El uso diario de cada pantalla está explicado en el **[Manual de usuario](MANUA
 
 El esquema está definido en `models.py` y versionado con **Alembic** (`migrations/versions/`).
 
-### SQLite (local)
+**No hace falta ejecutar migraciones a mano.** Al iniciar, la aplicación (`arranque.py`):
 
-La aplicación **crea las tablas automáticamente** al iniciar. En una instalación nueva, después del primer arranque marca la base en la última versión de migraciones:
+| Situación | Qué hace |
+|---|---|
+| Base SQLite nueva | Crea las tablas y la registra en la última versión |
+| Base existente (SQLite o PostgreSQL) | Aplica las migraciones pendientes (`alembic upgrade head`) |
 
-```bash
-python app.py              # crea las tablas (luego Ctrl+C)
-alembic stamp head         # registra la versión actual del esquema
-```
-
-Cuando actualices el código (`git pull`) y haya migraciones nuevas, aplícalas:
-
-```bash
-alembic upgrade head
-```
-
-> En SQLite **no** crees la base con `alembic upgrade head` desde cero: una migración antigua usa `ALTER COLUMN`, que SQLite no soporta. Usa el arranque de la aplicación más `alembic stamp head`.
-
-### PostgreSQL (producción)
-
-Las tablas se crean **solo** con migraciones:
-
-```bash
-alembic upgrade head
-```
+Si prefieres controlarlo tú (por ejemplo en un servidor con varias instancias), define `AUTO_MIGRAR=0` y ejecuta `alembic upgrade head` en cada despliegue.
 
 ### Crear una migración nueva
 
@@ -229,8 +234,8 @@ El proyecto incluye un `Procfile` (`web: gunicorn app:app`), compatible con Rail
 1. Crea una base **PostgreSQL** y define `DATABASE_URL` en el panel del servicio.
 2. Define una `SECRET_KEY` larga y aleatoria. Si se pierde o cambia, se cierran todas las sesiones.
 3. *(Opcional)* Define `APIS_NET_PE_TOKEN`.
-4. Ejecuta `alembic upgrade head` como comando de *release* o una sola vez desde la consola del servicio.
-5. Despliega. El servicio asigna el puerto automáticamente.
+4. Despliega. Las migraciones se aplican solas al iniciar. Si el servicio corre varias instancias a la vez, define `AUTO_MIGRAR=0` y ejecuta `alembic upgrade head` como comando de *release*.
+5. Listo. El servicio asigna el puerto automáticamente.
 
 Recomendaciones:
 - Sirve la aplicación **siempre con HTTPS**: maneja datos contables y contraseñas.
@@ -248,6 +253,9 @@ Plan_Contable/
 ├── sunat.py               # Tablas SUNAT (10, 2, 4) y generación de archivos PLE
 ├── models.py              # Modelos SQLAlchemy (asiento, línea, usuario, auditoría...)
 ├── db.py                  # Conexión a la base de datos (lee DATABASE_URL)
+├── arranque.py            # Al iniciar: respaldo automático y migraciones
+├── iniciar.bat            # Inicio con doble clic en Windows
+├── .env.example           # Modelo del archivo de configuración
 ├── init_db.py             # Crea las tablas manualmente (alternativa al arranque)
 ├── pcge_data.json         # Catálogo PCGE: 1,666 cuentas con código, nivel y elemento
 ├── requirements.txt       # Dependencias de Python
@@ -263,6 +271,7 @@ Plan_Contable/
 │   └── *.css              # Estilos (tema claro/oscuro, layout, componentes)
 ├── templates/             # Vistas Jinja2 (una por pantalla)
 │   └── partials/          # Cabecera, menú lateral y pie comunes
+├── respaldos/             # Respaldos automáticos de la base (no se suben a git)
 ├── MANUAL.md              # Manual de usuario
 └── README.md
 ```
@@ -310,21 +319,19 @@ Formulario / plantilla  ──►  Validación  ──►  Transacción  ──�
 
 ## Respaldos
 
-La base de datos contiene **toda la contabilidad** y **no está en el repositorio**. Haz copias periódicas.
+La base de datos contiene **toda la contabilidad** y **no está en el repositorio**.
 
-**SQLite**: detén la aplicación y copia el archivo:
+**Automáticos (SQLite):** cada vez que inicia la aplicación se guarda una copia en la carpeta `respaldos/`, con fecha y hora en el nombre (`plan_contable_20261124_093000.db`). Se conservan los últimos 30; puedes cambiarlo con `RESPALDOS_MAX`.
 
-```bash
-cp plan_contable.db respaldos/plan_contable_$(date +%Y%m%d).db
-```
+**Restaurar un respaldo:** cierra el sistema, reemplaza `plan_contable.db` por la copia elegida (renómbrala a `plan_contable.db`) y vuelve a iniciar.
 
-**PostgreSQL**:
+**Fuera del equipo:** la carpeta `respaldos/` está en la misma PC. Copia periódicamente su contenido a un disco externo, un USB o la nube.
+
+**PostgreSQL:** usa los respaldos del proveedor o `pg_dump`:
 
 ```bash
 pg_dump "$DATABASE_URL" > respaldo_$(date +%Y%m%d).sql
 ```
-
-Guarda las copias fuera del equipo: disco externo, USB o la nube.
 
 ---
 
@@ -333,7 +340,9 @@ Guarda las copias fuera del equipo: disco externo, USB o la nube.
 | Problema | Solución |
 |---|---|
 | `RuntimeError: DATABASE_URL no esta configurado` | Falta el archivo `.env` o la variable. Ver [Configuración](#configuración). |
-| `no such column: asiento.operacion_id` (u otra columna) | La base tiene un esquema antiguo. Ejecuta `alembic upgrade head`. |
+| `no such column: ...` | La base tiene un esquema antiguo. Reinicia el sistema (aplica las migraciones solo) o ejecuta `alembic upgrade head`. |
+| `iniciar.bat` dice *"No se encontró Python"* | Instala Python 3.12 marcando **"Add Python to PATH"** y vuelve a abrirlo. |
+| Me equivoqué y quiero volver a un estado anterior | Restaura un archivo de la carpeta `respaldos/` (ver [Respaldos](#respaldos)). |
 | La consulta de RUC o tipo de cambio falla | Revisa la conexión a internet o configura `APIS_NET_PE_TOKEN`. |
 | Los cambios de diseño no se ven | Recarga sin caché con `Ctrl + F5`. |
 | `Address already in use` | El puerto está ocupado: cierra la otra instancia o usa `PORT=5001`. |

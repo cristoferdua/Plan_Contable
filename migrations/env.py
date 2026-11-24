@@ -13,7 +13,7 @@ from models import Base  # noqa: E402
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:

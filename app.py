@@ -18,9 +18,10 @@ from models import Asiento, AsientoLinea, Base, CierreMes, Entidad
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "pcge_data.json")
 
-# En SQLite local las tablas se crean solas; en Postgres se usan las migraciones de Alembic.
-if engine.dialect.name == "sqlite":
-    Base.metadata.create_all(engine)
+# Respaldo automatico (SQLite) y esquema al dia (migraciones) antes de usar la base.
+import arranque  # noqa: E402
+
+arranque.preparar_base_de_datos(engine, Base.metadata)
 
 app = Flask(__name__)
 
@@ -3748,4 +3749,8 @@ contabilidad.init_app(app, CUENTAS_POR_CODIGO, _mes_cerrado, _generar_numero, _v
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    if os.environ.get("ABRIR_NAVEGADOR") == "1":
+        import threading
+        import webbrowser
+        threading.Timer(1.5, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
     app.run(host="0.0.0.0", port=port, debug=False)
