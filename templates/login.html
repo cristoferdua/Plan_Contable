@@ -3,44 +3,318 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% if modo == 'setup' %}Crear administrador{% else %}Iniciar sesion{% endif %} - Plan Contable</title>
+  <title>{% if modo == 'setup' %}Crear administrador{% elif modo == 'empresa' %}Datos de la empresa{% else %}Iniciar sesion{% endif %} - Plan Contable</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='polish.css') }}">
   <style>
     * { box-sizing: border-box; }
-    body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    body { margin:0; min-height:100vh; padding:2rem 0; display:flex; align-items:center; justify-content:center;
            background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
            font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; color:#1f2937; }
-    .box { background:#fff; width:min(380px, 92vw); border-radius:16px; padding:2rem 1.8rem; box-shadow:0 20px 50px rgba(0,0,0,.25); }
+    .box { background:#fff; width:min(400px, 92vw); border-radius:16px; padding:2rem 1.8rem; box-shadow:0 20px 50px rgba(0,0,0,.25); }
     .brand { display:flex; align-items:center; gap:.6rem; margin-bottom:1.2rem; }
     .brand .ic { font-size:2rem; color:#e67e22; }
     .brand h1 { margin:0; font-size:1.15rem; color:#1e3a5f; }
     .brand small { display:block; color:#6b7785; font-weight:500; font-size:.78rem; }
     label { display:block; font-size:.75rem; font-weight:600; color:#4a5568; margin:.8rem 0 .25rem; }
-    input { width:100%; padding:.65rem .75rem; border:1px solid #cbd5e1; border-radius:9px; font:inherit; }
-    input:focus { outline:2px solid #2c5282; border-color:transparent; }
+    input, select { width:100%; padding:.65rem .75rem; border:1px solid #cbd5e1; border-radius:9px; font:inherit; background-color:#fff; }
+    select { background-repeat:no-repeat !important; background-position:right .8rem center !important; padding-right:2.2rem; }
+    input:focus, select:focus { outline:2px solid #2c5282; border-color:transparent; }
     button { width:100%; margin-top:1.3rem; padding:.75rem; border:0; border-radius:9px; background:#1e3a5f; color:#fff; font:inherit; font-weight:700; cursor:pointer; }
     button:hover { background:#2c5282; }
+    button.sec { background:transparent; color:#4a5568; margin-top:.5rem; padding:.5rem; font-weight:600; }
+    button.sec:hover { background:#eef3f8; }
     .err { background:#fdecea; color:#8a1c12; border-radius:8px; padding:.55rem .7rem; font-size:.84rem; margin-bottom:.5rem; }
     .info { background:#eef3f8; color:#1e3a5f; border-radius:8px; padding:.6rem .75rem; font-size:.82rem; line-height:1.45; }
+    .emp { display:flex; align-items:center; gap:.6rem; background:#f4f8fd; border:1px solid #dbe5f0; border-radius:10px; padding:.6rem .75rem; margin-bottom:.4rem; }
+    .emp .ic { color:#2c5282; font-size:1.4rem; }
+    .emp b { display:block; font-size:.86rem; color:#1e3a5f; }
+    .emp span.r { font-size:.74rem; color:#6b7785; font-family:ui-monospace,Consolas,monospace; }
+    .emp-link { display:block; text-align:center; margin-top:1rem; font-size:.8rem; color:#2c5282; text-decoration:none; font-weight:600; }
+    .emp-link:hover { text-decoration:underline; }
+    .ruc-row { display:flex; gap:.4rem; }
+    .ruc-row input { font-family:ui-monospace,Consolas,monospace; }
+    .ruc-row button { width:auto; margin:0; padding:.55rem .8rem; white-space:nowrap; font-size:.8rem; background:#2c5282; }
+    .hint { font-size:.74rem; color:#6b7785; min-height:1em; margin-top:.3rem; }
+    .box.ancha { width:min(560px, 94vw); }
+    .sd { margin-top:1.4rem; padding-top:1.1rem; border-top:1px dashed #d8dee7; }
+    .sd h2 { margin:0; font-size:.95rem; color:#1e3a5f; display:flex; align-items:center; gap:.4rem; }
+    .sd h2 .opt { font-size:.68rem; font-weight:600; color:#6b7785; background:#eef1f5; padding:.1rem .45rem; border-radius:999px; }
+    .sd p.d { margin:.3rem 0 .7rem; font-size:.8rem; color:#6b7785; line-height:1.45; }
+    .chips { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.6rem; }
+    .chip { width:auto; margin:0; padding:.35rem .7rem; border-radius:999px; background:#eef3f8; color:#1e3a5f; border:1px solid #d6e2ef; font-size:.78rem; font-weight:600; display:inline-flex; align-items:center; gap:.3rem; }
+    .chip:hover { background:#dfe9f5; }
+    .chip .ic { font-size:1rem; }
+    .chip.on { background:#1e3a5f; color:#fff; border-color:#1e3a5f; }
+    .sd-buscar { position:relative; }
+    .sd-buscar .ic.lupa { position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:#8896a6; font-size:1.1rem; }
+    .sd-buscar input { padding-left:2.2rem; }
+    .sd-res { position:absolute; left:0; right:0; top:calc(100% + 4px); background:#fff; border:1px solid #d8dee7; border-radius:10px; box-shadow:0 10px 30px rgba(15,23,42,.15); z-index:20; max-height:260px; overflow:auto; padding:4px; }
+    .sd-res[hidden], .sd-form[hidden], .sd-vacio[hidden] { display:none; }
+    .sd-opt { display:flex; gap:.6rem; padding:.45rem .6rem; border-radius:8px; cursor:pointer; font-size:.82rem; align-items:baseline; }
+    .sd-opt:hover, .sd-opt.f { background:#eaf1fb; }
+    .sd-opt code { font-weight:700; color:#1e3a5f; min-width:54px; }
+    .sd-opt span { color:#4a5568; }
+    .sd-form { margin-top:.7rem; background:#f7f9fc; border:1px solid #e1e8f0; border-radius:12px; padding:.8rem; }
+    .sd-padre { display:flex; justify-content:space-between; align-items:center; gap:.5rem; font-size:.8rem; color:#4a5568; }
+    .sd-padre b { color:#1e3a5f; }
+    .sd-padre a { color:#2c5282; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .sd-fila { display:flex; gap:.5rem; margin-top:.6rem; align-items:flex-end; }
+    .sd-fila label { margin-top:0; }
+    .sd-cod { display:flex; }
+    .sd-cod .pref { padding:.65rem .55rem; background:#e6edf5; border:1px solid #cbd5e1; border-right:0; border-radius:9px 0 0 9px; font-family:ui-monospace,Consolas,monospace; font-weight:700; color:#1e3a5f; }
+    .sd-cod input { width:3.4rem; border-radius:0 9px 9px 0; font-family:ui-monospace,Consolas,monospace; text-align:center; padding:.65rem .3rem; }
+    .sd-fila .desc { flex:1; }
+    .sd-fila button { width:auto; margin:0; padding:.65rem .9rem; background:#e67e22; display:inline-flex; align-items:center; gap:.25rem; white-space:nowrap; }
+    .sd-fila button:hover { background:#d35400; }
+    .sd-hijas { margin-top:.5rem; font-size:.74rem; color:#6b7785; }
+    .sd-err { color:#c0392b; font-size:.78rem; min-height:1em; margin-top:.35rem; }
+    .sd-lista { list-style:none; margin:.7rem 0 0; padding:0; display:flex; flex-direction:column; gap:.35rem; }
+    .sd-lista li { display:flex; align-items:center; gap:.6rem; padding:.45rem .6rem; border:1px solid #d7ecdd; background:#f1faf3; border-radius:9px; font-size:.82rem; }
+    .sd-lista li code { font-weight:700; color:#1d6b3a; min-width:70px; }
+    .sd-lista li .p { color:#6b7785; font-size:.72rem; margin-left:auto; }
+    .sd-lista li button { width:auto; margin:0; padding:.15rem .35rem; background:transparent; color:#9aa8b6; font-family:'Material Symbols Rounded'; font-size:1.05rem; font-weight:400; }
+    .sd-lista li button:hover { color:#c0392b; background:#fdecea; }
+    .sd-vacio { font-size:.78rem; color:#8896a6; font-style:italic; margin-top:.5rem; }
+    @media (max-width: 520px) { .sd-fila { flex-wrap:wrap; } .sd-fila .desc { flex-basis:100%; order:3; } }
+    .pasos { font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#e67e22; margin-bottom:.3rem; }
   </style>
 </head>
 <body>
-  <form class="box" method="post" autocomplete="on">
+  <form class="box{% if modo == 'empresa' %} ancha{% endif %}" method="post" autocomplete="on">
     <div class="brand">
       <span class="ic">menu_book</span>
       <h1>Plan Contable <small>PCGE &middot; Libros electronicos SUNAT</small></h1>
     </div>
     {% if error %}<div class="err">{{ error }}</div>{% endif %}
-    {% if modo == 'setup' %}
-      <div class="info">Primer uso: crea el usuario <strong>administrador</strong>. Despues podras crear usuarios para contadores y asistentes.</div>
-      <label for="nombre">Nombre completo</label>
-      <input id="nombre" name="nombre" required>
+
+    {% if modo == 'empresa' %}
+      <div class="pasos">Configurar la empresa</div>
+      <div class="info">Estos datos identifican a la empresa en los reportes y nombran los archivos del PLE. Puedes cambiarlos luego en <strong>Configuracion</strong>.</div>
+      <label for="ruc">RUC de la empresa</label>
+      <div class="ruc-row">
+        <input id="ruc" name="ruc" maxlength="11" inputmode="numeric" required value="{{ emp.ruc }}" autofocus>
+        <button type="button" id="btn-sunat" title="Traer la razon social desde SUNAT">Buscar SUNAT</button>
+      </div>
+      <div class="hint" id="hint"></div>
+      <label for="razon_social">Razon social</label>
+      <input id="razon_social" name="razon_social" required value="{{ emp.razon_social }}">
+      <label for="tasa_igv">Tasa de IGV</label>
+      <select id="tasa_igv" name="tasa_igv">
+        <option value="18" {% if emp.tasa_igv == '18' %}selected{% endif %}>18 % (general)</option>
+        <option value="10.5" {% if emp.tasa_igv == '10.5' %}selected{% endif %}>10.5 % (MYPE restaurantes, hoteles)</option>
+      </select>
+      <section class="sd" id="sd">
+        <h2><span class="ic">account_tree</span> Cuentas propias de la empresa <span class="opt">opcional</span></h2>
+        <p class="d">Divide una cuenta del PCGE para llevar el detalle de tu empresa: una cuenta por cada banco, caja o cliente importante.
+          Elige un atajo o busca la cuenta, ponle nombre y presiona <b>Agregar</b>. Se guarda al instante.</p>
+        <div class="chips">
+          <button type="button" class="chip" data-padre="1041" data-ej="BCP cuenta corriente soles"><span class="ic">account_balance</span> Bancos</button>
+          <button type="button" class="chip" data-padre="1011" data-ej="Caja tienda principal"><span class="ic">point_of_sale</span> Caja</button>
+          <button type="button" class="chip" data-padre="1212" data-ej="Cliente Comercial Lima SAC"><span class="ic">group</span> Clientes</button>
+          <button type="button" class="chip" data-padre="4212" data-ej="Proveedor Distribuidora Norte"><span class="ic">local_shipping</span> Proveedores</button>
+          <button type="button" class="chip" data-padre="70121" data-ej="Venta de abarrotes"><span class="ic">sell</span> Ventas</button>
+        </div>
+        <div class="sd-buscar">
+          <span class="ic lupa">search</span>
+          <input id="sd-q" placeholder="O busca otra cuenta: banco, caja, 6361, alquileres..." autocomplete="off">
+          <div class="sd-res" id="sd-res" hidden></div>
+        </div>
+        <div class="sd-form" id="sd-form" hidden>
+          <div class="sd-padre"><span>Dividir <b id="sd-padre-txt"></b></span><a id="sd-cambiar">Cambiar cuenta</a></div>
+          <div class="sd-fila">
+            <div>
+              <label for="sd-suf">Codigo</label>
+              <div class="sd-cod"><span class="pref" id="sd-pref"></span><input id="sd-suf" maxlength="2" inputmode="numeric"></div>
+            </div>
+            <div class="desc">
+              <label for="sd-desc">Nombre de la cuenta</label>
+              <input id="sd-desc" maxlength="150">
+            </div>
+            <button type="button" id="sd-add"><span class="ic">add</span> Agregar</button>
+          </div>
+          <div class="sd-hijas" id="sd-hijas"></div>
+        </div>
+        <div class="sd-err" id="sd-err"></div>
+        <ul class="sd-lista" id="sd-lista"></ul>
+        <div class="sd-vacio" id="sd-vacio">Aun no has creado cuentas propias.</div>
+      </section>
+
+      <button type="submit">Guardar y continuar</button>
+      <button type="submit" name="omitir" value="1" class="sec" formnovalidate>Hacerlo despues</button>
+    {% else %}
+      {% if modo == 'setup' %}
+        <div class="pasos">Paso 1 de 2</div>
+        <div class="info">Primer uso: crea el usuario <strong>administrador</strong>. En el siguiente paso configuras los datos de la empresa.</div>
+        <label for="nombre">Nombre completo</label>
+        <input id="nombre" name="nombre" required>
+      {% elif empresa_actual and empresa_actual.razon_social %}
+        <div class="emp">
+          <span class="ic">business</span>
+          <span><b>{{ empresa_actual.razon_social }}</b><span class="r">RUC {{ empresa_actual.ruc }}</span></span>
+        </div>
+      {% endif %}
+      <label for="username">Usuario</label>
+      <input id="username" name="username" required autofocus autocomplete="username">
+      <label for="password">Contrasena{% if modo == 'setup' %} (minimo 8 caracteres){% endif %}</label>
+      <input id="password" name="password" type="password" required autocomplete="{% if modo == 'setup' %}new-password{% else %}current-password{% endif %}" {% if modo == 'setup' %}minlength="8"{% endif %}>
+      <button type="submit">{% if modo == 'setup' %}Crear administrador{% else %}Ingresar{% endif %}</button>
+      {% if modo == 'login' %}
+        <a class="emp-link" href="{{ url_for('auth.empresa_inicio') }}">{% if empresa_actual and empresa_actual.ruc %}Cambiar datos de la empresa{% else %}Configurar la empresa{% endif %} (administrador)</a>
+      {% endif %}
     {% endif %}
-    <label for="username">Usuario</label>
-    <input id="username" name="username" required autofocus autocomplete="username">
-    <label for="password">Contrasena{% if modo == 'setup' %} (minimo 8 caracteres){% endif %}</label>
-    <input id="password" name="password" type="password" required autocomplete="{% if modo == 'setup' %}new-password{% else %}current-password{% endif %}" {% if modo == 'setup' %}minlength="8"{% endif %}>
-    <button type="submit">{% if modo == 'setup' %}Crear administrador{% else %}Ingresar{% endif %}</button>
   </form>
+  {% if modo == 'empresa' %}
+  <script>
+    (function () {
+      var ruc = document.getElementById('ruc');
+      var razon = document.getElementById('razon_social');
+      var hint = document.getElementById('hint');
+      ruc.addEventListener('input', function () { ruc.value = ruc.value.replace(/[^0-9]/g, ''); });
+      document.getElementById('btn-sunat').addEventListener('click', function () {
+        var v = ruc.value.trim();
+        if (v.length !== 11) { hint.textContent = 'El RUC tiene 11 digitos.'; return; }
+        hint.textContent = 'Consultando SUNAT...';
+        fetch('/sunat/ruc/' + v)
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d.ok) { hint.textContent = d.error || 'No se encontro el RUC.'; return; }
+            razon.value = d.data.razon_social || razon.value;
+            hint.textContent = [d.data.estado, d.data.condicion].filter(Boolean).join(' · ') || 'Datos encontrados.';
+          })
+          .catch(function () { hint.textContent = 'Sin conexion: escribe la razon social a mano.'; });
+      });
+    })();
+
+    // ===== Cuentas propias (subdivisionarias) =====
+    (function () {
+      function $(id) { return document.getElementById(id); }
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+      function json(r) { return r.json(); }
+      var q = $('sd-q'), res = $('sd-res'), form = $('sd-form'), suf = $('sd-suf'), desc = $('sd-desc'), err = $('sd-err');
+      var padreActual = null, ejemploActual = '', timer = null, opciones = [], foco = -1;
+
+      function pintarLista(cuentas) {
+        $('sd-lista').innerHTML = cuentas.map(function (c) {
+          return '<li><code>' + esc(c.codigo) + '</code><span>' + esc(c.descripcion) + '</span>' +
+            '<span class="p">de ' + esc(c.padre) + '</span>' +
+            '<button type="button" data-del="' + esc(c.codigo) + '" title="Quitar">close</button></li>';
+        }).join('');
+        $('sd-vacio').hidden = cuentas.length > 0;
+      }
+      function cargarLista() {
+        fetch('/cuentas-propias').then(json).then(function (d) { pintarLista(d.cuentas || []); });
+      }
+
+      function elegir(codigo, ejemplo) {
+        res.hidden = true;
+        err.textContent = '';
+        ejemploActual = ejemplo || '';
+        document.querySelectorAll('.chip').forEach(function (c) { c.classList.toggle('on', c.dataset.padre === codigo); });
+        fetch('/cuentas-propias/siguiente?padre=' + encodeURIComponent(codigo)).then(json).then(function (d) {
+          if (!d.ok) { err.textContent = d.error; return; }
+          padreActual = d.padre.codigo;
+          $('sd-padre-txt').textContent = d.padre.codigo + ' · ' + d.padre.descripcion;
+          $('sd-pref').textContent = d.padre.codigo;
+          suf.value = d.sufijo;
+          desc.value = '';
+          desc.placeholder = 'Ej. ' + (ejemploActual || 'nombre de la cuenta');
+          var hijas = d.hijas.filter(function (h) { return h.propia || h.codigo.length === d.codigo.length; });
+          $('sd-hijas').textContent = hijas.length
+            ? 'Ya existen: ' + hijas.map(function (h) { return h.codigo + ' ' + h.descripcion; }).join(' · ')
+            : '';
+          form.hidden = false;
+          q.value = '';
+          desc.focus();
+        });
+      }
+
+      function agregar() {
+        if (!padreActual) return;
+        err.textContent = '';
+        fetch('/cuentas-propias', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ padre: padreActual, sufijo: suf.value.trim(), descripcion: desc.value.trim() })
+        }).then(json).then(function (d) {
+          if (!d.ok) { err.textContent = d.error || 'No se pudo crear.'; return; }
+          cargarLista();
+          elegir(padreActual, ejemploActual);  // queda lista para agregar la siguiente
+        }).catch(function () { err.textContent = 'Error de conexion.'; });
+      }
+
+      function pintarResultados() {
+        res.innerHTML = opciones.length
+          ? opciones.map(function (c, i) {
+              return '<div class="sd-opt' + (i === foco ? ' f' : '') + '" data-cod="' + esc(c.codigo) + '"><code>' +
+                esc(c.codigo) + '</code><span>' + esc(c.descripcion) + '</span></div>';
+            }).join('')
+          : '<div class="sd-opt"><span>Sin resultados</span></div>';
+        res.hidden = false;
+      }
+
+      q.addEventListener('input', function () {
+        clearTimeout(timer);
+        var v = q.value.trim();
+        if (v.length < 2) { res.hidden = true; return; }
+        timer = setTimeout(function () {
+          fetch('/buscar?q=' + encodeURIComponent(v)).then(json).then(function (d) {
+            opciones = (d.resultados || []).filter(function (c) { return c.nivel >= 3 && c.codigo.length <= 6; }).slice(0, 8);
+            foco = -1;
+            pintarResultados();
+          });
+        }, 180);
+      });
+      q.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!opciones.length) return;
+          foco = (foco + (e.key === 'ArrowDown' ? 1 : -1) + opciones.length) % opciones.length;
+          pintarResultados();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          var o = opciones[foco >= 0 ? foco : 0];
+          if (o) elegir(o.codigo);
+        } else if (e.key === 'Escape') {
+          res.hidden = true;
+        }
+      });
+      q.addEventListener('blur', function () { setTimeout(function () { res.hidden = true; }, 150); });
+      res.addEventListener('mousedown', function (e) {
+        var o = e.target.closest('[data-cod]');
+        if (o) { e.preventDefault(); elegir(o.dataset.cod); }
+      });
+      document.querySelectorAll('.chip').forEach(function (c) {
+        c.addEventListener('click', function () { elegir(c.dataset.padre, c.dataset.ej); });
+      });
+      $('sd-cambiar').addEventListener('click', function () {
+        form.hidden = true;
+        padreActual = null;
+        document.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('on'); });
+        q.focus();
+      });
+      suf.addEventListener('input', function () { suf.value = suf.value.replace(/[^0-9]/g, ''); });
+      [suf, desc].forEach(function (el) {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); agregar(); }
+        });
+      });
+      $('sd-add').addEventListener('click', agregar);
+      $('sd-lista').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-del]');
+        if (!b) return;
+        fetch('/cuentas-propias/' + encodeURIComponent(b.dataset.del), { method: 'DELETE' }).then(json).then(function (d) {
+          if (!d.ok) { err.textContent = d.error; return; }
+          cargarLista();
+          if (padreActual) elegir(padreActual, ejemploActual);
+        });
+      });
+      cargarLista();
+    })();
+  </script>
+  {% endif %}
 </body>
 </html>

@@ -384,18 +384,78 @@ def normalizar(s):
 
 
 with open(DATA_FILE, encoding="utf-8") as f:
-    CUENTAS = json.load(f)
-for c in CUENTAS:
+    CUENTAS_PCGE = json.load(f)
+for c in CUENTAS_PCGE:
     c["_norm"] = normalizar(c["descripcion"])
-CUENTAS.sort(key=lambda c: c["codigo"])
-CUENTAS_POR_CODIGO = {c["codigo"]: c for c in CUENTAS}
+    c["propia"] = False
 
-# Una cuenta "hoja" no tiene subcuentas en el catalogo. El PCGE define varias
-# cuentas solo hasta 3 digitos (417 AFP, 424 Honorarios, 422 Anticipos...):
-# esas tambien deben aceptar montos.
-_CODIGOS = set(CUENTAS_POR_CODIGO)
-for _c in CUENTAS:
-    _c["hoja"] = not any(o != _c["codigo"] and o.startswith(_c["codigo"]) for o in _CODIGOS)
+# CUENTAS y CUENTAS_POR_CODIGO se actualizan EN SITIO (otros modulos guardan
+# la referencia): catalogo oficial + subdivisionarias propias de la empresa.
+CUENTAS = []
+CUENTAS_POR_CODIGO = {}
+_PROPIAS_RAW = None  # ultimo JSON leido de config, para recargar solo si cambia
+
+MAX_DIGITOS_CUENTA = 8
+
+
+def _cuentas_propias():
+    try:
+        return json.loads(config_get("cuentas_propias", "[]") or "[]")
+    except json.JSONDecodeError:
+        return []
+
+
+def _armar_catalogo(propias):
+    todas = list(CUENTAS_PCGE)
+    oficiales = {c["codigo"]: c for c in CUENTAS_PCGE}
+    por_codigo = dict(oficiales)
+    for p in sorted(propias, key=lambda x: x["codigo"]):
+        padre = (por_codigo.get(p.get("padre") or "")
+                 or por_codigo.get(p["codigo"][:-1]) or por_codigo.get(p["codigo"][:-2]))
+        if not padre or p["codigo"] in por_codigo:
+            continue
+        c = {
+            "codigo": p["codigo"],
+            "descripcion": p["descripcion"],
+            "nivel": padre["nivel"] + 1,
+            "elemento": padre["elemento"],
+            "elemento_nombre": padre["elemento_nombre"],
+            "_norm": normalizar(p["descripcion"]),
+            "propia": True,
+            "padre": padre["codigo"],
+            "creado_por": p.get("creado_por"),
+        }
+        todas.append(c)
+        por_codigo[c["codigo"]] = c
+    todas.sort(key=lambda c: c["codigo"])
+    # Una cuenta "hoja" no tiene subcuentas en el catalogo. El PCGE define varias
+    # cuentas solo hasta 3 digitos (417 AFP, 424 Honorarios, 422 Anticipos...):
+    # esas tambien deben aceptar montos.
+    codigos = sorted(por_codigo)
+    for i, cod in enumerate(codigos):
+        sig = codigos[i + 1] if i + 1 < len(codigos) else ""
+        por_codigo[cod]["hoja"] = not sig.startswith(cod)
+    CUENTAS[:] = todas
+    CUENTAS_POR_CODIGO.clear()
+    CUENTAS_POR_CODIGO.update(por_codigo)
+
+
+def sincronizar_catalogo(forzar=False):
+    """Recarga las subdivisionarias si cambiaron en la BD (sirve con varios workers)."""
+    global _PROPIAS_RAW
+    raw = config_get("cuentas_propias", "[]") or "[]"
+    if forzar or raw != _PROPIAS_RAW:
+        _PROPIAS_RAW = raw
+        _armar_catalogo(_cuentas_propias())
+
+
+sincronizar_catalogo(forzar=True)
+
+
+@app.before_request
+def _catalogo_al_dia():
+    if request.endpoint != "static":
+        sincronizar_catalogo()
 
 
 def es_cuenta_movimiento(cuenta) -> bool:
@@ -483,6 +543,7 @@ def to_json(c, favoritas=None):
         "elemento_nombre": c["elemento_nombre"],
         "hoja": c["hoja"],
         "movimiento": es_cuenta_movimiento(c),
+        "propia": c.get("propia", False),
     }
     if favoritas is not None:
         out["es_favorita"] = c["codigo"] in favoritas
@@ -513,6 +574,8 @@ def index():
         elemento_sel=elemento,
         total=len(resultados),
         buscando=(bool(q) or bool(elemento)),
+        total_catalogo=len(CUENTAS),
+        total_propias=sum(1 for c in CUENTAS if c.get("propia")),
     )
 
 
@@ -2558,20 +2621,7 @@ def reporte_anual_excel():
 
 def _validar_ruc(ruc: str) -> bool:
     """Valida formato RUC peruano: 11 digitos + check digit."""
-    ruc = (ruc or "").strip()
-    if len(ruc) != 11 or not ruc.isdigit():
-        return False
-    if ruc[:2] not in ("10", "15", "17", "20"):
-        return False
-    pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
-    suma = sum(int(ruc[i]) * pesos[i] for i in range(10))
-    resto = suma % 11
-    check = 11 - resto
-    if check == 10:
-        check = 0
-    elif check == 11:
-        check = 1
-    return check == int(ruc[10])
+    return auth.ruc_valido(ruc)
 
 
 def _consultar_sunat_online(ruc: str):
@@ -2874,8 +2924,8 @@ def _parsear_excel_importacion(fileobj):
             errores.append(f"Fila {linea_num}: cuenta {cuenta} no existe en PCGE.")
             continue
         nivel = CUENTAS_POR_CODIGO[cuenta]["nivel"]
-        if nivel not in NIVELES_MOVIMIENTO:
-            errores.append(f"Fila {linea_num}: cuenta {cuenta} es nivel {nivel}; solo niveles 4 o 5.")
+        if not es_cuenta_movimiento(CUENTAS_POR_CODIGO[cuenta]):
+            errores.append(f"Fila {linea_num}: cuenta {cuenta} es nivel {nivel} y tiene subcuentas; usa una cuenta de detalle.")
             continue
 
         try:
@@ -3660,7 +3710,7 @@ def reporte_registros_excel():
 
 def _descripcion_con_padre(c):
     """'Costo' -> 'Vehiculos motorizados > Costo': las subcuentas genericas necesitan el nombre del padre."""
-    padre = CUENTAS_POR_CODIGO.get(c["codigo"][:-1])
+    padre = CUENTAS_POR_CODIGO.get(c.get("padre") or c["codigo"][:-1])
     if c["nivel"] >= 4 and padre and len(c["descripcion"]) < 25 and padre["descripcion"] != c["descripcion"]:
         return f'{padre["descripcion"]} › {c["descripcion"]}'
     return c["descripcion"]
@@ -3678,6 +3728,102 @@ def cuentas_info():
             if c else {"existe": False}
         )
     return out
+
+
+# ---------------------------------------------------------------- Subdivisionarias propias
+
+@app.route("/cuentas-propias")
+def cuentas_propias_listar():
+    propias = [to_json(c) | {"padre": c["padre"], "creado_por": c.get("creado_por")}
+               for c in CUENTAS if c.get("propia")]
+    return {"ok": True, "cuentas": propias}
+
+
+def _choque_con_hermana(padre_cod, codigo):
+    """Una subcuenta existente del padre que seria prefijo del codigo nuevo (ej. 1011 para 10111)."""
+    return next((o for o in CUENTAS_POR_CODIGO
+                 if len(padre_cod) < len(o) < len(codigo) and codigo.startswith(o)), None)
+
+
+@app.route("/cuentas-propias/siguiente")
+def cuentas_propias_siguiente():
+    """Sugiere el siguiente codigo libre debajo de una cuenta (padre + 2 digitos)."""
+    padre_cod = (request.args.get("padre") or "").strip()
+    padre = CUENTAS_POR_CODIGO.get(padre_cod)
+    if not padre or padre["nivel"] < 3 or len(padre_cod) + 2 > MAX_DIGITOS_CUENTA:
+        return {"ok": False, "error": "Esa cuenta no se puede subdividir."}, 400
+    hijas = [to_json(c) for c in CUENTAS
+             if c["codigo"] != padre_cod and c["codigo"].startswith(padre_cod)]
+    for n in range(1, 100):
+        suf = f"{n:02d}"
+        cod = padre_cod + suf
+        if cod not in CUENTAS_POR_CODIGO and not _choque_con_hermana(padre_cod, cod):
+            return {"ok": True, "padre": to_json(padre), "sufijo": suf, "codigo": cod, "hijas": hijas}
+    return {"ok": False, "error": "No quedan codigos libres en esta cuenta."}, 400
+
+
+@app.route("/cuentas-propias", methods=["POST"])
+@requiere_rol("admin", "contador")
+def cuentas_propias_crear():
+    """Agrega una subdivisionaria de la empresa debajo de una cuenta del catalogo."""
+    from auth import config_set
+    d = request.get_json(silent=True) or {}
+    padre_cod = (d.get("padre") or "").strip()
+    sufijo = (d.get("sufijo") or "").strip()
+    descripcion = " ".join((d.get("descripcion") or "").split())[:150]
+    padre = CUENTAS_POR_CODIGO.get(padre_cod)
+    if not padre:
+        return {"ok": False, "error": f"La cuenta {padre_cod!r} no existe."}, 400
+    if padre["nivel"] < 3:
+        return {"ok": False, "error": "Solo se puede subdividir una cuenta de 3 digitos o mas."}, 400
+    if not sufijo.isdigit() or len(sufijo) not in (1, 2):
+        return {"ok": False, "error": "El sufijo debe ser de 1 o 2 digitos (ej. 1 o 01)."}, 400
+    codigo = padre_cod + sufijo
+    if len(codigo) > MAX_DIGITOS_CUENTA:
+        return {"ok": False, "error": f"El codigo no puede superar {MAX_DIGITOS_CUENTA} digitos."}, 400
+    if codigo in CUENTAS_POR_CODIGO:
+        return {"ok": False, "error": f"La cuenta {codigo} ya existe."}, 400
+    choque = _choque_con_hermana(padre_cod, codigo)
+    if choque:
+        return {"ok": False, "error": f"El codigo {codigo} quedaria debajo de la cuenta {choque}; usa otro numero."}, 400
+    if len(descripcion) < 3:
+        return {"ok": False, "error": "La descripcion debe tener al menos 3 caracteres."}, 400
+    with SessionLocal() as s:
+        with s.begin():
+            lista = _cuentas_propias()
+            if any(p["codigo"] == codigo for p in lista):
+                return {"ok": False, "error": f"La cuenta {codigo} ya existe."}, 400
+            item = {"codigo": codigo, "padre": padre_cod, "descripcion": descripcion, "creado_por": usuario_actual()}
+            lista.append(item)
+            config_set(s, "cuentas_propias", json.dumps(lista, ensure_ascii=False))
+            registrar(s, "crear", "cuenta", None, despues=item | {"padre": padre_cod})
+    sincronizar_catalogo(forzar=True)
+    return {"ok": True, "cuenta": to_json(CUENTAS_POR_CODIGO[codigo])}
+
+
+@app.route("/cuentas-propias/<codigo>", methods=["DELETE"])
+@requiere_rol("admin", "contador")
+def cuentas_propias_borrar(codigo):
+    from auth import config_set
+    c = CUENTAS_POR_CODIGO.get(codigo)
+    if not c or not c.get("propia"):
+        return {"ok": False, "error": "Solo se pueden borrar subdivisionarias propias."}, 400
+    if any(o != codigo and o.startswith(codigo) for o in CUENTAS_POR_CODIGO):
+        return {"ok": False, "error": "Primero borra las subcuentas que dependen de esta."}, 400
+    with SessionLocal() as s:
+        with s.begin():
+            usada = s.execute(
+                select(func.count(AsientoLinea.id)).where(AsientoLinea.cuenta_codigo == codigo)
+            ).scalar() or 0
+            if usada:
+                return {"ok": False, "error": f"La cuenta {codigo} ya tiene {usada} movimiento(s); no se puede borrar."}, 400
+            lista = _cuentas_propias()
+            item = next((p for p in lista if p["codigo"] == codigo), None)
+            lista = [p for p in lista if p["codigo"] != codigo]
+            config_set(s, "cuentas_propias", json.dumps(lista, ensure_ascii=False))
+            registrar(s, "borrar", "cuenta", None, antes=item)
+    sincronizar_catalogo(forzar=True)
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- Plantillas propias

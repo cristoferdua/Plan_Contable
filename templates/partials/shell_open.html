@@ -20,9 +20,9 @@
   <aside class="app-sidebar">
     <a href="/" class="app-brand">
       <span class="ic">menu_book</span>
-      <span>
+      <span{% if empresa_actual and empresa_actual.razon_social %} title="{{ empresa_actual.razon_social }} &middot; RUC {{ empresa_actual.ruc }}"{% endif %}>
         Plan Contable
-        <small>PCGE 2026</small>
+        <small>{% if empresa_actual and empresa_actual.razon_social %}{{ empresa_actual.razon_social|truncate(26, True, '…') }}{% else %}PCGE 2026{% endif %}</small>
       </span>
     </a>
     <nav class="app-nav">

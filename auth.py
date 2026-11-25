@@ -43,6 +43,29 @@ def config_set(s, clave, valor):
         s.add(Config(clave=clave, valor=valor))
 
 
+def ruc_valido(ruc: str) -> bool:
+    """Valida formato RUC peruano: 11 digitos + digito verificador."""
+    ruc = (ruc or "").strip()
+    if len(ruc) != 11 or not ruc.isdigit() or ruc[:2] not in ("10", "15", "17", "20"):
+        return False
+    pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+    check = 11 - sum(int(ruc[i]) * pesos[i] for i in range(10)) % 11
+    check = {10: 0, 11: 1}.get(check, check)
+    return check == int(ruc[10])
+
+
+def empresa_basica():
+    with SessionLocal() as s:
+        filas = {c.clave: c.valor for c in s.execute(
+            select(Config).where(Config.clave.in_(("empresa_ruc", "empresa_razon_social", "tasa_igv")))
+        ).scalars()}
+    return {
+        "ruc": filas.get("empresa_ruc") or "",
+        "razon_social": filas.get("empresa_razon_social") or "",
+        "tasa_igv": filas.get("tasa_igv") or "18",
+    }
+
+
 def _secret_key():
     """SECRET_KEY de entorno; si no hay, se genera una y se guarda en la BD
     para que las sesiones sobrevivan reinicios."""
@@ -159,7 +182,8 @@ def init_app(app):
 
     @app.context_processor
     def _ctx():
-        return {"usuario_actual": getattr(g, "usuario", None), "ROLES": ROLES}
+        return {"usuario_actual": getattr(g, "usuario", None), "ROLES": ROLES,
+                "empresa_actual": empresa_basica()}
 
 
 # ---------------------------------------------------------------- Rutas
@@ -193,7 +217,11 @@ def login():
                     flask_session.permanent = True
                     g.usuario = {"username": u.username}
                     registrar(s, "login", "usuario", u.id)
-                    return redirect(_next_seguro(request.args.get("next")))
+                    destino = _next_seguro(request.args.get("next"))
+                    # Primer ingreso del administrador sin empresa configurada: pedirla ahora.
+                    if u.rol == "admin" and not empresa_basica()["ruc"]:
+                        return redirect(url_for("auth.empresa_inicio", next=destino))
+                    return redirect(destino)
         error = "Usuario o contrasena incorrectos."
     return render_template("login.html", error=error, modo="login")
 
@@ -222,8 +250,44 @@ def setup():
                     uid = u.id
             flask_session.clear()
             flask_session["uid"] = uid
-            return redirect("/")
+            flask_session.permanent = True
+            return redirect(url_for("auth.empresa_inicio"))
     return render_template("login.html", error=error, modo="setup")
+
+
+@bp.route("/empresa/inicio", methods=["GET", "POST"])
+def empresa_inicio():
+    """Paso de inicio: datos de la empresa (RUC, razon social, IGV) en la pantalla de acceso."""
+    nxt = _next_seguro(request.args.get("next"))
+    if nxt.startswith("/empresa/inicio"):
+        nxt = "/"
+    if g.usuario["rol"] != "admin":
+        return redirect(nxt)
+    emp = empresa_basica()
+    error = None
+    if request.method == "POST":
+        if request.form.get("omitir"):
+            return redirect(nxt)
+        ruc = (request.form.get("ruc") or "").strip()
+        razon = " ".join((request.form.get("razon_social") or "").split())[:300]
+        tasa = (request.form.get("tasa_igv") or "18").strip()
+        emp = {"ruc": ruc, "razon_social": razon, "tasa_igv": tasa}
+        if not ruc_valido(ruc):
+            error = "RUC invalido: deben ser 11 digitos con digito verificador correcto."
+        elif len(razon) < 3:
+            error = "Escribe la razon social de la empresa."
+        elif tasa not in ("18", "10.5"):
+            error = "Tasa de IGV invalida."
+        else:
+            antes = empresa_basica()
+            with SessionLocal() as s:
+                with s.begin():
+                    config_set(s, "empresa_ruc", ruc)
+                    config_set(s, "empresa_razon_social", razon)
+                    config_set(s, "tasa_igv", tasa)
+                    registrar(s, "editar", "config", None, antes=antes, despues=emp)
+            return redirect(nxt)
+    return render_template("login.html", error=error, modo="empresa", emp=emp, nxt=nxt)
 
 
 @bp.route("/logout", methods=["POST", "GET"])
