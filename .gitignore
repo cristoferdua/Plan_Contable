@@ -16,3 +16,7 @@ dist/
 
 # Respaldos automaticos de la base de datos
 respaldos/
+
+# Presentaciones y temporales de Office
+*.pptx
+~$*
