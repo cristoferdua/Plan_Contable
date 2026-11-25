@@ -2833,15 +2833,17 @@ def _parsear_excel_importacion(fileobj):
     ws = wb.active
     errores = []
 
-    # Buscar fila de headers: primera fila que tenga "Fecha" en col A
+    # Buscar fila de headers: "Fecha..." en col A y "Cuenta..." en col D. Se exigen
+    # ambas para no confundirla con una fila de titulo o de reglas que mencione "Fecha".
     header_row = None
     for row in range(1, 15):
-        v = ws.cell(row=row, column=1).value
-        if v and "fecha" in str(v).lower():
+        v = str(ws.cell(row=row, column=1).value or "").strip().lower()
+        d = str(ws.cell(row=row, column=4).value or "").strip().lower()
+        if v.startswith("fecha") and d.startswith("cuenta"):
             header_row = row
             break
     if header_row is None:
-        return [], ["No se encontro la fila de headers (debe comenzar con 'Fecha ...' en columna A)."]
+        return [], ["No se encontro la fila de headers ('Fecha ...' en columna A y 'Cuenta ...' en columna D)."]
 
     grupos = {}
     orden = []
